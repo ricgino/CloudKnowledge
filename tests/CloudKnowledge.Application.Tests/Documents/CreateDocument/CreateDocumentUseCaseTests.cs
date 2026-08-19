@@ -45,5 +45,20 @@ public sealed class CreateDocumentUseCaseTests
         {
             return Task.FromResult<Document?>(null);
         }
+
+        public Task<IReadOnlyList<Document>> GetPageAsync(
+            int skip,
+            int take,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<Document>>(
+                Array.Empty<Document>());
+        }
+
+        public Task<int> CountAsync(
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(0);
+        }        
     }
 }

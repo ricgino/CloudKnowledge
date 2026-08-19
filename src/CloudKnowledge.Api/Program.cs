@@ -4,6 +4,7 @@ using CloudKnowledge.Application.Documents.GetDocument;
 using CloudKnowledge.Infrastructure.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using CloudKnowledge.Application.Documents.GetDocuments;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,7 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<CreateDocumentUseCase>();
 builder.Services.AddScoped<GetDocumentUseCase>();
+builder.Services.AddScoped<GetDocumentsUseCase>();
 
 builder.Services.AddOpenApi();
 

@@ -11,4 +11,12 @@ public interface IDocumentRepository
     Task<Document?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Document>> GetPageAsync(
+        int skip,
+        int take,
+        CancellationToken cancellationToken);
+
+    Task<int> CountAsync(
+        CancellationToken cancellationToken);
 }

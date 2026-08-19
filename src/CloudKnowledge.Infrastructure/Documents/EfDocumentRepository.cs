@@ -35,4 +35,24 @@ public sealed class EfDocumentRepository : IDocumentRepository
                 document => document.Id == id,
                 cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Document>> GetPageAsync(
+    int skip,
+    int take,
+    CancellationToken cancellationToken)
+    {
+        return await _dbContext.Documents
+            .AsNoTracking()
+            .OrderBy(document => document.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> CountAsync(
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Documents
+            .CountAsync(cancellationToken);
+    }
 }

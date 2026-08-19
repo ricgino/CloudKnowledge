@@ -2,6 +2,7 @@ using CloudKnowledge.Api.Contracts.Documents;
 using Microsoft.AspNetCore.Mvc;
 using CloudKnowledge.Application.Documents.CreateDocument;
 using CloudKnowledge.Application.Documents.GetDocument;
+using CloudKnowledge.Application.Documents.GetDocuments;
 
 namespace CloudKnowledge.Api.Controllers;
 
@@ -12,13 +13,16 @@ public sealed class DocumentsController : ControllerBase
 
     private readonly CreateDocumentUseCase _createDocumentUseCase;
     private readonly GetDocumentUseCase _getDocumentUseCase;
+    private readonly GetDocumentsUseCase _getDocumentsUseCase;
 
     public DocumentsController(
         CreateDocumentUseCase createDocumentUseCase,
-        GetDocumentUseCase getDocumentUseCase)
+        GetDocumentUseCase getDocumentUseCase,
+        GetDocumentsUseCase getDocumentsUseCase)
     {
         _createDocumentUseCase = createDocumentUseCase;
         _getDocumentUseCase = getDocumentUseCase;
+        _getDocumentsUseCase = getDocumentsUseCase;
     }
 
     [HttpPost]
@@ -62,6 +66,34 @@ public sealed class DocumentsController : ControllerBase
             result.FileName,
             result.ContentType,
             result.Status.ToString());
+
+        return Ok(response);
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<GetDocumentsResponse>> GetAll(
+        [FromQuery] GetDocumentsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _getDocumentsUseCase.ExecuteAsync(
+            request.Page,
+            request.PageSize,
+            cancellationToken);
+
+        var items = result.Items
+            .Select(document => new DocumentResponse(
+                document.Id,
+                document.FileName,
+                document.ContentType,
+                document.Status.ToString()))
+            .ToList();
+
+        var response = new GetDocumentsResponse(
+            items,
+            result.Page,
+            result.PageSize,
+            result.TotalCount,
+            result.TotalPages);
 
         return Ok(response);
     }
