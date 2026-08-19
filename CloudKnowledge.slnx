@@ -1,2 +1,8 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CloudKnowledge.Api/CloudKnowledge.Api.csproj" />
+    <Project Path="src/CloudKnowledge.Application/CloudKnowledge.Application.csproj" />
+    <Project Path="src/CloudKnowledge.Domain/CloudKnowledge.Domain.csproj" />
+    <Project Path="src/CloudKnowledge.Infrastructure/CloudKnowledge.Infrastructure.csproj" />
+  </Folder>
 </Solution>
