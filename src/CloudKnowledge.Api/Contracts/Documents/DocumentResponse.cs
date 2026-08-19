@@ -1,6 +1,6 @@
 namespace CloudKnowledge.Api.Contracts.Documents;
 
-public sealed record CreateDocumentResponse(
+public sealed record DocumentResponse(
     Guid Id,
     string FileName,
     string ContentType,

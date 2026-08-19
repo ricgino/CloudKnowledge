@@ -10,6 +10,39 @@ public sealed class Document
 
     public DocumentStatus Status { get; private set; }
 
+    public void MarkAsProcessing()
+    {
+        if (Status != DocumentStatus.Pending)
+        {
+            throw new InvalidOperationException(
+                $"Cannot start processing a document with status '{Status}'.");
+        }
+
+        Status = DocumentStatus.Processing;
+    }
+
+    public void MarkAsReady()
+    {
+        if (Status != DocumentStatus.Processing)
+        {
+            throw new InvalidOperationException(
+                $"Cannot mark as ready a document with status '{Status}'.");
+        }
+
+        Status = DocumentStatus.Ready;
+    }
+
+    public void MarkAsFailed()
+    {
+        if (Status != DocumentStatus.Processing)
+        {
+            throw new InvalidOperationException(
+                $"Cannot mark as failed a document with status '{Status}'.");
+        }
+
+        Status = DocumentStatus.Failed;
+    }
+
     private Document(
         Guid id,
         string fileName,
@@ -26,6 +59,20 @@ public sealed class Document
         string fileName,
         string contentType)
     {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            throw new ArgumentException(
+                "File name cannot be empty.",
+                nameof(fileName));
+        }
+
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            throw new ArgumentException(
+                "Content type cannot be empty.",
+                nameof(contentType));
+        }
+
         return new Document(
             Guid.NewGuid(),
             fileName,
