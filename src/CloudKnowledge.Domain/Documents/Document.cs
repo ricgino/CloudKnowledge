@@ -2,13 +2,14 @@ namespace CloudKnowledge.Domain.Documents;
 
 public sealed class Document
 {
-    public Guid Id { get; }
+    public Guid Id { get; private set; }
 
-    public string FileName { get; }
+    public string FileName { get; private set; }
 
-    public string ContentType { get; }
+    public string ContentType { get; private set; }
 
     public DocumentStatus Status { get; private set; }
+
 
     public void MarkAsProcessing()
     {
