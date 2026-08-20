@@ -31,5 +31,19 @@ public sealed class DocumentConfiguration
             .HasColumnName("status")
             .HasConversion<int>()
             .IsRequired();
+            
+        builder.Property(document => document.CreatedAtUtc)
+            .HasColumnName("created_at_utc")
+            .HasColumnType("timestamp with time zone")
+            .HasDefaultValueSql("CURRENT_TIMESTAMP")
+            .IsRequired();
+        
+        builder.HasIndex(document => new
+            {
+                document.CreatedAtUtc,
+                document.Id
+            })
+            .IsDescending(true, false)
+            .HasDatabaseName("IX_documents_created_at_utc_id");
     }
 }

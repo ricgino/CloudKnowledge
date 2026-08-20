@@ -43,7 +43,8 @@ public sealed class EfDocumentRepository : IDocumentRepository
     {
         return await _dbContext.Documents
             .AsNoTracking()
-            .OrderBy(document => document.Id)
+            .OrderByDescending(document => document.CreatedAtUtc)
+            .ThenBy(document => document.Id)
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);

@@ -9,6 +9,7 @@ public sealed class Document
     public string ContentType { get; private set; }
 
     public DocumentStatus Status { get; private set; }
+    public DateTime CreatedAtUtc { get; private set; }
 
 
     public void MarkAsProcessing()
@@ -48,12 +49,14 @@ public sealed class Document
         Guid id,
         string fileName,
         string contentType,
-        DocumentStatus status)
+        DocumentStatus status,
+        DateTime createdAtUtc)
     {
         Id = id;
         FileName = fileName;
         ContentType = contentType;
         Status = status;
+        CreatedAtUtc = createdAtUtc;
     }
 
     public static Document Create(
@@ -78,6 +81,7 @@ public sealed class Document
             Guid.NewGuid(),
             fileName,
             contentType,
-            DocumentStatus.Pending);
+            DocumentStatus.Pending,
+            DateTime.UtcNow);
     }
 }
