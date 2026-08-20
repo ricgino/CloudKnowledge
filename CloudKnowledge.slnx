@@ -6,6 +6,7 @@
     <Project Path="src/CloudKnowledge.Infrastructure/CloudKnowledge.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/CloudKnowledge.Api.IntegrationTests/CloudKnowledge.Api.IntegrationTests.csproj" />
     <Project Path="tests/CloudKnowledge.Application.Tests/CloudKnowledge.Application.Tests.csproj" />
     <Project Path="tests/CloudKnowledge.Domain.Tests/CloudKnowledge.Domain.Tests.csproj" />
   </Folder>

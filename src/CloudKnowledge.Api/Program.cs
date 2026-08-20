@@ -8,16 +8,22 @@ using CloudKnowledge.Application.Documents.GetDocuments;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var postgresConnectionString =
-    builder.Configuration.GetConnectionString("Postgres")
-    ?? throw new InvalidOperationException(
-        "Connection string 'Postgres' was not found.");
 
 builder.Services.AddControllers();
 
 builder.Services.AddDbContext<CloudKnowledgeDbContext>(
-    options =>
-        options.UseNpgsql(postgresConnectionString));
+    (serviceProvider, options) =>
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var connectionString =
+            configuration.GetConnectionString("Postgres")
+            ?? throw new InvalidOperationException(
+                "Connection string 'Postgres' was not found.");
+
+        options.UseNpgsql(connectionString);
+    });
 
 builder.Services.AddScoped<
     IDocumentRepository,
@@ -43,3 +49,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program
+{
+}
