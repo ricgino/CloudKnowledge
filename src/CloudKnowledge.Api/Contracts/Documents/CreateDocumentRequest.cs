@@ -1,12 +1,10 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace CloudKnowledge.Api.Contracts.Documents;
 
-public sealed record CreateDocumentRequest(
+public sealed class CreateDocumentRequest
+{
     [Required]
-    [StringLength(255)]
-    string FileName,
-
-    [Required]
-    [StringLength(100)]
-    string ContentType);
+    public IFormFile File { get; init; } = default!;
+}

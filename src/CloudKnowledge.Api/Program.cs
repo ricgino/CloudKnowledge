@@ -5,6 +5,7 @@ using CloudKnowledge.Infrastructure.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using CloudKnowledge.Application.Documents.GetDocuments;
+using Azure.Storage.Blobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +33,36 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<CreateDocumentUseCase>();
 builder.Services.AddScoped<GetDocumentUseCase>();
 builder.Services.AddScoped<GetDocumentsUseCase>();
+
+builder.Services.AddSingleton(
+    serviceProvider =>
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var connectionString =
+            configuration["Storage:ConnectionString"]
+            ?? throw new InvalidOperationException(
+                "Storage connection string was not found.");
+
+        var containerName =
+            configuration["Storage:ContainerName"]
+            ?? throw new InvalidOperationException(
+                "Storage container name was not found.");
+
+        var blobClientOptions =
+            new BlobClientOptions(
+                BlobClientOptions.ServiceVersion.V2025_11_05);
+
+        return new BlobContainerClient(
+            connectionString,
+            containerName,
+            blobClientOptions);
+    });
+
+builder.Services.AddScoped<
+    IDocumentStorage,
+    AzureBlobDocumentStorage>();
 
 builder.Services.AddOpenApi();
 

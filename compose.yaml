@@ -2,23 +2,33 @@ services:
   postgres:
     image: postgres:18
     container_name: cloudknowledge-postgres
-
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-
     ports:
       - "5432:5432"
-
     volumes:
       - postgres_data:/var/lib/postgresql
-
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.36.0
+    container_name: cloudknowledge-azurite
+    command: >
+      azurite-blob
+      --blobHost 0.0.0.0
+      --blobPort 10000
+      --location /data
+    ports:
+      - "10000:10000"
+    volumes:
+      - azurite_data:/data
+
 volumes:
   postgres_data:
+  azurite_data:

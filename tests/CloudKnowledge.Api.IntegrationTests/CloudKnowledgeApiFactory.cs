@@ -7,12 +7,18 @@ namespace CloudKnowledge.Api.IntegrationTests;
 public sealed class CloudKnowledgeApiFactory
     : WebApplicationFactory<Program>
 {
-    private readonly string _connectionString;
+    private readonly string _postgresConnectionString;
+    private readonly string _storageConnectionString;
 
     public CloudKnowledgeApiFactory(
-        string connectionString)
+        string postgresConnectionString,
+        string storageConnectionString)
     {
-        _connectionString = connectionString;
+        _postgresConnectionString =
+            postgresConnectionString;
+
+        _storageConnectionString =
+            storageConnectionString;
     }
 
     protected override void ConfigureWebHost(
@@ -25,7 +31,13 @@ public sealed class CloudKnowledgeApiFactory
                     new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:Postgres"] =
-                            _connectionString
+                            _postgresConnectionString,
+
+                        ["Storage:ConnectionString"] =
+                            _storageConnectionString,
+
+                        ["Storage:ContainerName"] =
+                            "documents"
                     });
             });
     }

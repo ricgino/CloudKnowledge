@@ -26,26 +26,36 @@ public sealed class DocumentsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<DocumentResponse>> Create(
-        CreateDocumentRequest request,
-        CancellationToken cancellationToken)
+[Consumes("multipart/form-data")]
+public async Task<ActionResult<DocumentResponse>> Create(
+    [FromForm] CreateDocumentRequest request,
+    CancellationToken cancellationToken)
+{
+    if (request.File.Length == 0)
     {
-        var result = await _createDocumentUseCase.ExecuteAsync(
-            request.FileName,
-            request.ContentType,
-            cancellationToken);
-
-        var response = new DocumentResponse(
-            result.Id,
-            result.FileName,
-            result.ContentType,
-            result.Status.ToString());
-
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = response.Id },
-            response);
+        return BadRequest("The uploaded file is empty.");
     }
+
+    await using var stream =
+        request.File.OpenReadStream();
+
+    var result = await _createDocumentUseCase.ExecuteAsync(
+        request.File.FileName,
+        request.File.ContentType,
+        stream,
+        cancellationToken);
+
+    var response = new DocumentResponse(
+        result.Id,
+        result.FileName,
+        result.ContentType,
+        result.Status.ToString());
+
+    return CreatedAtAction(
+        nameof(GetById),
+        new { id = response.Id },
+        response);
+}
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<DocumentResponse>> GetById(

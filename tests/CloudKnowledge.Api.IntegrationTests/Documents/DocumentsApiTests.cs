@@ -1,9 +1,12 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Azure.Storage.Blobs;
 using CloudKnowledge.Api.Contracts.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Testcontainers.Azurite;
 using Testcontainers.PostgreSql;
 
 namespace CloudKnowledge.Api.IntegrationTests.Documents;
@@ -20,11 +23,18 @@ public sealed class DocumentsApiTests
                 .WithPassword("cloudknowledge_test")
                 .Build();
 
+        await using var azurite =
+            new AzuriteBuilder(
+                "mcr.microsoft.com/azure-storage/azurite:3.36.0")
+                .Build();
+
         await postgres.StartAsync();
+        await azurite.StartAsync();
 
         using var factory =
             new CloudKnowledgeApiFactory(
-                postgres.GetConnectionString());
+                postgres.GetConnectionString(),
+                azurite.GetConnectionString());
 
         using var client = factory.CreateClient(
             new()
@@ -34,13 +44,28 @@ public sealed class DocumentsApiTests
 
         await ApplyMigrationsAsync(factory);
 
-        var createResponse = await client.PostAsJsonAsync(
-            "/api/documents",
-            new
-            {
-                fileName = "integration-test.pdf",
-                contentType = "application/pdf"
-            });
+        var fileBytes =
+            new byte[] { 1, 2, 3, 4, 5 };
+
+        using var multipartContent =
+            new MultipartFormDataContent();
+
+        using var fileContent =
+            new ByteArrayContent(fileBytes);
+
+        fileContent.Headers.ContentType =
+            new MediaTypeHeaderValue(
+                "application/pdf");
+
+        multipartContent.Add(
+            fileContent,
+            "File",
+            "integration-test.pdf");
+
+        var createResponse =
+            await client.PostAsync(
+                "/api/documents",
+                multipartContent);
 
         Assert.Equal(
             HttpStatusCode.Created,
@@ -51,11 +76,36 @@ public sealed class DocumentsApiTests
                 .ReadFromJsonAsync<DocumentResponse>();
 
         Assert.NotNull(createdDocument);
-        Assert.NotEqual(Guid.Empty, createdDocument.Id);
-        Assert.Equal("Pending", createdDocument.Status);
+        Assert.NotEqual(
+            Guid.Empty,
+            createdDocument.Id);
 
-        var getResponse = await client.GetAsync(
-            $"/api/documents/{createdDocument.Id}");
+        Assert.Equal(
+            "Pending",
+            createdDocument.Status);
+
+        var blobClientOptions =
+            new BlobClientOptions(
+                BlobClientOptions.ServiceVersion.V2025_11_05);
+
+        var blobContainer =
+            new BlobContainerClient(
+                azurite.GetConnectionString(),
+                "documents",
+                blobClientOptions);
+
+        var blobClient =
+            blobContainer.GetBlobClient(
+                createdDocument.Id.ToString());
+
+        var blobExists =
+            await blobClient.ExistsAsync();
+
+        Assert.True(blobExists.Value);
+
+        var getResponse =
+            await client.GetAsync(
+                $"/api/documents/{createdDocument.Id}");
 
         Assert.Equal(
             HttpStatusCode.OK,
