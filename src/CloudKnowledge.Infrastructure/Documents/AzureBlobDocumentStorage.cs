@@ -40,4 +40,21 @@ public sealed class AzureBlobDocumentStorage : IDocumentStorage
             options,
             cancellationToken);
     }
+
+    public async Task<Stream> OpenReadAsync(
+    Guid documentId,
+    CancellationToken cancellationToken)
+{
+    var blobClient =
+        _containerClient.GetBlobClient(
+            documentId.ToString());
+
+    var options =
+        new BlobOpenReadOptions(
+            allowModifications: false);
+
+    return await blobClient.OpenReadAsync(
+        options,
+        cancellationToken);
+}
 }

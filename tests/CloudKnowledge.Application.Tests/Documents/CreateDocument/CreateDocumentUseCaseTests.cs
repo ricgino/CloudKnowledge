@@ -77,6 +77,13 @@ public sealed class CreateDocumentUseCaseTests
 
             UploadedLength = copy.Length;
         }
+        public Task<Stream> OpenReadAsync(
+            Guid documentId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException(
+                "This test only verifies document upload.");
+        }
     }
 
     private sealed class FakeDocumentRepository
@@ -120,7 +127,14 @@ public sealed class CreateDocumentUseCaseTests
             CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
-        }        
+        }
+        public Task<Stream> OpenReadAsync(
+            Guid documentId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException(
+                "This test only verifies document upload.");
+        }
     }
 
     private sealed class FakeDocumentProcessingQueue

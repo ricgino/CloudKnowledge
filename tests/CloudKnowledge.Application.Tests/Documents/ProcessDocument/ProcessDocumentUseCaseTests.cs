@@ -19,7 +19,7 @@ public sealed class ProcessDocumentUseCaseTests
             new FakeDocumentRepository(document);
 
         var useCase =
-            new ProcessDocumentUseCase(repository);
+            CreateUseCase(repository);
 
         await useCase.ExecuteAsync(
             document.Id,
@@ -48,7 +48,7 @@ public sealed class ProcessDocumentUseCaseTests
             new FakeDocumentRepository(document);
 
         var useCase =
-            new ProcessDocumentUseCase(repository);
+            CreateUseCase(repository);
 
         await useCase.ExecuteAsync(
             document.Id,
@@ -78,7 +78,7 @@ public sealed class ProcessDocumentUseCaseTests
             new FakeDocumentRepository(document);
 
         var useCase =
-            new ProcessDocumentUseCase(repository);
+            CreateUseCase(repository);
 
         await useCase.ExecuteAsync(
             document.Id,
@@ -100,7 +100,7 @@ public sealed class ProcessDocumentUseCaseTests
             new FakeDocumentRepository(null);
 
         var useCase =
-            new ProcessDocumentUseCase(repository);
+            CreateUseCase(repository);
 
         await Assert.ThrowsAsync<PermanentDocumentProcessingException>(
             () => useCase.ExecuteAsync(
@@ -108,6 +108,88 @@ public sealed class ProcessDocumentUseCaseTests
                 CancellationToken.None));
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WhenExtractedTextIsEmpty_ShouldThrowPermanentException()
+    {
+        var document =
+            Document.Create(
+                "empty.pdf",
+                "application/pdf");
+
+        var repository =
+            new FakeDocumentRepository(document);
+
+        var useCase =
+            new ProcessDocumentUseCase(
+                repository,
+                new FakeDocumentStorage(),
+                new FakeDocumentTextExtractor(""),
+                new FakeDocumentChunkRepository(),
+                new TextChunker());
+
+        await Assert.ThrowsAsync<PermanentDocumentProcessingException>(
+            () => useCase.ExecuteAsync(
+                document.Id,
+                CancellationToken.None));
+
+        Assert.Equal(
+            DocumentStatus.Processing,
+            document.Status);
+    }
+
+    private static ProcessDocumentUseCase CreateUseCase(
+        IDocumentRepository repository)
+    {
+        return new ProcessDocumentUseCase(
+            repository,
+            new FakeDocumentStorage(),
+            new FakeDocumentTextExtractor(),
+            new FakeDocumentChunkRepository(),
+            new TextChunker());
+    }
+
+    private sealed class FakeDocumentStorage
+        : IDocumentStorage
+    {
+        public Task UploadAsync(
+            Guid documentId,
+            Stream content,
+            string contentType,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<Stream> OpenReadAsync(
+            Guid documentId,
+            CancellationToken cancellationToken)
+        {
+            Stream content =
+                new MemoryStream(
+                    new byte[] { 1, 2, 3, 4 });
+
+            return Task.FromResult(content);
+        }
+    }
+
+    private sealed class FakeDocumentTextExtractor
+        : IDocumentTextExtractor
+    {
+        private readonly string _text;
+
+        public FakeDocumentTextExtractor(
+            string text = "Extracted document text.")
+        {
+            _text = text;
+        }
+
+        public string Extract(
+            Stream content,
+            CancellationToken cancellationToken)
+        {
+            return _text;
+        }
+    }
     private sealed class FakeDocumentRepository
         : IDocumentRepository
     {
@@ -164,5 +246,26 @@ public sealed class ProcessDocumentUseCaseTests
         {
             return Task.FromResult(0);
         }
+
     }
+
+    private sealed class FakeDocumentChunkRepository
+            : IDocumentChunkRepository
+        {
+            public IReadOnlyCollection<DocumentChunk>? SavedChunks
+            {
+                get;
+                private set;
+            }
+
+            public Task ReplaceForDocumentAsync(
+                Guid documentId,
+                IReadOnlyCollection<DocumentChunk> chunks,
+                CancellationToken cancellationToken)
+            {
+                SavedChunks = chunks;
+
+                return Task.CompletedTask;
+            }
+        }
 }

@@ -13,6 +13,9 @@ public sealed class CloudKnowledgeDbContext : DbContext
 
     public DbSet<Document> Documents => Set<Document>();
 
+    public DbSet<DocumentChunk> DocumentChunks =>
+    Set<DocumentChunk>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(

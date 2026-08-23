@@ -7,4 +7,8 @@ public interface IDocumentStorage
         Stream content,
         string contentType,
         CancellationToken cancellationToken);
+
+    Task<Stream> OpenReadAsync(
+        Guid documentId,
+        CancellationToken cancellationToken);
 }

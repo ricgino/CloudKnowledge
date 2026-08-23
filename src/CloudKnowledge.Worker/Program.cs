@@ -6,6 +6,7 @@ using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Worker;
 using Microsoft.EntityFrameworkCore;
 using CloudKnowledge.Application.Documents.FailDocument;
+using Azure.Storage.Blobs;
 
 var builder =
     Host.CreateApplicationBuilder(args);
@@ -24,12 +25,52 @@ builder.Services.AddDbContext<CloudKnowledgeDbContext>(
         options.UseNpgsql(connectionString);
     });
 
+builder.Services.AddSingleton(
+    serviceProvider =>
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var connectionString =
+            configuration["Storage:ConnectionString"]
+            ?? throw new InvalidOperationException(
+                "Storage connection string was not found.");
+
+        var containerName =
+            configuration["Storage:ContainerName"]
+            ?? throw new InvalidOperationException(
+                "Storage container name was not found.");
+
+        var blobClientOptions =
+            new BlobClientOptions(
+                BlobClientOptions.ServiceVersion.V2025_11_05);
+
+        return new BlobContainerClient(
+            connectionString,
+            containerName,
+            blobClientOptions);
+    });
+
+builder.Services.AddScoped<
+    IDocumentStorage,
+    AzureBlobDocumentStorage>();
+
+builder.Services.AddScoped<
+    IDocumentTextExtractor,
+    PdfPigDocumentTextExtractor>();
+
 builder.Services.AddScoped<
     IDocumentRepository,
     EfDocumentRepository>();
 
 builder.Services.AddScoped<ProcessDocumentUseCase>();
 builder.Services.AddScoped<FailDocumentUseCase>();
+
+builder.Services.AddScoped<
+    IDocumentChunkRepository,
+    EfDocumentChunkRepository>();
+
+builder.Services.AddSingleton<TextChunker>();
 
 builder.Services.AddSingleton(
     serviceProvider =>
