@@ -2,6 +2,7 @@ using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.CreateDocument;
 using CloudKnowledge.Domain.Documents;
 
+
 namespace CloudKnowledge.Application.Tests.Documents.CreateDocument;
 
 public sealed class CreateDocumentUseCaseTests
@@ -11,11 +12,13 @@ public sealed class CreateDocumentUseCaseTests
     {
         var repository = new FakeDocumentRepository();
         var storage = new FakeDocumentStorage();
+        var queue = new FakeDocumentProcessingQueue();
 
         var useCase = new CreateDocumentUseCase(
             repository,
-            storage);
-
+            storage,
+            queue);
+            
         await using var content =
             new MemoryStream(new byte[] { 1, 2, 3, 4 });
 
@@ -46,6 +49,9 @@ public sealed class CreateDocumentUseCaseTests
         Assert.Equal(
             4,
             storage.UploadedLength);
+        Assert.Equal(
+            result.Id,
+            queue.PublishedDocumentId);
     }
 
     private sealed class FakeDocumentStorage : IDocumentStorage
@@ -109,4 +115,19 @@ public sealed class CreateDocumentUseCaseTests
             return Task.FromResult(0);
         }
     }
+
+    private sealed class FakeDocumentProcessingQueue
+    : IDocumentProcessingQueue
+{
+    public Guid? PublishedDocumentId { get; private set; }
+
+    public Task PublishAsync(
+        Guid documentId,
+        CancellationToken cancellationToken)
+    {
+        PublishedDocumentId = documentId;
+
+        return Task.CompletedTask;
+    }
+}
 }

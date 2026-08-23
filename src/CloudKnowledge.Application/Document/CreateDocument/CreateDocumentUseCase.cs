@@ -7,13 +7,16 @@ public sealed class CreateDocumentUseCase
 {
     private readonly IDocumentRepository _documentRepository;
     private readonly IDocumentStorage _documentStorage;
+    private readonly IDocumentProcessingQueue _documentProcessingQueue;
 
     public CreateDocumentUseCase(
         IDocumentRepository documentRepository,
-        IDocumentStorage documentStorage)
+        IDocumentStorage documentStorage,
+        IDocumentProcessingQueue documentProcessingQueue)
     {
         _documentRepository = documentRepository;
         _documentStorage = documentStorage;
+        _documentProcessingQueue = documentProcessingQueue;
     }
 
     public async Task<CreateDocumentResult> ExecuteAsync(
@@ -34,6 +37,10 @@ public sealed class CreateDocumentUseCase
 
         await _documentRepository.AddAsync(
             document,
+            cancellationToken);
+
+        await _documentProcessingQueue.PublishAsync(
+            document.Id,
             cancellationToken);
 
         return new CreateDocumentResult(

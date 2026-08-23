@@ -1,6 +1,9 @@
+using CloudKnowledge.Application.Documents;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace CloudKnowledge.Api.IntegrationTests;
 
@@ -9,6 +12,8 @@ public sealed class CloudKnowledgeApiFactory
 {
     private readonly string _postgresConnectionString;
     private readonly string _storageConnectionString;
+
+    public FakeDocumentProcessingQueue ProcessingQueue { get; } = new();
 
     public CloudKnowledgeApiFactory(
         string postgresConnectionString,
@@ -40,5 +45,29 @@ public sealed class CloudKnowledgeApiFactory
                             "documents"
                     });
             });
+
+        builder.ConfigureServices(
+            services =>
+            {
+                services.RemoveAll<IDocumentProcessingQueue>();
+
+                services.AddSingleton<IDocumentProcessingQueue>(
+                    ProcessingQueue);
+            });
+    }
+
+    public sealed class FakeDocumentProcessingQueue
+        : IDocumentProcessingQueue
+    {
+        public Guid? PublishedDocumentId { get; private set; }
+
+        public Task PublishAsync(
+            Guid documentId,
+            CancellationToken cancellationToken)
+        {
+            PublishedDocumentId = documentId;
+
+            return Task.CompletedTask;
+        }
     }
 }

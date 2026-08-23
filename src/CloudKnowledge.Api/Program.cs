@@ -6,6 +6,7 @@ using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using CloudKnowledge.Application.Documents.GetDocuments;
 using Azure.Storage.Blobs;
+using Azure.Messaging.ServiceBus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,6 +64,43 @@ builder.Services.AddSingleton(
 builder.Services.AddScoped<
     IDocumentStorage,
     AzureBlobDocumentStorage>();
+
+builder.Services.AddSingleton(
+    serviceProvider =>
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var connectionString =
+            configuration["Messaging:ConnectionString"]
+            ?? throw new InvalidOperationException(
+                "Service Bus connection string was not found.");
+
+        return new ServiceBusClient(
+            connectionString);
+    });
+
+builder.Services.AddSingleton(
+    serviceProvider =>
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var queueName =
+            configuration["Messaging:QueueName"]
+            ?? throw new InvalidOperationException(
+                "Service Bus queue name was not found.");
+
+        var client =
+            serviceProvider.GetRequiredService<ServiceBusClient>();
+
+        return client.CreateSender(
+            queueName);
+    });
+
+builder.Services.AddScoped<
+    IDocumentProcessingQueue,
+    AzureServiceBusDocumentProcessingQueue>();    
 
 builder.Services.AddOpenApi();
 

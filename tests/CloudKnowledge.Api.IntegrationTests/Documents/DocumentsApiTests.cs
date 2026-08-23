@@ -76,9 +76,14 @@ public sealed class DocumentsApiTests
                 .ReadFromJsonAsync<DocumentResponse>();
 
         Assert.NotNull(createdDocument);
+
         Assert.NotEqual(
             Guid.Empty,
             createdDocument.Id);
+        
+        Assert.Equal(
+            createdDocument.Id,
+            factory.ProcessingQueue.PublishedDocumentId);
 
         Assert.Equal(
             "Pending",
@@ -124,6 +129,11 @@ public sealed class DocumentsApiTests
         Assert.Equal(
             "integration-test.pdf",
             retrievedDocument.FileName);
+
+        Assert.Equal(
+            createdDocument.Id,
+            factory.ProcessingQueue.PublishedDocumentId);
+
     }
 
     private static async Task ApplyMigrationsAsync(
