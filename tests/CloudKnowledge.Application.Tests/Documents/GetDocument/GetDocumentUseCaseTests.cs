@@ -85,5 +85,12 @@ public sealed class GetDocumentUseCaseTests
         {
             return Task.FromResult(0);
         }
+
+        public Task UpdateAsync(
+            Document document,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

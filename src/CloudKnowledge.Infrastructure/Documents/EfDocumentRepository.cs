@@ -25,6 +25,16 @@ public sealed class EfDocumentRepository : IDocumentRepository
             cancellationToken);
     }
 
+    public async Task UpdateAsync(
+        Document document,
+        CancellationToken cancellationToken)
+    {
+        _dbContext.Documents.Update(document);
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
+    }
+
     public async Task<Document?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken)

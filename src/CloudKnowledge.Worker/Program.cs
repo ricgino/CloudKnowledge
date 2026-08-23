@@ -1,8 +1,34 @@
 using Azure.Messaging.ServiceBus;
+using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Documents.ProcessDocument;
+using CloudKnowledge.Infrastructure.Documents;
+using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Worker;
+using Microsoft.EntityFrameworkCore;
 
 var builder =
     Host.CreateApplicationBuilder(args);
+
+builder.Services.AddDbContext<CloudKnowledgeDbContext>(
+    (serviceProvider, options) =>
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var connectionString =
+            configuration.GetConnectionString("Postgres")
+            ?? throw new InvalidOperationException(
+                "Connection string 'Postgres' was not found.");
+
+        options.UseNpgsql(connectionString);
+    });
+
+builder.Services.AddScoped<
+    IDocumentRepository,
+    EfDocumentRepository>();
+
+builder.Services.AddScoped<
+    ProcessDocumentUseCase>();
 
 builder.Services.AddSingleton(
     serviceProvider =>

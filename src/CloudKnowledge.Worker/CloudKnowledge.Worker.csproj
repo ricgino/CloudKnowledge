@@ -14,5 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CloudKnowledge.Application\CloudKnowledge.Application.csproj" />
+    <ProjectReference Include="..\CloudKnowledge.Infrastructure\CloudKnowledge.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

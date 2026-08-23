@@ -114,6 +114,13 @@ public sealed class CreateDocumentUseCaseTests
         {
             return Task.FromResult(0);
         }
+
+        public Task UpdateAsync(
+            Document document,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }        
     }
 
     private sealed class FakeDocumentProcessingQueue

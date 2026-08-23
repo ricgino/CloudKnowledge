@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Documents.ProcessDocument;
 
 namespace CloudKnowledge.Worker;
 
@@ -9,17 +10,19 @@ public sealed class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private readonly ServiceBusClient _serviceBusClient;
     private readonly IConfiguration _configuration;
-
     private ServiceBusProcessor? _processor;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public Worker(
         ILogger<Worker> logger,
         ServiceBusClient serviceBusClient,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
         _serviceBusClient = serviceBusClient;
         _configuration = configuration;
+        _scopeFactory = scopeFactory;
     }
 
     protected override async Task ExecuteAsync(
@@ -72,7 +75,7 @@ public sealed class Worker : BackgroundService
     }
 
     private async Task ProcessMessageAsync(
-        ProcessMessageEventArgs args)
+    ProcessMessageEventArgs args)
     {
         var json =
             args.Message.Body.ToString();
@@ -89,6 +92,21 @@ public sealed class Worker : BackgroundService
 
         _logger.LogInformation(
             "Received document {DocumentId} for processing.",
+            message.DocumentId);
+
+        await using var scope =
+            _scopeFactory.CreateAsyncScope();
+
+        var useCase =
+            scope.ServiceProvider
+                .GetRequiredService<ProcessDocumentUseCase>();
+
+        await useCase.ExecuteAsync(
+            message.DocumentId,
+            args.CancellationToken);
+
+        _logger.LogInformation(
+            "Document {DocumentId} processed successfully.",
             message.DocumentId);
 
         await args.CompleteMessageAsync(

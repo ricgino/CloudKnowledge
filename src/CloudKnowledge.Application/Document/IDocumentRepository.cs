@@ -8,6 +8,10 @@ public interface IDocumentRepository
         Document document,
         CancellationToken cancellationToken);
 
+    Task UpdateAsync(
+        Document document,
+        CancellationToken cancellationToken);        
+
     Task<Document?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken);
@@ -19,4 +23,5 @@ public interface IDocumentRepository
 
     Task<int> CountAsync(
         CancellationToken cancellationToken);
+
 }
