@@ -5,6 +5,7 @@ using CloudKnowledge.Infrastructure.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Worker;
 using Microsoft.EntityFrameworkCore;
+using CloudKnowledge.Application.Documents.FailDocument;
 
 var builder =
     Host.CreateApplicationBuilder(args);
@@ -27,8 +28,8 @@ builder.Services.AddScoped<
     IDocumentRepository,
     EfDocumentRepository>();
 
-builder.Services.AddScoped<
-    ProcessDocumentUseCase>();
+builder.Services.AddScoped<ProcessDocumentUseCase>();
+builder.Services.AddScoped<FailDocumentUseCase>();
 
 builder.Services.AddSingleton(
     serviceProvider =>

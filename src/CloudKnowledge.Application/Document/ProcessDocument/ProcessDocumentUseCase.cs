@@ -1,4 +1,5 @@
-using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Domain.Documents;
+using CloudKnowledge.Application.Documents.ProcessDocument.Exceptions;
 
 namespace CloudKnowledge.Application.Documents.ProcessDocument;
 
@@ -23,15 +24,29 @@ public sealed class ProcessDocumentUseCase
 
         if (document is null)
         {
-            throw new InvalidOperationException(
+            throw new PermanentDocumentProcessingException(
                 $"Document '{documentId}' was not found.");
         }
 
-        document.MarkAsProcessing();
+        if (document.Status == DocumentStatus.Ready)
+        {
+            return;
+        }
 
-        await _documentRepository.UpdateAsync(
-            document,
-            cancellationToken);
+        if (document.Status == DocumentStatus.Pending)
+        {
+            document.MarkAsProcessing();
+
+            await _documentRepository.UpdateAsync(
+                document,
+                cancellationToken);
+        }
+        else if (document.Status != DocumentStatus.Processing)
+        {
+            throw new InvalidOperationException(
+                $"Document '{documentId}' cannot be processed " +
+                $"from status '{document.Status}'.");
+        }
 
         // Real document processing will go here later:
         // text extraction

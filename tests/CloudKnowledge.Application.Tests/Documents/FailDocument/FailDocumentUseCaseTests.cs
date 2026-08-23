@@ -1,41 +1,13 @@
 using CloudKnowledge.Application.Documents;
-using CloudKnowledge.Application.Documents.ProcessDocument;
+using CloudKnowledge.Application.Documents.FailDocument;
 using CloudKnowledge.Domain.Documents;
-using CloudKnowledge.Application.Documents.ProcessDocument.Exceptions;
 
-namespace CloudKnowledge.Application.Tests.Documents.ProcessDocument;
+namespace CloudKnowledge.Application.Tests.Documents.FailDocument;
 
-public sealed class ProcessDocumentUseCaseTests
+public sealed class FailDocumentUseCaseTests
 {
     [Fact]
-    public async Task ExecuteAsync_WhenPending_ShouldMoveDocumentToReady()
-    {
-        var document =
-            Document.Create(
-                "architecture.pdf",
-                "application/pdf");
-
-        var repository =
-            new FakeDocumentRepository(document);
-
-        var useCase =
-            new ProcessDocumentUseCase(repository);
-
-        await useCase.ExecuteAsync(
-            document.Id,
-            CancellationToken.None);
-
-        Assert.Equal(
-            DocumentStatus.Ready,
-            document.Status);
-
-        Assert.Equal(
-            2,
-            repository.UpdateCount);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WhenAlreadyProcessing_ShouldResumeAndMoveToReady()
+    public async Task ExecuteAsync_WhenProcessing_ShouldMarkDocumentAsFailed()
     {
         var document =
             Document.Create(
@@ -48,18 +20,75 @@ public sealed class ProcessDocumentUseCaseTests
             new FakeDocumentRepository(document);
 
         var useCase =
-            new ProcessDocumentUseCase(repository);
+            new FailDocumentUseCase(repository);
 
         await useCase.ExecuteAsync(
             document.Id,
             CancellationToken.None);
 
         Assert.Equal(
-            DocumentStatus.Ready,
+            DocumentStatus.Failed,
             document.Status);
 
         Assert.Equal(
             1,
+            repository.UpdateCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenPending_ShouldMarkDocumentAsFailed()
+    {
+        var document =
+            Document.Create(
+                "architecture.pdf",
+                "application/pdf");
+
+        var repository =
+            new FakeDocumentRepository(document);
+
+        var useCase =
+            new FailDocumentUseCase(repository);
+
+        await useCase.ExecuteAsync(
+            document.Id,
+            CancellationToken.None);
+
+        Assert.Equal(
+            DocumentStatus.Failed,
+            document.Status);
+
+        Assert.Equal(
+            1,
+            repository.UpdateCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenAlreadyFailed_ShouldDoNothing()
+    {
+        var document =
+            Document.Create(
+                "architecture.pdf",
+                "application/pdf");
+
+        document.MarkAsProcessing();
+        document.MarkAsFailed();
+
+        var repository =
+            new FakeDocumentRepository(document);
+
+        var useCase =
+            new FailDocumentUseCase(repository);
+
+        await useCase.ExecuteAsync(
+            document.Id,
+            CancellationToken.None);
+
+        Assert.Equal(
+            DocumentStatus.Failed,
+            document.Status);
+
+        Assert.Equal(
+            0,
             repository.UpdateCount);
     }
 
@@ -78,7 +107,7 @@ public sealed class ProcessDocumentUseCaseTests
             new FakeDocumentRepository(document);
 
         var useCase =
-            new ProcessDocumentUseCase(repository);
+            new FailDocumentUseCase(repository);
 
         await useCase.ExecuteAsync(
             document.Id,
@@ -91,21 +120,6 @@ public sealed class ProcessDocumentUseCaseTests
         Assert.Equal(
             0,
             repository.UpdateCount);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WhenDocumentDoesNotExist_ShouldThrowPermanentException()
-    {
-        var repository =
-            new FakeDocumentRepository(null);
-
-        var useCase =
-            new ProcessDocumentUseCase(repository);
-
-        await Assert.ThrowsAsync<PermanentDocumentProcessingException>(
-            () => useCase.ExecuteAsync(
-                Guid.NewGuid(),
-                CancellationToken.None));
     }
 
     private sealed class FakeDocumentRepository
