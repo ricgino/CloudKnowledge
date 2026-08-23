@@ -17,7 +17,7 @@ public sealed class DocumentsApiTests
     public async Task CreateAndGetDocument_ShouldPersistDocument()
     {
         await using var postgres =
-            new PostgreSqlBuilder("postgres:18")
+            new PostgreSqlBuilder("pgvector/pgvector:0.8.6-pg18")
                 .WithDatabase("cloudknowledge_test")
                 .WithUsername("cloudknowledge")
                 .WithPassword("cloudknowledge_test")

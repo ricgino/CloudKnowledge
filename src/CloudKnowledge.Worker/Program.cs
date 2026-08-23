@@ -7,6 +7,7 @@ using CloudKnowledge.Worker;
 using Microsoft.EntityFrameworkCore;
 using CloudKnowledge.Application.Documents.FailDocument;
 using Azure.Storage.Blobs;
+using Pgvector.EntityFrameworkCore;
 
 var builder =
     Host.CreateApplicationBuilder(args);
@@ -22,7 +23,10 @@ builder.Services.AddDbContext<CloudKnowledgeDbContext>(
             ?? throw new InvalidOperationException(
                 "Connection string 'Postgres' was not found.");
 
-        options.UseNpgsql(connectionString);
+        options.UseNpgsql(
+            connectionString,
+            npgsqlOptions =>
+                npgsqlOptions.UseVector());
     });
 
 builder.Services.AddSingleton(
@@ -71,6 +75,14 @@ builder.Services.AddScoped<
     EfDocumentChunkRepository>();
 
 builder.Services.AddSingleton<TextChunker>();
+
+builder.Services.AddSingleton<IEmbeddingGenerator>(
+    new DevelopmentHashEmbeddingGenerator(
+        dimensions: 1536));
+
+builder.Services.AddScoped<
+    IDocumentChunkEmbeddingRepository,
+    EfDocumentChunkEmbeddingRepository>();
 
 builder.Services.AddSingleton(
     serviceProvider =>

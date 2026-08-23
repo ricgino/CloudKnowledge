@@ -125,7 +125,10 @@ public sealed class ProcessDocumentUseCaseTests
                 new FakeDocumentStorage(),
                 new FakeDocumentTextExtractor(""),
                 new FakeDocumentChunkRepository(),
-                new TextChunker());
+                new TextChunker(),
+                new FakeEmbeddingGenerator(),
+            new FakeDocumentChunkEmbeddingRepository()
+            );
 
         await Assert.ThrowsAsync<PermanentDocumentProcessingException>(
             () => useCase.ExecuteAsync(
@@ -137,6 +140,55 @@ public sealed class ProcessDocumentUseCaseTests
             document.Status);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WhenSuccessful_ShouldCreateEmbeddingForEveryChunk()
+    {
+        var document =
+            Document.Create(
+                "architecture.pdf",
+                "application/pdf");
+
+        var repository =
+            new FakeDocumentRepository(document);
+
+        var chunkRepository =
+            new FakeDocumentChunkRepository();
+
+        var embeddingRepository =
+            new FakeDocumentChunkEmbeddingRepository();
+
+        var useCase =
+            new ProcessDocumentUseCase(
+                repository,
+                new FakeDocumentStorage(),
+                new FakeDocumentTextExtractor(),
+                chunkRepository,
+                new TextChunker(),
+                new FakeEmbeddingGenerator(),
+                embeddingRepository);
+
+        await useCase.ExecuteAsync(
+            document.Id,
+            CancellationToken.None);
+
+        Assert.NotNull(
+            chunkRepository.SavedChunks);
+
+        Assert.NotNull(
+            embeddingRepository.SavedEmbeddings);
+
+        Assert.Equal(
+            chunkRepository.SavedChunks.Count,
+            embeddingRepository.SavedEmbeddings.Count);
+
+        Assert.All(
+            embeddingRepository.SavedEmbeddings,
+            embedding =>
+                Assert.Equal(
+                    1536,
+                    embedding.Values.Length));
+    }
+
     private static ProcessDocumentUseCase CreateUseCase(
         IDocumentRepository repository)
     {
@@ -145,7 +197,10 @@ public sealed class ProcessDocumentUseCaseTests
             new FakeDocumentStorage(),
             new FakeDocumentTextExtractor(),
             new FakeDocumentChunkRepository(),
-            new TextChunker());
+            new TextChunker(),
+            new FakeEmbeddingGenerator(),
+            new FakeDocumentChunkEmbeddingRepository()
+            );
     }
 
     private sealed class FakeDocumentStorage
@@ -264,6 +319,57 @@ public sealed class ProcessDocumentUseCaseTests
                 CancellationToken cancellationToken)
             {
                 SavedChunks = chunks;
+
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class FakeEmbeddingGenerator
+            : IEmbeddingGenerator
+        {
+            public int Dimensions => 1536;
+
+            public Task<IReadOnlyList<float[]>> GenerateAsync(
+                IReadOnlyList<string> inputs,
+                CancellationToken cancellationToken)
+            {
+                var result =
+                    inputs
+                        .Select(
+                            _ =>
+                            {
+                                var vector =
+                                    new float[Dimensions];
+
+                                vector[0] = 1;
+
+                                return vector;
+                            })
+                        .ToArray();
+
+                return Task.FromResult<
+                    IReadOnlyList<float[]>>(
+                        result);
+            }
+        }
+
+        private sealed class FakeDocumentChunkEmbeddingRepository
+            : IDocumentChunkEmbeddingRepository
+        {
+            public IReadOnlyCollection<DocumentChunkEmbedding>?
+                SavedEmbeddings
+            {
+                get;
+                private set;
+            }
+
+            public Task ReplaceForDocumentAsync(
+                Guid documentId,
+                IReadOnlyCollection<DocumentChunkEmbedding> embeddings,
+                CancellationToken cancellationToken)
+            {
+                SavedEmbeddings =
+                    embeddings;
 
                 return Task.CompletedTask;
             }

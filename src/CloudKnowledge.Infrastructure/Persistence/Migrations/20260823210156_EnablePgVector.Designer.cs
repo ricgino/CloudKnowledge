@@ -3,18 +3,20 @@ using System;
 using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using Pgvector;
 
 #nullable disable
 
 namespace CloudKnowledge.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(CloudKnowledgeDbContext))]
-    partial class CloudKnowledgeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260823210156_EnablePgVector")]
+    partial class EnablePgVector
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -89,43 +91,11 @@ namespace CloudKnowledge.Infrastructure.Persistence.Migrations
                     b.ToTable("document_chunks", (string)null);
                 });
 
-            modelBuilder.Entity("CloudKnowledge.Infrastructure.Persistence.Models.DocumentChunkEmbeddingRow", b =>
-                {
-                    b.Property<Guid>("ChunkId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("chunk_id");
-
-                    b.Property<Guid>("DocumentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("document_id");
-
-                    b.Property<Vector>("Embedding")
-                        .IsRequired()
-                        .HasColumnType("vector(1536)")
-                        .HasColumnName("embedding");
-
-                    b.HasKey("ChunkId");
-
-                    b.HasIndex("DocumentId")
-                        .HasDatabaseName("IX_document_chunk_embeddings_document_id");
-
-                    b.ToTable("document_chunk_embeddings", (string)null);
-                });
-
             modelBuilder.Entity("CloudKnowledge.Domain.Documents.DocumentChunk", b =>
                 {
                     b.HasOne("CloudKnowledge.Domain.Documents.Document", null)
                         .WithMany()
                         .HasForeignKey("DocumentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("CloudKnowledge.Infrastructure.Persistence.Models.DocumentChunkEmbeddingRow", b =>
-                {
-                    b.HasOne("CloudKnowledge.Domain.Documents.DocumentChunk", null)
-                        .WithOne()
-                        .HasForeignKey("CloudKnowledge.Infrastructure.Persistence.Models.DocumentChunkEmbeddingRow", "ChunkId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

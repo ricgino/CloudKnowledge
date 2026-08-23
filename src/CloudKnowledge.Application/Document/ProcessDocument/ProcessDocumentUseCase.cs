@@ -1,7 +1,6 @@
 using CloudKnowledge.Application.Documents.ProcessDocument.Exceptions;
 using CloudKnowledge.Domain.Documents;
 
-
 namespace CloudKnowledge.Application.Documents.ProcessDocument;
 
 public sealed class ProcessDocumentUseCase
@@ -11,19 +10,39 @@ public sealed class ProcessDocumentUseCase
     private readonly IDocumentTextExtractor _documentTextExtractor;
     private readonly IDocumentChunkRepository _documentChunkRepository;
     private readonly TextChunker _textChunker;
-    
+    private readonly IEmbeddingGenerator _embeddingGenerator;
+    private readonly IDocumentChunkEmbeddingRepository
+        _documentChunkEmbeddingRepository;
+
     public ProcessDocumentUseCase(
         IDocumentRepository documentRepository,
         IDocumentStorage documentStorage,
         IDocumentTextExtractor documentTextExtractor,
         IDocumentChunkRepository documentChunkRepository,
-        TextChunker textChunker)
+        TextChunker textChunker,
+        IEmbeddingGenerator embeddingGenerator,
+        IDocumentChunkEmbeddingRepository documentChunkEmbeddingRepository)
     {
-        _documentRepository = documentRepository;
-        _documentStorage = documentStorage;
-        _documentTextExtractor = documentTextExtractor;
-        _documentChunkRepository = documentChunkRepository;
-        _textChunker = textChunker;
+        _documentRepository =
+            documentRepository;
+
+        _documentStorage =
+            documentStorage;
+
+        _documentTextExtractor =
+            documentTextExtractor;
+
+        _documentChunkRepository =
+            documentChunkRepository;
+
+        _textChunker =
+            textChunker;
+
+        _embeddingGenerator =
+            embeddingGenerator;
+
+        _documentChunkEmbeddingRepository =
+            documentChunkEmbeddingRepository;
     }
 
     public async Task ExecuteAsync(
@@ -75,14 +94,6 @@ public sealed class ProcessDocumentUseCase
                 document.Id,
                 cancellationToken);
 
-        /*
-         * For now we buffer the PDF in memory.
-         *
-         * This gives PdfPig a seekable stream and, importantly,
-         * separates Blob/network failures from PDF parsing failures.
-         *
-         * Later we will add upload/file-size limits.
-         */
         await using var bufferedContent =
             new MemoryStream();
 
@@ -139,9 +150,50 @@ public sealed class ProcessDocumentUseCase
                             content))
                 .ToArray();
 
+        var embeddingVectors =
+            await _embeddingGenerator.GenerateAsync(
+                chunks
+                    .Select(
+                        chunk =>
+                            chunk.Content)
+                    .ToArray(),
+                cancellationToken);
+
+        if (embeddingVectors.Count != chunks.Length)
+        {
+            throw new InvalidOperationException(
+                "The embedding generator returned " +
+                "an unexpected number of embeddings.");
+        }
+
+        if (embeddingVectors.Any(
+            embedding =>
+                embedding.Length !=
+                _embeddingGenerator.Dimensions))
+        {
+            throw new InvalidOperationException(
+                "The embedding generator returned " +
+                "an embedding with an invalid dimension.");
+        }
+
+        var embeddings =
+            chunks
+                .Select(
+                    (chunk, index) =>
+                        new DocumentChunkEmbedding(
+                            chunk.Id,
+                            document.Id,
+                            embeddingVectors[index]))
+                .ToArray();
+
         await _documentChunkRepository.ReplaceForDocumentAsync(
             document.Id,
             chunks,
+            cancellationToken);
+
+        await _documentChunkEmbeddingRepository.ReplaceForDocumentAsync(
+            document.Id,
+            embeddings,
             cancellationToken);
 
         document.MarkAsReady();

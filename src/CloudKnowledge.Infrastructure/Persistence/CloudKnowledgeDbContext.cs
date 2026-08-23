@@ -1,5 +1,6 @@
 using CloudKnowledge.Domain.Documents;
 using Microsoft.EntityFrameworkCore;
+using CloudKnowledge.Infrastructure.Persistence.Models;
 
 namespace CloudKnowledge.Infrastructure.Persistence;
 
@@ -16,8 +17,14 @@ public sealed class CloudKnowledgeDbContext : DbContext
     public DbSet<DocumentChunk> DocumentChunks =>
     Set<DocumentChunk>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    public DbSet<DocumentChunkEmbeddingRow> DocumentChunkEmbeddings =>
+        Set<DocumentChunkEmbeddingRow>();
+
+    protected override void OnModelCreating(
+        ModelBuilder modelBuilder)
     {
+        modelBuilder.HasPostgresExtension("vector");
+
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(CloudKnowledgeDbContext).Assembly);
     }

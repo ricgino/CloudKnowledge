@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using CloudKnowledge.Application.Documents.GetDocuments;
 using Azure.Storage.Blobs;
 using Azure.Messaging.ServiceBus;
+using Pgvector.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,7 +25,10 @@ builder.Services.AddDbContext<CloudKnowledgeDbContext>(
             ?? throw new InvalidOperationException(
                 "Connection string 'Postgres' was not found.");
 
-        options.UseNpgsql(connectionString);
+        options.UseNpgsql(
+            connectionString,
+            npgsqlOptions =>
+                npgsqlOptions.UseVector());
     });
 
 builder.Services.AddScoped<
