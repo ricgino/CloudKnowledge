@@ -34,7 +34,7 @@ public sealed class DocumentChunkEmbeddingRowConfiguration
                 embedding =>
                     embedding.Embedding)
             .HasColumnName("embedding")
-            .HasColumnType("vector(1536)")
+            .HasColumnType("vector(768)")
             .IsRequired();
 
         builder.HasOne<DocumentChunk>()

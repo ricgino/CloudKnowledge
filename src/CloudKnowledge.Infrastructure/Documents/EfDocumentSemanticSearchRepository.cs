@@ -1,0 +1,73 @@
+using CloudKnowledge.Application.Documents.SearchDocuments;
+using CloudKnowledge.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Pgvector;
+using Pgvector.EntityFrameworkCore;
+
+namespace CloudKnowledge.Infrastructure.Documents;
+
+public sealed class EfDocumentSemanticSearchRepository
+    : IDocumentSemanticSearchRepository
+{
+    private readonly CloudKnowledgeDbContext _dbContext;
+
+    public EfDocumentSemanticSearchRepository(
+        CloudKnowledgeDbContext dbContext)
+    {
+        _dbContext =
+            dbContext;
+    }
+
+    public async Task<IReadOnlyList<SemanticSearchResult>> SearchAsync(
+        float[] queryEmbedding,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var queryVector =
+            new Vector(
+                queryEmbedding);
+
+        var rows =
+            await (
+                from embedding
+                    in _dbContext.DocumentChunkEmbeddings
+                        .AsNoTracking()
+
+                join chunk
+                    in _dbContext.DocumentChunks
+                        .AsNoTracking()
+
+                    on embedding.ChunkId
+                    equals chunk.Id
+
+                orderby embedding.Embedding
+                    .CosineDistance(queryVector)
+
+                select new
+                {
+                    chunk.DocumentId,
+                    ChunkId =
+                        chunk.Id,
+                    chunk.Position,
+                    chunk.Content,
+
+                    Distance =
+                        embedding.Embedding
+                            .CosineDistance(queryVector)
+                })
+                .Take(take)
+                .ToListAsync(
+                    cancellationToken);
+
+        return rows
+            .Select(
+                row =>
+                    new SemanticSearchResult(
+                        row.DocumentId,
+                        row.ChunkId,
+                        row.Position,
+                        row.Content,
+                        row.Distance))
+            .ToArray();
+    }
+}

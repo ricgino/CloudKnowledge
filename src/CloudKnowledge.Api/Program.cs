@@ -8,6 +8,9 @@ using CloudKnowledge.Application.Documents.GetDocuments;
 using Azure.Storage.Blobs;
 using Azure.Messaging.ServiceBus;
 using Pgvector.EntityFrameworkCore;
+using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Documents.SearchDocuments;
+using CloudKnowledge.Infrastructure.Documents;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -107,6 +110,33 @@ builder.Services.AddScoped<
     AzureServiceBusDocumentProcessingQueue>();    
 
 builder.Services.AddOpenApi();
+
+builder.Services.AddSingleton(
+    new HttpClient
+    {
+        BaseAddress =
+            new Uri(
+                "http://localhost:11434")
+    });
+
+builder.Services.AddSingleton<IEmbeddingGenerator>(
+    serviceProvider =>
+        new OllamaEmbeddingGenerator(
+            serviceProvider
+                .GetRequiredService<HttpClient>(),
+            model:
+                "nomic-embed-text-v2-moe",
+            inputPrefix:
+                "search_query: ",
+            dimensions:
+                768));
+
+builder.Services.AddScoped<
+    IDocumentSemanticSearchRepository,
+    EfDocumentSemanticSearchRepository>();
+
+builder.Services.AddScoped<
+    SearchDocumentsUseCase>();
 
 var app = builder.Build();
 

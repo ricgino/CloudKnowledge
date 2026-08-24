@@ -76,9 +76,25 @@ builder.Services.AddScoped<
 
 builder.Services.AddSingleton<TextChunker>();
 
+builder.Services.AddSingleton(
+    new HttpClient
+    {
+        BaseAddress =
+            new Uri(
+                "http://localhost:11434")
+    });
+
 builder.Services.AddSingleton<IEmbeddingGenerator>(
-    new DevelopmentHashEmbeddingGenerator(
-        dimensions: 1536));
+    serviceProvider =>
+        new OllamaEmbeddingGenerator(
+            serviceProvider
+                .GetRequiredService<HttpClient>(),
+            model:
+                "nomic-embed-text-v2-moe",
+            inputPrefix:
+                "search_document: ",
+            dimensions:
+                768));
 
 builder.Services.AddScoped<
     IDocumentChunkEmbeddingRepository,
