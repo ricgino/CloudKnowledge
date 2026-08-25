@@ -15,6 +15,10 @@ using CloudKnowledge.Application.Users;
 using CloudKnowledge.Infrastructure.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
+using CloudKnowledge.Application.Documents.Access;
+using CloudKnowledge.Application.Teams;
+using CloudKnowledge.Application.Teams.CreateTeam;
+using CloudKnowledge.Infrastructure.Teams;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -169,6 +173,17 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     SearchDocumentsUseCase>();
+
+builder.Services.AddScoped<
+    IDocumentAccessRepository,
+    EfDocumentAccessRepository>();
+
+builder.Services.AddScoped<
+    ITeamRepository,
+    EfTeamRepository>();
+
+builder.Services.AddScoped<
+    CreateTeamUseCase>();    
 
 var app = builder.Build();
 

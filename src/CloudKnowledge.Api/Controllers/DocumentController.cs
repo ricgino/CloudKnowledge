@@ -8,6 +8,8 @@ using Microsoft.Identity.Web.Resource;
 
 namespace CloudKnowledge.Api.Controllers;
 
+[Authorize]
+[RequiredScope("access_as_user")]
 [ApiController]
 [Route("api/documents")]
 public sealed class DocumentsController : ControllerBase
@@ -28,8 +30,6 @@ public sealed class DocumentsController : ControllerBase
     }
 
 [HttpPost]
-[Authorize]
-[RequiredScope("access_as_user")]
 [Consumes("multipart/form-data")]
 public async Task<ActionResult<DocumentResponse>> Create(
     [FromForm] CreateDocumentRequest request,

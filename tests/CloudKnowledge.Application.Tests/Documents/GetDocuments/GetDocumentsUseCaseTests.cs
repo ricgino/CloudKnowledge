@@ -1,5 +1,6 @@
-using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Documents.Access;
 using CloudKnowledge.Application.Documents.GetDocuments;
+using CloudKnowledge.Application.Users;
 using CloudKnowledge.Domain.Documents;
 
 namespace CloudKnowledge.Application.Tests.Documents.GetDocuments;
@@ -7,108 +8,201 @@ namespace CloudKnowledge.Application.Tests.Documents.GetDocuments;
 public sealed class GetDocumentsUseCaseTests
 {
     [Fact]
-    public async Task ExecuteAsync_ShouldReturnPaginatedDocuments()
+    public async Task ExecuteAsync_ShouldReturnOnlyAccessiblePaginatedDocuments()
     {
-        var documents = new[]
-        {
-            Document.Create("first.pdf", "application/pdf"),
-            Document.Create("second.pdf", "application/pdf"),
-            Document.Create("third.pdf", "application/pdf")
-        };
+        var userId =
+            Guid.NewGuid();
 
-        var repository = new FakeDocumentRepository(documents);
-        var useCase = new GetDocumentsUseCase(repository);
+        var documents =
+            new[]
+            {
+                Document.Create(
+                    "first.pdf",
+                    "application/pdf"),
 
-        var result = await useCase.ExecuteAsync(
-            page: 1,
-            pageSize: 2,
-            CancellationToken.None);
+                Document.Create(
+                    "second.pdf",
+                    "application/pdf"),
 
-        Assert.Equal(1, result.Page);
-        Assert.Equal(2, result.PageSize);
-        Assert.Equal(3, result.TotalCount);
-        Assert.Equal(2, result.TotalPages);
+                Document.Create(
+                    "third.pdf",
+                    "application/pdf")
+            };
 
-        Assert.Equal(2, result.Items.Count);
+        var repository =
+            new FakeDocumentAccessRepository(
+                documents);
+
+        var useCase =
+            new GetDocumentsUseCase(
+                repository,
+                new FakeCurrentUser(
+                    userId));
+
+        var result =
+            await useCase.ExecuteAsync(
+                page: 1,
+                pageSize: 2,
+                CancellationToken.None);
+
+        Assert.Equal(
+            1,
+            result.Page);
+
+        Assert.Equal(
+            2,
+            result.PageSize);
+
+        Assert.Equal(
+            3,
+            result.TotalCount);
+
+        Assert.Equal(
+            2,
+            result.TotalPages);
+
+        Assert.Equal(
+            2,
+            result.Items.Count);
+
+        Assert.Equal(
+            userId,
+            repository.ReceivedUserId);
     }
 
     [Fact]
     public async Task ExecuteAsync_WhenPageIsZero_ShouldThrow()
     {
-        var repository = new FakeDocumentRepository([]);
-        var useCase = new GetDocumentsUseCase(repository);
+        var useCase =
+            CreateUseCase();
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            useCase.ExecuteAsync(
-                page: 0,
-                pageSize: 20,
-                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () =>
+                useCase.ExecuteAsync(
+                    page: 0,
+                    pageSize: 20,
+                    CancellationToken.None));
     }
 
     [Fact]
     public async Task ExecuteAsync_WhenPageSizeIsTooLarge_ShouldThrow()
     {
-        var repository = new FakeDocumentRepository([]);
-        var useCase = new GetDocumentsUseCase(repository);
+        var useCase =
+            CreateUseCase();
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            useCase.ExecuteAsync(
-                page: 1,
-                pageSize: 101,
-                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () =>
+                useCase.ExecuteAsync(
+                    page: 1,
+                    pageSize: 101,
+                    CancellationToken.None));
     }
 
-    private sealed class FakeDocumentRepository : IDocumentRepository
+    private static GetDocumentsUseCase CreateUseCase()
     {
-        private readonly IReadOnlyList<Document> _documents;
+        return new GetDocumentsUseCase(
+            new FakeDocumentAccessRepository(
+                Array.Empty<Document>()),
+            new FakeCurrentUser(
+                Guid.NewGuid()));
+    }
 
-        public FakeDocumentRepository(
-            IReadOnlyList<Document> documents)
+    private sealed class FakeCurrentUser
+        : ICurrentUser
+    {
+        private readonly Guid
+            _userId;
+
+        public FakeCurrentUser(
+            Guid userId)
         {
-            _documents = documents;
+            _userId =
+                userId;
         }
 
-        public Task AddAsync(
-            Document document,
+        public Task<Guid> GetUserIdAsync(
             CancellationToken cancellationToken)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(
+                _userId);
+        }
+    }
+
+    private sealed class FakeDocumentAccessRepository
+        : IDocumentAccessRepository
+    {
+        private readonly IReadOnlyList<Document>
+            _documents;
+
+        public FakeDocumentAccessRepository(
+            IReadOnlyList<Document> documents)
+        {
+            _documents =
+                documents;
+        }
+
+        public Guid ReceivedUserId
+        {
+            get;
+            private set;
         }
 
         public Task<Document?> GetByIdAsync(
-            Guid id,
+            Guid userId,
+            Guid documentId,
             CancellationToken cancellationToken)
         {
-            var document = _documents
-                .SingleOrDefault(document => document.Id == id);
+            ReceivedUserId =
+                userId;
 
-            return Task.FromResult(document);
+            var document =
+                _documents.SingleOrDefault(
+                    item =>
+                        item.Id == documentId);
+
+            return Task.FromResult(
+                document);
         }
 
         public Task<IReadOnlyList<Document>> GetPageAsync(
+            Guid userId,
             int skip,
             int take,
             CancellationToken cancellationToken)
         {
-            IReadOnlyList<Document> result = _documents
-                .Skip(skip)
-                .Take(take)
-                .ToList();
+            ReceivedUserId =
+                userId;
 
-            return Task.FromResult(result);
+            IReadOnlyList<Document> result =
+                _documents
+                    .Skip(skip)
+                    .Take(take)
+                    .ToList();
+
+            return Task.FromResult(
+                result);
         }
 
         public Task<int> CountAsync(
+            Guid userId,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult(_documents.Count);
+            ReceivedUserId =
+                userId;
+
+            return Task.FromResult(
+                _documents.Count);
         }
 
-        public Task UpdateAsync(
-            Document document,
+        public Task<bool> CanAccessAsync(
+            Guid userId,
+            Guid documentId,
             CancellationToken cancellationToken)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(
+                _documents.Any(
+                    document =>
+                        document.Id == documentId));
         }
     }
 }

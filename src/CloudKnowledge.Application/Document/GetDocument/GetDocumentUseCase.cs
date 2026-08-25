@@ -1,22 +1,41 @@
+using CloudKnowledge.Application.Documents.Access;
+using CloudKnowledge.Application.Users;
+
 namespace CloudKnowledge.Application.Documents.GetDocument;
 
 public sealed class GetDocumentUseCase
 {
-    private readonly IDocumentRepository _documentRepository;
+    private readonly IDocumentAccessRepository
+        _documentAccessRepository;
+
+    private readonly ICurrentUser
+        _currentUser;
 
     public GetDocumentUseCase(
-        IDocumentRepository documentRepository)
+        IDocumentAccessRepository documentAccessRepository,
+        ICurrentUser currentUser)
     {
-        _documentRepository = documentRepository;
+        _documentAccessRepository =
+            documentAccessRepository;
+
+        _currentUser =
+            currentUser;
     }
 
     public async Task<GetDocumentResult?> ExecuteAsync(
         Guid id,
         CancellationToken cancellationToken)
     {
-        var document = await _documentRepository.GetByIdAsync(
-            id,
-            cancellationToken);
+        var userId =
+            await _currentUser.GetUserIdAsync(
+                cancellationToken);
+
+        var document =
+            await _documentAccessRepository
+                .GetByIdAsync(
+                    userId,
+                    id,
+                    cancellationToken);
 
         if (document is null)
         {
