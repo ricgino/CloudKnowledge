@@ -13,8 +13,19 @@ using CloudKnowledge.Application.Documents.AskDocuments;
 using CloudKnowledge.Api.Authentication;
 using CloudKnowledge.Application.Users;
 using CloudKnowledge.Infrastructure.Users;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Identity.Web;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddAuthentication(
+        JwtBearerDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApi(
+        builder.Configuration.GetSection(
+            "AzureAd"));
+
+builder.Services.AddAuthorization();
 
 builder.Services.AddHttpContextAccessor();
 
@@ -168,6 +179,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

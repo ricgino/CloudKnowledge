@@ -1,13 +1,17 @@
 using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.SearchDocuments;
+using CloudKnowledge.Application.Users;
 
 namespace CloudKnowledge.Application.Tests.Documents.SearchDocuments;
 
 public sealed class SearchDocumentsUseCaseTests
 {
     [Fact]
-    public async Task ExecuteAsync_WhenQueryIsValid_ShouldSearchUsingGeneratedEmbedding()
+    public async Task ExecuteAsync_WhenQueryIsValid_ShouldSearchOnlyForCurrentUser()
     {
+        var currentUserId =
+            Guid.NewGuid();
+
         var embeddingGenerator =
             new FakeEmbeddingGenerator();
 
@@ -17,7 +21,9 @@ public sealed class SearchDocumentsUseCaseTests
         var useCase =
             new SearchDocumentsUseCase(
                 embeddingGenerator,
-                searchRepository);
+                searchRepository,
+                new FakeCurrentUser(
+                    currentUserId));
 
         var result =
             await useCase.ExecuteAsync(
@@ -25,7 +31,8 @@ public sealed class SearchDocumentsUseCaseTests
                 5,
                 CancellationToken.None);
 
-        Assert.Single(result);
+        Assert.Single(
+            result);
 
         Assert.NotNull(
             searchRepository.ReceivedEmbedding);
@@ -37,6 +44,31 @@ public sealed class SearchDocumentsUseCaseTests
         Assert.Equal(
             5,
             searchRepository.ReceivedTake);
+
+        Assert.Equal(
+            currentUserId,
+            searchRepository.ReceivedUserId);
+    }
+
+    private sealed class FakeCurrentUser
+        : ICurrentUser
+    {
+        private readonly Guid
+            _userId;
+
+        public FakeCurrentUser(
+            Guid userId)
+        {
+            _userId =
+                userId;
+        }
+
+        public Task<Guid> GetUserIdAsync(
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                _userId);
+        }
     }
 
     private sealed class FakeEmbeddingGenerator
@@ -68,6 +100,12 @@ public sealed class SearchDocumentsUseCaseTests
     private sealed class FakeSemanticSearchRepository
         : IDocumentSemanticSearchRepository
     {
+        public Guid ReceivedUserId
+        {
+            get;
+            private set;
+        }
+
         public float[]? ReceivedEmbedding
         {
             get;
@@ -80,11 +118,16 @@ public sealed class SearchDocumentsUseCaseTests
             private set;
         }
 
-        public Task<IReadOnlyList<SemanticSearchResult>> SearchAsync(
-            float[] queryEmbedding,
-            int take,
-            CancellationToken cancellationToken)
+        public Task<IReadOnlyList<SemanticSearchResult>>
+            SearchAccessibleAsync(
+                Guid userId,
+                float[] queryEmbedding,
+                int take,
+                CancellationToken cancellationToken)
         {
+            ReceivedUserId =
+                userId;
+
             ReceivedEmbedding =
                 queryEmbedding;
 
@@ -104,18 +147,6 @@ public sealed class SearchDocumentsUseCaseTests
 
             return Task.FromResult(
                 result);
-        }
-
-        public Task<IReadOnlyList<SemanticSearchResult>> SearchAccessibleAsync(
-            Guid userId,
-            float[] queryEmbedding,
-            int take,
-            CancellationToken cancellationToken)
-        {
-            return SearchAsync(
-                queryEmbedding,
-                take,
-                cancellationToken);
         }
     }
 }

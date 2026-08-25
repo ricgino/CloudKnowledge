@@ -9,7 +9,8 @@ namespace CloudKnowledge.Infrastructure.Documents;
 public sealed class EfDocumentSemanticSearchRepository
     : IDocumentSemanticSearchRepository
 {
-    private readonly CloudKnowledgeDbContext _dbContext;
+    private readonly CloudKnowledgeDbContext
+        _dbContext;
 
     public EfDocumentSemanticSearchRepository(
         CloudKnowledgeDbContext dbContext)
@@ -18,23 +19,12 @@ public sealed class EfDocumentSemanticSearchRepository
             dbContext;
     }
 
-    public Task<IReadOnlyList<SemanticSearchResult>> SearchAsync(
-        float[] queryEmbedding,
-        int take,
-        CancellationToken cancellationToken)
-    {
-        return SearchInternalAsync(
-            accessibleUserId: null,
-            queryEmbedding,
-            take,
-            cancellationToken);
-    }
-
-    public Task<IReadOnlyList<SemanticSearchResult>> SearchAccessibleAsync(
-        Guid userId,
-        float[] queryEmbedding,
-        int take,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<SemanticSearchResult>>
+        SearchAccessibleAsync(
+            Guid userId,
+            float[] queryEmbedding,
+            int take,
+            CancellationToken cancellationToken)
     {
         if (userId == Guid.Empty)
         {
@@ -43,34 +33,16 @@ public sealed class EfDocumentSemanticSearchRepository
                 nameof(userId));
         }
 
-        return SearchInternalAsync(
-            userId,
-            queryEmbedding,
-            take,
-            cancellationToken);
-    }
-
-    private async Task<IReadOnlyList<SemanticSearchResult>> SearchInternalAsync(
-        Guid? accessibleUserId,
-        float[] queryEmbedding,
-        int take,
-        CancellationToken cancellationToken)
-    {
         var queryVector =
             new Vector(
                 queryEmbedding);
 
-        var documents =
+        var accessibleDocuments =
             _dbContext.Documents
-                .AsNoTracking();
-
-        if (accessibleUserId is not null)
-        {
-            documents =
-                documents.WhereAccessibleTo(
+                .AsNoTracking()
+                .WhereAccessibleTo(
                     _dbContext,
-                    accessibleUserId.Value);
-        }
+                    userId);
 
         var rows =
             await (
@@ -86,13 +58,14 @@ public sealed class EfDocumentSemanticSearchRepository
                     equals chunk.Id
 
                 join document
-                    in documents
+                    in accessibleDocuments
 
                     on chunk.DocumentId
                     equals document.Id
 
                 orderby embedding.Embedding
-                    .CosineDistance(queryVector)
+                    .CosineDistance(
+                        queryVector)
 
                 select new
                 {

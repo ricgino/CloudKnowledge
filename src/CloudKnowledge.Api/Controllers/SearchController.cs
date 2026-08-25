@@ -1,9 +1,13 @@
 using CloudKnowledge.Api.Contracts.Search;
 using CloudKnowledge.Application.Documents.SearchDocuments;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Identity.Web.Resource;
 
 namespace CloudKnowledge.Api.Controllers;
 
+[Authorize]
+[RequiredScope("access_as_user")]
 [ApiController]
 [Route("api/search")]
 public sealed class SearchController

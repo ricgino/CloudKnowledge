@@ -1,22 +1,32 @@
 using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Users;
 
 namespace CloudKnowledge.Application.Documents.SearchDocuments;
 
 public sealed class SearchDocumentsUseCase
 {
-    private readonly IEmbeddingGenerator _embeddingGenerator;
+    private readonly IEmbeddingGenerator
+        _embeddingGenerator;
+
     private readonly IDocumentSemanticSearchRepository
         _semanticSearchRepository;
 
+    private readonly ICurrentUser
+        _currentUser;
+
     public SearchDocumentsUseCase(
         IEmbeddingGenerator embeddingGenerator,
-        IDocumentSemanticSearchRepository semanticSearchRepository)
+        IDocumentSemanticSearchRepository semanticSearchRepository,
+        ICurrentUser currentUser)
     {
         _embeddingGenerator =
             embeddingGenerator;
 
         _semanticSearchRepository =
             semanticSearchRepository;
+
+        _currentUser =
+            currentUser;
     }
 
     public async Task<IReadOnlyList<SemanticSearchResult>> ExecuteAsync(
@@ -37,6 +47,10 @@ public sealed class SearchDocumentsUseCase
                 nameof(take),
                 "Take must be between 1 and 20.");
         }
+
+        var userId =
+            await _currentUser.GetUserIdAsync(
+                cancellationToken);
 
         var vectors =
             await _embeddingGenerator.GenerateAsync(
@@ -64,9 +78,11 @@ public sealed class SearchDocumentsUseCase
                 "an embedding with an invalid dimension.");
         }
 
-        return await _semanticSearchRepository.SearchAsync(
-            queryEmbedding,
-            take,
-            cancellationToken);
+        return await _semanticSearchRepository
+            .SearchAccessibleAsync(
+                userId,
+                queryEmbedding,
+                take,
+                cancellationToken);
     }
 }

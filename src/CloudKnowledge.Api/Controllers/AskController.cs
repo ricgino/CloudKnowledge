@@ -1,9 +1,13 @@
 using CloudKnowledge.Api.Contracts.Ask;
 using CloudKnowledge.Application.Documents.AskDocuments;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Identity.Web.Resource;
 
 namespace CloudKnowledge.Api.Controllers;
 
+[Authorize]
+[RequiredScope("access_as_user")]
 [ApiController]
 [Route("api/ask")]
 public sealed class AskController

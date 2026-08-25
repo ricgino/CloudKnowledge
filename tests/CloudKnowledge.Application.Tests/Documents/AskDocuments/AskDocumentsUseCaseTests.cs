@@ -1,6 +1,7 @@
 using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.AskDocuments;
 using CloudKnowledge.Application.Documents.SearchDocuments;
+using CloudKnowledge.Application.Users;
 
 namespace CloudKnowledge.Application.Tests.Documents.AskDocuments;
 
@@ -41,7 +42,8 @@ public sealed class AskDocumentsUseCaseTests
         var searchDocumentsUseCase =
             new SearchDocumentsUseCase(
                 embeddingGenerator,
-                semanticSearchRepository);
+                semanticSearchRepository,
+                new FakeCurrentUser());
 
         var answerGenerator =
             new FakeAnswerGenerator(
@@ -132,7 +134,8 @@ public sealed class AskDocumentsUseCaseTests
         var searchDocumentsUseCase =
             new SearchDocumentsUseCase(
                 embeddingGenerator,
-                semanticSearchRepository);
+                semanticSearchRepository,
+                new FakeCurrentUser());
 
         var answerGenerator =
             new FakeAnswerGenerator(
@@ -217,7 +220,8 @@ public sealed class AskDocumentsUseCaseTests
             new SearchDocumentsUseCase(
                 new FakeEmbeddingGenerator(),
                 new FakeSemanticSearchRepository(
-                    Array.Empty<SemanticSearchResult>()));
+                    Array.Empty<SemanticSearchResult>()),
+                new FakeCurrentUser());
 
         return new AskDocumentsUseCase(
             searchDocumentsUseCase,
@@ -285,7 +289,20 @@ public sealed class AskDocumentsUseCaseTests
                 take,
                 cancellationToken);
         }
+
     }
+
+    private sealed class FakeCurrentUser
+        : ICurrentUser
+    {
+        public Task<Guid> GetUserIdAsync(
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                Guid.Parse(
+                    "11111111-1111-1111-1111-111111111111"));
+        }
+    }    
 
     private sealed class FakeAnswerGenerator
         : IAnswerGenerator
