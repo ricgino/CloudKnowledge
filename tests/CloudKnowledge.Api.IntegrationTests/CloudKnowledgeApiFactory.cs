@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using CloudKnowledge.Api.IntegrationTests.Authentication;
+using Microsoft.AspNetCore.Authentication;
 
 namespace CloudKnowledge.Api.IntegrationTests;
 
@@ -50,6 +52,24 @@ public sealed class CloudKnowledgeApiFactory
             services =>
             {
                 services.RemoveAll<IDocumentProcessingQueue>();
+
+                services
+                    .AddAuthentication(
+                        options =>
+                        {
+                            options.DefaultAuthenticateScheme =
+                                TestAuthenticationHandler.SchemeName;
+
+                            options.DefaultChallengeScheme =
+                                TestAuthenticationHandler.SchemeName;
+                        })
+                    .AddScheme<
+                        AuthenticationSchemeOptions,
+                        TestAuthenticationHandler>(
+                            TestAuthenticationHandler.SchemeName,
+                            _ =>
+                            {
+                            });
 
                 services.AddSingleton<IDocumentProcessingQueue>(
                     ProcessingQueue);

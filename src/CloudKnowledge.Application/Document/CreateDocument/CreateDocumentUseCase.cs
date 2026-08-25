@@ -1,22 +1,40 @@
 using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Users;
 using CloudKnowledge.Domain.Documents;
 
 namespace CloudKnowledge.Application.Documents.CreateDocument;
 
 public sealed class CreateDocumentUseCase
 {
-    private readonly IDocumentRepository _documentRepository;
-    private readonly IDocumentStorage _documentStorage;
-    private readonly IDocumentProcessingQueue _documentProcessingQueue;
+    private readonly IDocumentRepository
+        _documentRepository;
+
+    private readonly IDocumentStorage
+        _documentStorage;
+
+    private readonly IDocumentProcessingQueue
+        _documentProcessingQueue;
+
+    private readonly ICurrentUser
+        _currentUser;
 
     public CreateDocumentUseCase(
         IDocumentRepository documentRepository,
         IDocumentStorage documentStorage,
-        IDocumentProcessingQueue documentProcessingQueue)
+        IDocumentProcessingQueue documentProcessingQueue,
+        ICurrentUser currentUser)
     {
-        _documentRepository = documentRepository;
-        _documentStorage = documentStorage;
-        _documentProcessingQueue = documentProcessingQueue;
+        _documentRepository =
+            documentRepository;
+
+        _documentStorage =
+            documentStorage;
+
+        _documentProcessingQueue =
+            documentProcessingQueue;
+
+        _currentUser =
+            currentUser;
     }
 
     public async Task<CreateDocumentResult> ExecuteAsync(
@@ -25,9 +43,17 @@ public sealed class CreateDocumentUseCase
         Stream content,
         CancellationToken cancellationToken)
     {
-        var document = Document.Create(
-            fileName,
-            contentType);
+        var userId =
+            await _currentUser.GetUserIdAsync(
+                cancellationToken);
+
+        var document =
+            Document.Create(
+                fileName,
+                contentType);
+
+        document.AssignOwner(
+            userId);
 
         await _documentStorage.UploadAsync(
             document.Id,

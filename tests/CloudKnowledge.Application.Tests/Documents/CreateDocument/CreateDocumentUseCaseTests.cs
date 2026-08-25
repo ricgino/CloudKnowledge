@@ -1,7 +1,7 @@
 using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.CreateDocument;
 using CloudKnowledge.Domain.Documents;
-
+using CloudKnowledge.Application.Users;
 
 namespace CloudKnowledge.Application.Tests.Documents.CreateDocument;
 
@@ -10,6 +10,7 @@ public sealed class CreateDocumentUseCaseTests
     [Fact]
     public async Task ExecuteAsync_ShouldUploadAndPersistPendingDocument()
     {
+        var userId = Guid.NewGuid();
         var repository = new FakeDocumentRepository();
         var storage = new FakeDocumentStorage();
         var queue = new FakeDocumentProcessingQueue();
@@ -17,7 +18,9 @@ public sealed class CreateDocumentUseCaseTests
         var useCase = new CreateDocumentUseCase(
             repository,
             storage,
-            queue);
+            queue,
+            new FakeCurrentUser(
+                userId));
             
         await using var content =
             new MemoryStream(new byte[] { 1, 2, 3, 4 });
@@ -34,6 +37,11 @@ public sealed class CreateDocumentUseCaseTests
         Assert.Equal(DocumentStatus.Pending, result.Status);
 
         Assert.NotNull(repository.AddedDocument);
+
+        Assert.Equal(
+            userId,
+            repository.AddedDocument.OwnerUserId);
+
         Assert.Equal(
             result.Id,
             repository.AddedDocument.Id);
@@ -86,6 +94,26 @@ public sealed class CreateDocumentUseCaseTests
         }
     }
 
+    private sealed class FakeCurrentUser
+        : ICurrentUser
+    {
+        private readonly Guid
+            _userId;
+
+        public FakeCurrentUser(
+            Guid userId)
+        {
+            _userId =
+                userId;
+        }
+
+        public Task<Guid> GetUserIdAsync(
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                _userId);
+        }
+    }
     private sealed class FakeDocumentRepository
         : IDocumentRepository
     {

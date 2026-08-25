@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using CloudKnowledge.Application.Documents.CreateDocument;
 using CloudKnowledge.Application.Documents.GetDocument;
 using CloudKnowledge.Application.Documents.GetDocuments;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Identity.Web.Resource;
 
 namespace CloudKnowledge.Api.Controllers;
 
@@ -25,7 +27,9 @@ public sealed class DocumentsController : ControllerBase
         _getDocumentsUseCase = getDocumentsUseCase;
     }
 
-    [HttpPost]
+[HttpPost]
+[Authorize]
+[RequiredScope("access_as_user")]
 [Consumes("multipart/form-data")]
 public async Task<ActionResult<DocumentResponse>> Create(
     [FromForm] CreateDocumentRequest request,
