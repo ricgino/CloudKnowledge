@@ -8,13 +8,23 @@ using CloudKnowledge.Application.Documents.GetDocuments;
 using Azure.Storage.Blobs;
 using Azure.Messaging.ServiceBus;
 using Pgvector.EntityFrameworkCore;
-using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.SearchDocuments;
-using CloudKnowledge.Infrastructure.Documents;
 using CloudKnowledge.Application.Documents.AskDocuments;
+using CloudKnowledge.Api.Authentication;
+using CloudKnowledge.Application.Users;
+using CloudKnowledge.Infrastructure.Users;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddScoped<
+    IUserAccountRepository,
+    EfUserAccountRepository>();
+
+builder.Services.AddScoped<
+    ICurrentUser,
+    HttpCurrentUser>();
 
 builder.Services.AddControllers();
 
@@ -131,7 +141,7 @@ builder.Services.AddSingleton<IEmbeddingGenerator>(
                 "search_query: ",
             dimensions:
                 768));
-                
+
 builder.Services.AddSingleton<IAnswerGenerator>(
     serviceProvider =>
         new OllamaAnswerGenerator(
