@@ -28,6 +28,16 @@ public sealed class UserAccountConfiguration
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(user => user.ExternalIssuer)
+            .HasColumnName("external_issuer")
+            .HasMaxLength(500)
+            .IsRequired(false);
+
+        builder.Property(user => user.ExternalSubject)
+            .HasColumnName("external_subject")
+            .HasMaxLength(255)
+            .IsRequired(false);
+
         builder.Property(user => user.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
@@ -36,5 +46,15 @@ public sealed class UserAccountConfiguration
         builder.HasIndex(user => user.Email)
             .IsUnique()
             .HasDatabaseName("IX_user_accounts_email");
+
+        builder.HasIndex(user => new
+            {
+                user.ExternalIssuer,
+                user.ExternalSubject
+            })
+            .IsUnique()
+            .HasDatabaseName(
+                "IX_user_accounts_external_identity");
+                
     }
 }

@@ -8,6 +8,10 @@ public sealed class UserAccount
 
     public string DisplayName { get; private set; }
 
+    public string? ExternalIssuer { get; private set; }
+
+    public string? ExternalSubject { get; private set; }
+
     public DateTime CreatedAtUtc { get; private set; }
 
     private UserAccount(
@@ -45,5 +49,49 @@ public sealed class UserAccount
             email.Trim(),
             displayName.Trim(),
             DateTime.UtcNow);
+    }
+
+    public void LinkExternalIdentity(
+        string issuer,
+        string subject)
+    {
+        if (string.IsNullOrWhiteSpace(issuer))
+        {
+            throw new ArgumentException(
+                "External issuer cannot be empty.",
+                nameof(issuer));
+        }
+
+        if (string.IsNullOrWhiteSpace(subject))
+        {
+            throw new ArgumentException(
+                "External subject cannot be empty.",
+                nameof(subject));
+        }
+
+        issuer =
+            issuer.Trim();
+
+        subject =
+            subject.Trim();
+
+        if (ExternalIssuer == issuer &&
+            ExternalSubject == subject)
+        {
+            return;
+        }
+
+        if (ExternalIssuer is not null ||
+            ExternalSubject is not null)
+        {
+            throw new InvalidOperationException(
+                "User account is already linked to an external identity.");
+        }
+
+        ExternalIssuer =
+            issuer;
+
+        ExternalSubject =
+            subject;
     }
 }
