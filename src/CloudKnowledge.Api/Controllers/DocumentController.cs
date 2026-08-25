@@ -5,6 +5,7 @@ using CloudKnowledge.Application.Documents.GetDocument;
 using CloudKnowledge.Application.Documents.GetDocuments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Identity.Web.Resource;
+using CloudKnowledge.Application.Documents.Sharing;
 
 namespace CloudKnowledge.Api.Controllers;
 
@@ -18,15 +19,21 @@ public sealed class DocumentsController : ControllerBase
     private readonly CreateDocumentUseCase _createDocumentUseCase;
     private readonly GetDocumentUseCase _getDocumentUseCase;
     private readonly GetDocumentsUseCase _getDocumentsUseCase;
+    private readonly ShareDocumentWithTeamUseCase _shareDocumentWithTeamUseCase;
+    private readonly UnshareDocumentFromTeamUseCase _unshareDocumentFromTeamUseCase;
 
     public DocumentsController(
         CreateDocumentUseCase createDocumentUseCase,
         GetDocumentUseCase getDocumentUseCase,
-        GetDocumentsUseCase getDocumentsUseCase)
+        GetDocumentsUseCase getDocumentsUseCase,
+        ShareDocumentWithTeamUseCase shareDocumentWithTeamUseCase,
+        UnshareDocumentFromTeamUseCase unshareDocumentFromTeamUseCase)
     {
         _createDocumentUseCase = createDocumentUseCase;
         _getDocumentUseCase = getDocumentUseCase;
         _getDocumentsUseCase = getDocumentsUseCase;
+        _shareDocumentWithTeamUseCase = shareDocumentWithTeamUseCase;
+        _unshareDocumentFromTeamUseCase = unshareDocumentFromTeamUseCase;
     }
 
 [HttpPost]
@@ -112,4 +119,67 @@ public async Task<ActionResult<DocumentResponse>> Create(
         return Ok(response);
     }
     
+    [HttpPut("{documentId:guid}/teams/{teamId:guid}")]
+    public async Task<IActionResult> ShareWithTeam(
+        Guid documentId,
+        Guid teamId,
+        CancellationToken cancellationToken)
+    {
+        var result =
+            await _shareDocumentWithTeamUseCase.ExecuteAsync(
+                documentId,
+                teamId,
+                cancellationToken);
+
+        return result switch
+        {
+            ShareDocumentStatus.Shared =>
+                NoContent(),
+
+            ShareDocumentStatus.AlreadyShared =>
+                NoContent(),
+
+            ShareDocumentStatus.DocumentNotFoundOrNotOwner =>
+                NotFound(),
+
+            ShareDocumentStatus.TeamNotFoundOrNotMember =>
+                NotFound(),
+
+            _ =>
+                throw new InvalidOperationException(
+                    "Unexpected share document result.")
+        };
+    }
+
+    [HttpDelete("{documentId:guid}/teams/{teamId:guid}")]
+    public async Task<IActionResult> UnshareFromTeam(
+        Guid documentId,
+        Guid teamId,
+        CancellationToken cancellationToken)
+    {
+        var result =
+            await _unshareDocumentFromTeamUseCase.ExecuteAsync(
+                documentId,
+                teamId,
+                cancellationToken);
+
+        return result switch
+        {
+            UnshareDocumentStatus.Unshared =>
+                NoContent(),
+
+            UnshareDocumentStatus.NotShared =>
+                NoContent(),
+
+            UnshareDocumentStatus.DocumentNotFoundOrNotOwner =>
+                NotFound(),
+
+            UnshareDocumentStatus.TeamNotFoundOrNotMember =>
+                NotFound(),
+
+            _ =>
+                throw new InvalidOperationException(
+                    "Unexpected unshare document result.")
+        };
+    }
 }

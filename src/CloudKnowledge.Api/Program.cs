@@ -20,6 +20,7 @@ using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Application.Teams.CreateTeam;
 using CloudKnowledge.Infrastructure.Teams;
 using CloudKnowledge.Application.Teams.AddTeamMember;
+using CloudKnowledge.Application.Documents.Sharing;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -197,6 +198,16 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     AddTeamMemberUseCase>();
 
+builder.Services.AddScoped<
+    IDocumentSharingRepository,
+    EfDocumentSharingRepository>();
+
+builder.Services.AddScoped<
+    ShareDocumentWithTeamUseCase>();
+
+builder.Services.AddScoped<
+    UnshareDocumentFromTeamUseCase>();
+    
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
