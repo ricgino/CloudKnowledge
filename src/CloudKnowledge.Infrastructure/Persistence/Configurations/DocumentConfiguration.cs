@@ -1,6 +1,7 @@
 using CloudKnowledge.Domain.Documents;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using CloudKnowledge.Domain.Users;
 
 namespace CloudKnowledge.Infrastructure.Persistence.Configurations;
 
@@ -16,6 +17,18 @@ public sealed class DocumentConfiguration
         builder.Property(document => document.Id)
             .HasColumnName("id")
             .ValueGeneratedNever();
+
+        builder.Property(document => document.OwnerUserId)
+            .HasColumnName("owner_user_id")
+            .IsRequired(false);
+
+        builder.HasOne<UserAccount>()
+            .WithMany()
+            .HasForeignKey(document => document.OwnerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(document => document.OwnerUserId)
+            .HasDatabaseName("IX_documents_owner_user_id");
 
         builder.Property(document => document.FileName)
             .HasColumnName("file_name")

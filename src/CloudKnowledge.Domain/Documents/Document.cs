@@ -4,13 +4,40 @@ public sealed class Document
 {
     public Guid Id { get; private set; }
 
+    public Guid? OwnerUserId { get; private set; }
+
     public string FileName { get; private set; }
 
     public string ContentType { get; private set; }
 
     public DocumentStatus Status { get; private set; }
+
     public DateTime CreatedAtUtc { get; private set; }
 
+    public void AssignOwner(
+        Guid ownerUserId)
+    {
+        if (ownerUserId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Owner user id cannot be empty.",
+                nameof(ownerUserId));
+        }
+
+        if (OwnerUserId == ownerUserId)
+        {
+            return;
+        }
+
+        if (OwnerUserId is not null)
+        {
+            throw new InvalidOperationException(
+                "Document already has an owner.");
+        }
+
+        OwnerUserId =
+            ownerUserId;
+    }
 
     public void MarkAsProcessing()
     {
@@ -20,7 +47,8 @@ public sealed class Document
                 $"Cannot start processing a document with status '{Status}'.");
         }
 
-        Status = DocumentStatus.Processing;
+        Status =
+            DocumentStatus.Processing;
     }
 
     public void MarkAsReady()
@@ -31,7 +59,8 @@ public sealed class Document
                 $"Cannot mark as ready a document with status '{Status}'.");
         }
 
-        Status = DocumentStatus.Ready;
+        Status =
+            DocumentStatus.Ready;
     }
 
     public void MarkAsFailed()
@@ -42,7 +71,8 @@ public sealed class Document
                 $"Cannot mark as failed a document with status '{Status}'.");
         }
 
-        Status = DocumentStatus.Failed;
+        Status =
+            DocumentStatus.Failed;
     }
 
     private Document(
@@ -52,11 +82,20 @@ public sealed class Document
         DocumentStatus status,
         DateTime createdAtUtc)
     {
-        Id = id;
-        FileName = fileName;
-        ContentType = contentType;
-        Status = status;
-        CreatedAtUtc = createdAtUtc;
+        Id =
+            id;
+
+        FileName =
+            fileName;
+
+        ContentType =
+            contentType;
+
+        Status =
+            status;
+
+        CreatedAtUtc =
+            createdAtUtc;
     }
 
     public static Document Create(
