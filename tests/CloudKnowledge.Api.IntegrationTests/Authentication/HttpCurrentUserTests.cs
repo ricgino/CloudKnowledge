@@ -9,7 +9,7 @@ namespace CloudKnowledge.Api.IntegrationTests.Authentication;
 public sealed class HttpCurrentUserTests
 {
     [Fact]
-    public async Task GetUserIdAsync_WhenAuthenticatedIdentityExists_ShouldReturnInternalUserId()
+    public async Task GetUserIdAsync_WhenUserAlreadyExists_ShouldReturnExistingUserId()
     {
         var user =
             UserAccount.Create(
@@ -21,25 +21,24 @@ public sealed class HttpCurrentUserTests
             "alice-subject");
 
         var repository =
-            new FakeUserAccountRepository(
-                user);
+            new FakeUserAccountRepository();
 
-        var httpContext =
-            CreateAuthenticatedContext(
-                "https://issuer.example.com/",
-                "alice-subject");
-
-        var accessor =
-            new HttpContextAccessor
-            {
-                HttpContext =
-                    httpContext
-            };
+        await repository.AddAsync(
+            user,
+            CancellationToken.None);
 
         var sut =
-            new HttpCurrentUser(
-                accessor,
-                repository);
+            CreateCurrentUser(
+                repository,
+                CreateAuthenticatedContext(
+                    issuer:
+                        "https://issuer.example.com/",
+                    subject:
+                        "alice-subject",
+                    email:
+                        "alice@example.com",
+                    displayName:
+                        "Alice"));
 
         var userId =
             await sut.GetUserIdAsync(
@@ -48,6 +47,88 @@ public sealed class HttpCurrentUserTests
         Assert.Equal(
             user.Id,
             userId);
+
+        Assert.Single(
+            repository.Users);
+    }
+
+    [Fact]
+    public async Task GetUserIdAsync_WhenUserDoesNotExist_ShouldProvisionUser()
+    {
+        var repository =
+            new FakeUserAccountRepository();
+
+        var sut =
+            CreateCurrentUser(
+                repository,
+                CreateAuthenticatedContext(
+                    issuer:
+                        "https://issuer.example.com/",
+                    subject:
+                        "new-user-subject",
+                    email:
+                        "newuser@example.com",
+                    displayName:
+                        "New User"));
+
+        var userId =
+            await sut.GetUserIdAsync(
+                CancellationToken.None);
+
+        var createdUser =
+            Assert.Single(
+                repository.Users);
+
+        Assert.Equal(
+            userId,
+            createdUser.Id);
+
+        Assert.Equal(
+            "newuser@example.com",
+            createdUser.Email);
+
+        Assert.Equal(
+            "New User",
+            createdUser.DisplayName);
+
+        Assert.Equal(
+            "https://issuer.example.com/",
+            createdUser.ExternalIssuer);
+
+        Assert.Equal(
+            "new-user-subject",
+            createdUser.ExternalSubject);
+    }
+
+    [Fact]
+    public async Task GetUserIdAsync_WhenNameIsMissing_ShouldUseEmailAsDisplayName()
+    {
+        var repository =
+            new FakeUserAccountRepository();
+
+        var sut =
+            CreateCurrentUser(
+                repository,
+                CreateAuthenticatedContext(
+                    issuer:
+                        "https://issuer.example.com/",
+                    subject:
+                        "new-user-subject",
+                    email:
+                        "newuser@example.com",
+                    displayName:
+                        null));
+
+        await sut.GetUserIdAsync(
+            CancellationToken.None);
+
+        var createdUser =
+            Assert.Single(
+                repository.Users);
+
+        Assert.Equal(
+            "newuser@example.com",
+            createdUser.DisplayName);
     }
 
     [Fact]
@@ -72,96 +153,131 @@ public sealed class HttpCurrentUserTests
     }
 
     [Fact]
-    public async Task GetUserIdAsync_WhenExternalIdentityIsUnknown_ShouldThrow()
+    public async Task GetUserIdAsync_WhenNewUserHasNoEmail_ShouldThrow()
     {
-        var httpContext =
-            CreateAuthenticatedContext(
-                "https://issuer.example.com/",
-                "unknown-subject");
+        var repository =
+            new FakeUserAccountRepository();
 
-        var accessor =
-            new HttpContextAccessor
-            {
-                HttpContext =
-                    httpContext
-            };
+        var context =
+            CreateAuthenticatedContext(
+                issuer:
+                    "https://issuer.example.com/",
+                subject:
+                    "new-user-subject",
+                email:
+                    null,
+                displayName:
+                    "New User");
 
         var sut =
-            new HttpCurrentUser(
-                accessor,
-                new FakeUserAccountRepository());
+            CreateCurrentUser(
+                repository,
+                context);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () =>
                 sut.GetUserIdAsync(
                     CancellationToken.None));
+
+        Assert.Empty(
+            repository.Users);
+    }
+
+    private static HttpCurrentUser CreateCurrentUser(
+        IUserAccountRepository repository,
+        DefaultHttpContext context)
+    {
+        var accessor =
+            new HttpContextAccessor
+            {
+                HttpContext =
+                    context
+            };
+
+        return new HttpCurrentUser(
+            accessor,
+            repository);
     }
 
     private static DefaultHttpContext CreateAuthenticatedContext(
         string issuer,
-        string subject)
+        string subject,
+        string? email,
+        string? displayName)
     {
+        var claims =
+            new List<Claim>
+            {
+                new(
+                    "iss",
+                    issuer),
+
+                new(
+                    "sub",
+                    subject)
+            };
+
+        if (email is not null)
+        {
+            claims.Add(
+                new Claim(
+                    "email",
+                    email));
+        }
+
+        if (displayName is not null)
+        {
+            claims.Add(
+                new Claim(
+                    "name",
+                    displayName));
+        }
+
         var identity =
             new ClaimsIdentity(
-                new[]
-                {
-                    new Claim(
-                        "iss",
-                        issuer),
-
-                    new Claim(
-                        "sub",
-                        subject)
-                },
+                claims,
                 authenticationType:
                     "Test");
-
-        var principal =
-            new ClaimsPrincipal(
-                identity);
 
         return new DefaultHttpContext
         {
             User =
-                principal
+                new ClaimsPrincipal(
+                    identity)
         };
     }
 
     private sealed class FakeUserAccountRepository
         : IUserAccountRepository
     {
-        private readonly UserAccount?
-            _user;
-
-        public FakeUserAccountRepository(
-            UserAccount? user = null)
+        public List<UserAccount> Users
         {
-            _user =
-                user;
-        }
+            get;
+        } = new();
 
         public Task<UserAccount?> GetByExternalIdentityAsync(
             string issuer,
             string subject,
             CancellationToken cancellationToken)
         {
-            if (_user is null ||
-                _user.ExternalIssuer != issuer ||
-                _user.ExternalSubject != subject)
-            {
-                return Task.FromResult<UserAccount?>(
-                    null);
-            }
+            var user =
+                Users.SingleOrDefault(
+                    item =>
+                        item.ExternalIssuer == issuer
+                        && item.ExternalSubject == subject);
 
-            return Task.FromResult<UserAccount?>(
-                _user);
+            return Task.FromResult(
+                user);
         }
 
         public Task AddAsync(
             UserAccount user,
             CancellationToken cancellationToken)
         {
-            throw new NotSupportedException();
+            Users.Add(
+                user);
+
+            return Task.CompletedTask;
         }
     }
 }

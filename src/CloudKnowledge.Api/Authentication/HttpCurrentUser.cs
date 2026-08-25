@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using CloudKnowledge.Application.Users;
+using CloudKnowledge.Domain.Users;
 
 namespace CloudKnowledge.Api.Authentication;
 
@@ -37,14 +39,10 @@ public sealed class HttpCurrentUser
         }
 
         var issuer =
-            principal
-                .FindFirst("iss")?
-                .Value;
+            principal.FindFirst("iss")?.Value;
 
         var subject =
-            principal
-                .FindFirst("sub")?
-                .Value;
+            principal.FindFirst("sub")?.Value;
 
         if (string.IsNullOrWhiteSpace(issuer))
         {
@@ -58,19 +56,47 @@ public sealed class HttpCurrentUser
                 "The authenticated identity does not contain a subject.");
         }
 
-        var user =
+        var existingUser =
             await _userAccountRepository
                 .GetByExternalIdentityAsync(
                     issuer,
                     subject,
                     cancellationToken);
 
-        if (user is null)
+        if (existingUser is not null)
         {
-            throw new InvalidOperationException(
-                "The authenticated identity is not linked to a CloudKnowledge user.");
+            return existingUser.Id;
         }
 
-        return user.Id;
+        var email =
+            principal.FindFirst("email")?.Value
+            ?? principal.FindFirst("preferred_username")?.Value
+            ?? principal.FindFirst(ClaimTypes.Email)?.Value;
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new InvalidOperationException(
+                "The authenticated identity does not contain an email address.");
+        }
+
+        var displayName =
+            principal.FindFirst("name")?.Value
+            ?? principal.FindFirst(ClaimTypes.Name)?.Value
+            ?? email;
+
+        var newUser =
+            UserAccount.Create(
+                email,
+                displayName);
+
+        newUser.LinkExternalIdentity(
+            issuer,
+            subject);
+
+        await _userAccountRepository.AddAsync(
+            newUser,
+            cancellationToken);
+
+        return newUser.Id;
     }
 }
