@@ -1,6 +1,8 @@
 using CloudKnowledge.Domain.Documents;
-using Microsoft.EntityFrameworkCore;
+using CloudKnowledge.Domain.Teams;
+using CloudKnowledge.Domain.Users;
 using CloudKnowledge.Infrastructure.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace CloudKnowledge.Infrastructure.Persistence;
 
@@ -12,13 +14,26 @@ public sealed class CloudKnowledgeDbContext : DbContext
     {
     }
 
-    public DbSet<Document> Documents => Set<Document>();
+    public DbSet<Document> Documents =>
+        Set<Document>();
 
     public DbSet<DocumentChunk> DocumentChunks =>
-    Set<DocumentChunk>();
+        Set<DocumentChunk>();
 
     public DbSet<DocumentChunkEmbeddingRow> DocumentChunkEmbeddings =>
         Set<DocumentChunkEmbeddingRow>();
+
+    public DbSet<UserAccount> UserAccounts =>
+        Set<UserAccount>();
+
+    public DbSet<Team> Teams =>
+        Set<Team>();
+
+    public DbSet<TeamMember> TeamMembers =>
+        Set<TeamMember>();
+
+    public DbSet<DocumentTeamAccess> DocumentTeamAccess =>
+        Set<DocumentTeamAccess>();
 
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
