@@ -105,5 +105,17 @@ public sealed class SearchDocumentsUseCaseTests
             return Task.FromResult(
                 result);
         }
+
+        public Task<IReadOnlyList<SemanticSearchResult>> SearchAccessibleAsync(
+            Guid userId,
+            float[] queryEmbedding,
+            int take,
+            CancellationToken cancellationToken)
+        {
+            return SearchAsync(
+                queryEmbedding,
+                take,
+                cancellationToken);
+        }
     }
 }

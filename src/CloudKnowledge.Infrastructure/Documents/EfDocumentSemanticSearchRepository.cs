@@ -18,7 +18,40 @@ public sealed class EfDocumentSemanticSearchRepository
             dbContext;
     }
 
-    public async Task<IReadOnlyList<SemanticSearchResult>> SearchAsync(
+    public Task<IReadOnlyList<SemanticSearchResult>> SearchAsync(
+        float[] queryEmbedding,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        return SearchInternalAsync(
+            accessibleUserId: null,
+            queryEmbedding,
+            take,
+            cancellationToken);
+    }
+
+    public Task<IReadOnlyList<SemanticSearchResult>> SearchAccessibleAsync(
+        Guid userId,
+        float[] queryEmbedding,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "User id cannot be empty.",
+                nameof(userId));
+        }
+
+        return SearchInternalAsync(
+            userId,
+            queryEmbedding,
+            take,
+            cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<SemanticSearchResult>> SearchInternalAsync(
+        Guid? accessibleUserId,
         float[] queryEmbedding,
         int take,
         CancellationToken cancellationToken)
@@ -26,6 +59,18 @@ public sealed class EfDocumentSemanticSearchRepository
         var queryVector =
             new Vector(
                 queryEmbedding);
+
+        var documents =
+            _dbContext.Documents
+                .AsNoTracking();
+
+        if (accessibleUserId is not null)
+        {
+            documents =
+                documents.WhereAccessibleTo(
+                    _dbContext,
+                    accessibleUserId.Value);
+        }
 
         var rows =
             await (
@@ -40,20 +85,29 @@ public sealed class EfDocumentSemanticSearchRepository
                     on embedding.ChunkId
                     equals chunk.Id
 
+                join document
+                    in documents
+
+                    on chunk.DocumentId
+                    equals document.Id
+
                 orderby embedding.Embedding
                     .CosineDistance(queryVector)
 
                 select new
                 {
                     chunk.DocumentId,
+
                     ChunkId =
                         chunk.Id,
+
                     chunk.Position,
                     chunk.Content,
 
                     Distance =
                         embedding.Embedding
-                            .CosineDistance(queryVector)
+                            .CosineDistance(
+                                queryVector)
                 })
                 .Take(take)
                 .ToListAsync(

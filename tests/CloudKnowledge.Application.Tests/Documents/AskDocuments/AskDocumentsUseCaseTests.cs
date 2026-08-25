@@ -273,6 +273,18 @@ public sealed class AskDocumentsUseCaseTests
             return Task.FromResult(
                 _results);
         }
+
+        public Task<IReadOnlyList<SemanticSearchResult>> SearchAccessibleAsync(
+            Guid userId,
+            float[] queryEmbedding,
+            int take,
+            CancellationToken cancellationToken)
+        {
+            return SearchAsync(
+                queryEmbedding,
+                take,
+                cancellationToken);
+        }
     }
 
     private sealed class FakeAnswerGenerator

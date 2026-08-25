@@ -6,4 +6,10 @@ public interface IDocumentSemanticSearchRepository
         float[] queryEmbedding,
         int take,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<SemanticSearchResult>> SearchAccessibleAsync(
+        Guid userId,
+        float[] queryEmbedding,
+        int take,
+        CancellationToken cancellationToken);
 }
