@@ -19,6 +19,7 @@ using CloudKnowledge.Application.Documents.Access;
 using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Application.Teams.CreateTeam;
 using CloudKnowledge.Infrastructure.Teams;
+using CloudKnowledge.Application.Teams.AddTeamMember;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -184,6 +185,17 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     CreateTeamUseCase>();    
+
+builder.Services.AddScoped<
+    IUserDirectoryRepository,
+    EfUserDirectoryRepository>();
+
+builder.Services.AddScoped<
+    ITeamMembershipRepository,
+    EfTeamMembershipRepository>();
+
+builder.Services.AddScoped<
+    AddTeamMemberUseCase>();
 
 var app = builder.Build();
 
