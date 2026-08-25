@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using CloudKnowledge.Application.Documents.FailDocument;
 using Azure.Storage.Blobs;
 using Pgvector.EntityFrameworkCore;
+using CloudKnowledge.Application.Documents.AskDocuments;
 
 var builder =
     Host.CreateApplicationBuilder(args);
@@ -95,6 +96,16 @@ builder.Services.AddSingleton<IEmbeddingGenerator>(
                 "search_document: ",
             dimensions:
                 768));
+
+builder.Services.AddSingleton<IAnswerGenerator>(
+    serviceProvider =>
+        new OllamaAnswerGenerator(
+            serviceProvider
+                .GetRequiredService<HttpClient>(),
+            model:
+                "qwen3:4b"));
+
+builder.Services.AddScoped<AskDocumentsUseCase>();
 
 builder.Services.AddScoped<
     IDocumentChunkEmbeddingRepository,

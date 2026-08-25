@@ -11,6 +11,7 @@ using Pgvector.EntityFrameworkCore;
 using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.SearchDocuments;
 using CloudKnowledge.Infrastructure.Documents;
+using CloudKnowledge.Application.Documents.AskDocuments;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -130,6 +131,16 @@ builder.Services.AddSingleton<IEmbeddingGenerator>(
                 "search_query: ",
             dimensions:
                 768));
+                
+builder.Services.AddSingleton<IAnswerGenerator>(
+    serviceProvider =>
+        new OllamaAnswerGenerator(
+            serviceProvider
+                .GetRequiredService<HttpClient>(),
+            model:
+                "qwen3:4b"));
+
+builder.Services.AddScoped<AskDocumentsUseCase>();                
 
 builder.Services.AddScoped<
     IDocumentSemanticSearchRepository,
