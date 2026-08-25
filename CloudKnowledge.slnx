@@ -10,5 +10,6 @@
     <Project Path="tests/CloudKnowledge.Api.IntegrationTests/CloudKnowledge.Api.IntegrationTests.csproj" />
     <Project Path="tests/CloudKnowledge.Application.Tests/CloudKnowledge.Application.Tests.csproj" />
     <Project Path="tests/CloudKnowledge.Domain.Tests/CloudKnowledge.Domain.Tests.csproj" />
+    <Project Path="tests/CloudKnowledge.Infrastructure.Tests/CloudKnowledge.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>
