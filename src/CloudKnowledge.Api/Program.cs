@@ -1,27 +1,27 @@
+using Azure.Messaging.ServiceBus;
+using Azure.Storage.Blobs;
+using CloudKnowledge.Api.Authentication;
 using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Documents.Access;
+using CloudKnowledge.Application.Documents.AskDocuments;
 using CloudKnowledge.Application.Documents.CreateDocument;
 using CloudKnowledge.Application.Documents.GetDocument;
-using CloudKnowledge.Infrastructure.Documents;
-using CloudKnowledge.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 using CloudKnowledge.Application.Documents.GetDocuments;
-using Azure.Storage.Blobs;
-using Azure.Messaging.ServiceBus;
-using Pgvector.EntityFrameworkCore;
 using CloudKnowledge.Application.Documents.SearchDocuments;
-using CloudKnowledge.Application.Documents.AskDocuments;
-using CloudKnowledge.Api.Authentication;
-using CloudKnowledge.Application.Users;
-using CloudKnowledge.Infrastructure.Users;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Identity.Web;
-using CloudKnowledge.Application.Documents.Access;
+using CloudKnowledge.Application.Documents.Sharing;
 using CloudKnowledge.Application.Teams;
+using CloudKnowledge.Application.Teams.AddTeamMember;
 using CloudKnowledge.Application.Teams.CreateTeam;
 using CloudKnowledge.Application.Teams.GetTeams;
+using CloudKnowledge.Application.Users;
+using CloudKnowledge.Infrastructure.Documents;
+using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Infrastructure.Teams;
-using CloudKnowledge.Application.Teams.AddTeamMember;
-using CloudKnowledge.Application.Documents.Sharing;
+using CloudKnowledge.Infrastructure.Users;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Web;
+using Pgvector.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,9 +41,20 @@ builder.Services.AddCors(
             "CloudKnowledgeWeb",
             policy =>
             {
+                var allowedOrigins =
+                    builder.Configuration
+                        .GetSection("Cors:AllowedOrigins")
+                        .Get<string[]>()
+                    ?? [];
+
+                if (allowedOrigins.Length == 0)
+                {
+                    throw new InvalidOperationException(
+                        "At least one CORS allowed origin must be configured.");
+                }
+
                 policy
-                    .WithOrigins(
-                        "http://localhost:4200")
+                    .WithOrigins(allowedOrigins)
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             });
@@ -156,32 +167,63 @@ builder.Services.AddScoped<
 builder.Services.AddOpenApi();
 
 builder.Services.AddSingleton(
-    new HttpClient
+    serviceProvider =>
     {
-        BaseAddress =
-            new Uri(
-                "http://localhost:11434")
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var baseUrl =
+            configuration["Ai:BaseUrl"]
+            ?? throw new InvalidOperationException(
+                "AI base URL was not found.");
+
+        return new HttpClient
+        {
+            BaseAddress =
+                new Uri(baseUrl)
+        };
     });
 
 builder.Services.AddSingleton<IEmbeddingGenerator>(
     serviceProvider =>
-        new OllamaEmbeddingGenerator(
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var model =
+            configuration["Ai:EmbeddingModel"]
+            ?? throw new InvalidOperationException(
+                "AI embedding model was not found.");
+
+        var dimensions =
+            configuration.GetValue<int>(
+                "Ai:EmbeddingDimensions");
+
+        return new OllamaEmbeddingGenerator(
             serviceProvider
                 .GetRequiredService<HttpClient>(),
-            model:
-                "nomic-embed-text-v2-moe",
+            model,
             inputPrefix:
                 "search_query: ",
-            dimensions:
-                768));
+            dimensions);
+    });
 
 builder.Services.AddSingleton<IAnswerGenerator>(
     serviceProvider =>
-        new OllamaAnswerGenerator(
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var model =
+            configuration["Ai:AnswerModel"]
+            ?? throw new InvalidOperationException(
+                "AI answer model was not found.");
+
+        return new OllamaAnswerGenerator(
             serviceProvider
                 .GetRequiredService<HttpClient>(),
-            model:
-                "qwen3:4b"));
+            model);
+    });
 
 builder.Services.AddScoped<AskDocumentsUseCase>();
 
@@ -229,18 +271,17 @@ builder.Services.AddScoped<
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+    app.MapOpenApi();
+}
 
 app.UseCors(
     "CloudKnowledgeWeb");
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
 
 app.MapControllers();
 

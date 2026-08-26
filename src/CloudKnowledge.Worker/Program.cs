@@ -1,14 +1,13 @@
 using Azure.Messaging.ServiceBus;
+using Azure.Storage.Blobs;
 using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Documents.FailDocument;
 using CloudKnowledge.Application.Documents.ProcessDocument;
 using CloudKnowledge.Infrastructure.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Worker;
 using Microsoft.EntityFrameworkCore;
-using CloudKnowledge.Application.Documents.FailDocument;
-using Azure.Storage.Blobs;
 using Pgvector.EntityFrameworkCore;
-using CloudKnowledge.Application.Documents.AskDocuments;
 
 var builder =
     Host.CreateApplicationBuilder(args);
@@ -78,32 +77,46 @@ builder.Services.AddScoped<
 builder.Services.AddSingleton<TextChunker>();
 
 builder.Services.AddSingleton(
-    new HttpClient
+    serviceProvider =>
     {
-        BaseAddress =
-            new Uri(
-                "http://localhost:11434")
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var baseUrl =
+            configuration["Ai:BaseUrl"]
+            ?? throw new InvalidOperationException(
+                "AI base URL was not found.");
+
+        return new HttpClient
+        {
+            BaseAddress =
+                new Uri(baseUrl)
+        };
     });
 
 builder.Services.AddSingleton<IEmbeddingGenerator>(
     serviceProvider =>
-        new OllamaEmbeddingGenerator(
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var model =
+            configuration["Ai:EmbeddingModel"]
+            ?? throw new InvalidOperationException(
+                "AI embedding model was not found.");
+
+        var dimensions =
+            configuration.GetValue<int>(
+                "Ai:EmbeddingDimensions");
+
+        return new OllamaEmbeddingGenerator(
             serviceProvider
                 .GetRequiredService<HttpClient>(),
-            model:
-                "nomic-embed-text-v2-moe",
+            model,
             inputPrefix:
                 "search_document: ",
-            dimensions:
-                768));
-
-builder.Services.AddSingleton<IAnswerGenerator>(
-    serviceProvider =>
-        new OllamaAnswerGenerator(
-            serviceProvider
-                .GetRequiredService<HttpClient>(),
-            model:
-                "qwen3:4b"));
+            dimensions);
+    });
 
 builder.Services.AddScoped<
     IDocumentChunkEmbeddingRepository,

@@ -58,3 +58,25 @@ jobs:
 
       - name: Build Angular app
         run: npm run build
+
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Build API image
+        run: >-
+          docker build
+          --file src/CloudKnowledge.Api/Dockerfile
+          --tag cloudknowledge-api:ci
+          .
+
+      - name: Build Worker image
+        run: >-
+          docker build
+          --file src/CloudKnowledge.Worker/Dockerfile
+          --tag cloudknowledge-worker:ci
+          .
