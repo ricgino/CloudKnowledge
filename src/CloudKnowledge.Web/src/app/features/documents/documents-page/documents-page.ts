@@ -1,4 +1,5 @@
 import {
+  ChangeDetectorRef,
   Component,
   OnInit
 } from '@angular/core';
@@ -38,7 +39,10 @@ export class DocumentsPage
 
   constructor(
     private readonly documentsService:
-      Documents)
+      Documents,
+
+    private readonly cdr:
+      ChangeDetectorRef)
   {
   }
 
@@ -70,6 +74,8 @@ export class DocumentsPage
 
             this.loading =
               false;
+
+            this.cdr.detectChanges();
           },
 
         error:
@@ -80,6 +86,8 @@ export class DocumentsPage
 
             this.loading =
               false;
+
+            this.cdr.detectChanges();
           }
       });
   }
@@ -124,6 +132,7 @@ export class DocumentsPage
             this.selectedFile =
               null;
 
+            this.cdr.detectChanges();
             this.loadDocuments();
           },
 
@@ -135,6 +144,8 @@ export class DocumentsPage
 
             this.uploading =
               false;
+
+            this.cdr.detectChanges();
           }
       });
   }
