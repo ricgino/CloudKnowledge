@@ -1,0 +1,39 @@
+<h1>CloudKnowledge</h1>
+
+@if (!loggedIn) {
+  <button (click)="login()">
+    Sign in
+  </button>
+}
+
+@if (loggedIn) {
+  <p>
+    Authenticated with Microsoft Entra External ID.
+  </p>
+
+  <button (click)="showAccessTokenClaims()">
+    Show safe token claims
+  </button>
+
+  <button (click)="loadDocuments()">
+    Call CloudKnowledge API
+  </button>
+
+  <button (click)="logout()">
+    Sign out
+  </button>
+}
+
+@if (tokenClaims) {
+  <h2>Access token claims</h2>
+
+  <pre>{{ tokenClaims | json }}</pre>
+}
+
+@if (apiResult) {
+  <h2>API response</h2>
+
+  <pre>{{ apiResult }}</pre>
+}
+
+<router-outlet></router-outlet>
