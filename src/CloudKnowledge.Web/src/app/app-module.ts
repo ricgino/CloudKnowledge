@@ -29,6 +29,7 @@ import { App } from './app';
 
 import { apiBaseUrl, apiScope, loginRequest, msalConfig } from './auth-config';
 import { DocumentsPage } from './features/documents/documents-page/documents-page';
+import { TeamsPage } from './features/teams/teams-page/teams-page';
 
 export function MSALInstanceFactory(): IPublicClientApplication {
   return new PublicClientApplication(msalConfig);
@@ -57,7 +58,7 @@ export function MSALInterceptorConfigFactory(): MsalInterceptorConfiguration {
 }
 
 @NgModule({
-  declarations: [App, RedirectComponent, DocumentsPage],
+  declarations: [App, RedirectComponent, DocumentsPage, TeamsPage],
 
   imports: [BrowserModule, CommonModule, AppRoutingModule, HttpClientModule, MsalModule],
 

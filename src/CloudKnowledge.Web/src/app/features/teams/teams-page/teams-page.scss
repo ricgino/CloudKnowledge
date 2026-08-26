@@ -1,0 +1,158 @@
+.teams-page {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.teams-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h2 {
+  margin-bottom: 0.35rem;
+  font-size: 2rem;
+}
+
+.subtitle {
+  margin-bottom: 0;
+  color: #5f6368;
+}
+
+.team-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.team-card,
+.team-list,
+.success-message,
+.error-message {
+  border: 1px solid #dadce0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.team-card {
+  padding: 1.25rem;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+}
+
+.member-controls {
+  grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1fr) auto;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+input,
+select {
+  min-width: 0;
+  border: 1px solid #c7cacf;
+  border-radius: 9px;
+  padding: 0.7rem 0.8rem;
+  background: #fff;
+}
+
+button {
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.primary-button {
+  border: 1px solid #1a73e8;
+  background: #1a73e8;
+  color: #fff;
+}
+
+.secondary-button {
+  border: 1px solid #dadce0;
+  background: #fff;
+}
+
+.team-list {
+  display: grid;
+  overflow: hidden;
+}
+
+.team-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+}
+
+.team-row + .team-row {
+  border-top: 1px solid #eceff1;
+}
+
+.team-row span {
+  color: #5f6368;
+}
+
+.success-message,
+.error-message {
+  margin: 0;
+  padding: 0.85rem 1rem;
+}
+
+.success-message {
+  border-color: #b7dfc1;
+  background: #e6f4ea;
+}
+
+.error-message {
+  border-color: #f5c2c0;
+  background: #fce8e6;
+}
+
+@media (max-width: 900px) {
+  .team-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .member-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .teams-header {
+    flex-direction: column;
+  }
+
+  .controls {
+    grid-template-columns: 1fr;
+  }
+}

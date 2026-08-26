@@ -18,6 +18,7 @@ using Microsoft.Identity.Web;
 using CloudKnowledge.Application.Documents.Access;
 using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Application.Teams.CreateTeam;
+using CloudKnowledge.Application.Teams.GetTeams;
 using CloudKnowledge.Infrastructure.Teams;
 using CloudKnowledge.Application.Teams.AddTeamMember;
 using CloudKnowledge.Application.Documents.Sharing;
@@ -47,7 +48,6 @@ builder.Services.AddCors(
                     .AllowAnyMethod();
             });
     });
-
 
 builder.Services.AddHttpContextAccessor();
 
@@ -151,7 +151,7 @@ builder.Services.AddSingleton(
 
 builder.Services.AddScoped<
     IDocumentProcessingQueue,
-    AzureServiceBusDocumentProcessingQueue>();    
+    AzureServiceBusDocumentProcessingQueue>();
 
 builder.Services.AddOpenApi();
 
@@ -183,7 +183,7 @@ builder.Services.AddSingleton<IAnswerGenerator>(
             model:
                 "qwen3:4b"));
 
-builder.Services.AddScoped<AskDocumentsUseCase>();                
+builder.Services.AddScoped<AskDocumentsUseCase>();
 
 builder.Services.AddScoped<
     IDocumentSemanticSearchRepository,
@@ -201,7 +201,10 @@ builder.Services.AddScoped<
     EfTeamRepository>();
 
 builder.Services.AddScoped<
-    CreateTeamUseCase>();    
+    CreateTeamUseCase>();
+
+builder.Services.AddScoped<
+    GetTeamsUseCase>();
 
 builder.Services.AddScoped<
     IUserDirectoryRepository,
@@ -224,7 +227,6 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     UnshareDocumentFromTeamUseCase>();
 
-
 var app = builder.Build();
 
 app.UseHttpsRedirection();
@@ -239,11 +241,6 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-
-app.UseHttpsRedirection();
-
-app.UseAuthentication();
-app.UseAuthorization();
 
 app.MapControllers();
 

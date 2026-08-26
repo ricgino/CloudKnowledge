@@ -14,7 +14,6 @@ import {
   apiBaseUrl
 } from '../../auth-config';
 
-
 export interface DocumentItem
 {
   id: string;
@@ -86,6 +85,25 @@ export class Documents
     return this.http.post<DocumentItem>(
       `${apiBaseUrl}/api/documents`,
       formData);
+  }
+
+  shareWithTeam(
+    documentId: string,
+    teamId: string):
+    Observable<void>
+  {
+    return this.http.put<void>(
+      `${apiBaseUrl}/api/documents/${documentId}/teams/${teamId}`,
+      null);
+  }
+
+  unshareFromTeam(
+    documentId: string,
+    teamId: string):
+    Observable<void>
+  {
+    return this.http.delete<void>(
+      `${apiBaseUrl}/api/documents/${documentId}/teams/${teamId}`);
   }
 
   search(

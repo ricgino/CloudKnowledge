@@ -11,6 +11,11 @@ import {
   SearchDocumentResult
 } from '../documents';
 
+import {
+  TeamItem,
+  Teams
+} from '../../teams/teams';
+
 @Component({
   selector: 'app-documents-page',
   standalone: false,
@@ -26,6 +31,12 @@ export class DocumentsPage
   errorMessage = '';
   selectedFile: File | null = null;
 
+  teams: TeamItem[] = [];
+  selectedDocumentId = '';
+  selectedTeamId = '';
+  sharing = false;
+  sharingMessage = '';
+
   searchQuery = '';
   searchResults: SearchDocumentResult[] = [];
   searching = false;
@@ -37,6 +48,7 @@ export class DocumentsPage
 
   constructor(
     private readonly documentsService: Documents,
+    private readonly teamsService: Teams,
     private readonly cdr: ChangeDetectorRef)
   {
   }
@@ -44,6 +56,7 @@ export class DocumentsPage
   ngOnInit(): void
   {
     this.loadDocuments();
+    this.loadTeams();
   }
 
   loadDocuments(): void
@@ -57,6 +70,15 @@ export class DocumentsPage
         next: response =>
         {
           this.documents = response.items;
+
+          if (
+            !this.selectedDocumentId &&
+            this.documents.length > 0)
+          {
+            this.selectedDocumentId =
+              this.documents[0].id;
+          }
+
           this.loading = false;
           this.cdr.detectChanges();
         },
@@ -65,6 +87,34 @@ export class DocumentsPage
           this.errorMessage =
             `Unable to load documents (HTTP ${error.status}).`;
           this.loading = false;
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  loadTeams(): void
+  {
+    this.teamsService
+      .getTeams()
+      .subscribe({
+        next: teams =>
+        {
+          this.teams = teams;
+
+          if (
+            !this.selectedTeamId &&
+            teams.length > 0)
+          {
+            this.selectedTeamId =
+              teams[0].id;
+          }
+
+          this.cdr.detectChanges();
+        },
+        error: error =>
+        {
+          this.errorMessage =
+            `Unable to load teams for sharing (HTTP ${error.status}).`;
           this.cdr.detectChanges();
         }
       });
@@ -104,6 +154,92 @@ export class DocumentsPage
           this.errorMessage =
             `Unable to upload document (HTTP ${error.status}).`;
           this.uploading = false;
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  onSelectedDocumentChanged(event: Event): void
+  {
+    this.selectedDocumentId =
+      (event.target as HTMLSelectElement).value;
+  }
+
+  onSelectedTeamChanged(event: Event): void
+  {
+    this.selectedTeamId =
+      (event.target as HTMLSelectElement).value;
+  }
+
+  shareSelected(): void
+  {
+    if (
+      !this.selectedDocumentId ||
+      !this.selectedTeamId)
+    {
+      return;
+    }
+
+    this.sharing = true;
+    this.sharingMessage = '';
+    this.errorMessage = '';
+
+    this.documentsService
+      .shareWithTeam(
+        this.selectedDocumentId,
+        this.selectedTeamId)
+      .subscribe({
+        next: () =>
+        {
+          this.sharing = false;
+          this.sharingMessage =
+            'Document shared with the selected team.';
+          this.cdr.detectChanges();
+        },
+        error: error =>
+        {
+          this.sharing = false;
+          this.errorMessage =
+            error.status === 404
+              ? 'Only the document owner can change sharing for this team.'
+              : `Unable to share document (HTTP ${error.status}).`;
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  unshareSelected(): void
+  {
+    if (
+      !this.selectedDocumentId ||
+      !this.selectedTeamId)
+    {
+      return;
+    }
+
+    this.sharing = true;
+    this.sharingMessage = '';
+    this.errorMessage = '';
+
+    this.documentsService
+      .unshareFromTeam(
+        this.selectedDocumentId,
+        this.selectedTeamId)
+      .subscribe({
+        next: () =>
+        {
+          this.sharing = false;
+          this.sharingMessage =
+            'Document access removed from the selected team.';
+          this.cdr.detectChanges();
+        },
+        error: error =>
+        {
+          this.sharing = false;
+          this.errorMessage =
+            error.status === 404
+              ? 'Only the document owner can change sharing for this team.'
+              : `Unable to unshare document (HTTP ${error.status}).`;
           this.cdr.detectChanges();
         }
       });

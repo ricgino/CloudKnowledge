@@ -4,7 +4,7 @@
       <p class="eyebrow">Knowledge base</p>
       <h2>Documents</h2>
       <p class="subtitle">
-        Upload documents, search their content and ask grounded questions.
+        Upload documents, share them with teams, search their content and ask grounded questions.
       </p>
     </div>
 
@@ -78,6 +78,71 @@
   }
 
   <div class="knowledge-tools">
+    <section class="tool-card">
+      <p class="eyebrow">Team access</p>
+      <h3>Share a document</h3>
+      <p class="tool-description">
+        Document owners can grant or revoke access for one of their teams.
+      </p>
+
+      <label>
+        Document
+        <select
+          [value]="selectedDocumentId"
+          (change)="onSelectedDocumentChanged($event)">
+          <option value="">Select a document</option>
+          @for (document of documents; track document.id) {
+            <option [value]="document.id">
+              {{ document.fileName }}
+            </option>
+          }
+        </select>
+      </label>
+
+      <label>
+        Team
+        <select
+          [value]="selectedTeamId"
+          (change)="onSelectedTeamChanged($event)">
+          <option value="">Select a team</option>
+          @for (team of teams; track team.id) {
+            <option [value]="team.id">
+              {{ team.name }} · {{ team.role }}
+            </option>
+          }
+        </select>
+      </label>
+
+      <div class="ask-actions">
+        <button
+          type="button"
+          class="primary-button"
+          (click)="shareSelected()"
+          [disabled]="!selectedDocumentId || !selectedTeamId || sharing">
+          {{ sharing ? 'Updating...' : 'Share' }}
+        </button>
+
+        <button
+          type="button"
+          class="secondary-button"
+          (click)="unshareSelected()"
+          [disabled]="!selectedDocumentId || !selectedTeamId || sharing">
+          Unshare
+        </button>
+
+        <button
+          type="button"
+          class="secondary-button"
+          (click)="loadTeams()">
+          Refresh teams
+        </button>
+      </div>
+
+      @if (sharingMessage) {
+        <p class="muted-result">{{ sharingMessage }}</p>
+      }
+    </section>
+
     <section class="tool-card">
       <p class="eyebrow">Semantic retrieval</p>
       <h3>Search knowledge</h3>

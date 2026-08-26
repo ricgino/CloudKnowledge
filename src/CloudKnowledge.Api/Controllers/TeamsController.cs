@@ -1,6 +1,7 @@
 using CloudKnowledge.Api.Contracts.Teams;
 using CloudKnowledge.Application.Teams.AddTeamMember;
 using CloudKnowledge.Application.Teams.CreateTeam;
+using CloudKnowledge.Application.Teams.GetTeams;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Identity.Web.Resource;
@@ -20,15 +21,42 @@ public sealed class TeamsController
     private readonly AddTeamMemberUseCase
         _addTeamMemberUseCase;
 
+    private readonly GetTeamsUseCase
+        _getTeamsUseCase;
+
     public TeamsController(
         CreateTeamUseCase createTeamUseCase,
-        AddTeamMemberUseCase addTeamMemberUseCase)
+        AddTeamMemberUseCase addTeamMemberUseCase,
+        GetTeamsUseCase getTeamsUseCase)
     {
         _createTeamUseCase =
             createTeamUseCase;
 
         _addTeamMemberUseCase =
             addTeamMemberUseCase;
+
+        _getTeamsUseCase =
+            getTeamsUseCase;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<TeamResponse>>> GetAll(
+        CancellationToken cancellationToken)
+    {
+        var results =
+            await _getTeamsUseCase.ExecuteAsync(
+                cancellationToken);
+
+        var response =
+            results
+                .Select(result =>
+                    new TeamResponse(
+                        result.Id,
+                        result.Name,
+                        result.Role.ToString()))
+                .ToArray();
+
+        return Ok(response);
     }
 
     [HttpPost]

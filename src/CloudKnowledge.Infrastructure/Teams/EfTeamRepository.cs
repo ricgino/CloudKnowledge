@@ -1,6 +1,8 @@
 using CloudKnowledge.Application.Teams;
+using CloudKnowledge.Application.Teams.GetTeams;
 using CloudKnowledge.Domain.Teams;
 using CloudKnowledge.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace CloudKnowledge.Infrastructure.Teams;
 
@@ -30,5 +32,24 @@ public sealed class EfTeamRepository
 
         await _dbContext.SaveChangesAsync(
             cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<GetTeamsResult>> GetForUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        return await (
+            from membership in _dbContext.TeamMembers
+            join team in _dbContext.Teams
+                on membership.TeamId equals team.Id
+            where membership.UserId == userId
+            orderby team.Name, team.Id
+            select new GetTeamsResult(
+                team.Id,
+                team.Name,
+                membership.Role))
+            .AsNoTracking()
+            .ToListAsync(
+                cancellationToken);
     }
 }
