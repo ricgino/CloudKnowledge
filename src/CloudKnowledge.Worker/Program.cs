@@ -105,8 +105,6 @@ builder.Services.AddSingleton<IAnswerGenerator>(
             model:
                 "qwen3:4b"));
 
-builder.Services.AddScoped<AskDocumentsUseCase>();
-
 builder.Services.AddScoped<
     IDocumentChunkEmbeddingRepository,
     EfDocumentChunkEmbeddingRepository>();

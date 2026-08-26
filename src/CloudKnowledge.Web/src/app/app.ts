@@ -442,7 +442,7 @@ export class App
     void
   {
     const documentId =
-      'ab01e593-05d5-4fc9-bae8-ca3d50d8ab1b';
+      '9614226f-3cec-4c90-9055-1c408591a4f6';
 
     const teamId =
       '08446f1f-678d-4057-946c-a2df7637ea9a';
@@ -481,7 +481,7 @@ export class App
     void
   {
     const documentId =
-      'ab01e593-05d5-4fc9-bae8-ca3d50d8ab1b';
+      '9614226f-3cec-4c90-9055-1c408591a4f6';
 
     const teamId =
       '08446f1f-678d-4057-946c-a2df7637ea9a';
@@ -515,4 +515,76 @@ export class App
       });
   }
 
+  searchTestDocument():
+    void
+  {
+    this.http
+      .post(
+        `${apiBaseUrl}/api/search`,
+        {
+          query:
+            'gestione dei documenti',
+          take:
+            5
+        })
+      .subscribe({
+        next:
+          result =>
+          {
+            this.apiResult =
+              JSON.stringify(
+                result,
+                null,
+                2);
+          },
+
+        error:
+          error =>
+          {
+            this.apiResult =
+              `HTTP ${error.status}\n` +
+              JSON.stringify(
+                error.error,
+                null,
+                2);
+          }
+      });
+  }
+
+  askTestDocument():
+    void
+  {
+    this.http
+      .post(
+        `${apiBaseUrl}/api/ask`,
+        {
+          question:
+            'Come funziona il sistema OTP descritto nel documento?',
+          take:
+            5
+        })
+      .subscribe({
+        next:
+          result =>
+          {
+            this.apiResult =
+              JSON.stringify(
+                result,
+                null,
+                2);
+          },
+
+        error:
+          error =>
+          {
+            this.apiResult =
+              `HTTP ${error.status}\n` +
+              JSON.stringify(
+                error.error,
+                null,
+                2);
+          }
+      });
+  }
+  
 }
