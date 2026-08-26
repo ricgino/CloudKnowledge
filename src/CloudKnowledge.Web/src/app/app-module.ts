@@ -1,20 +1,15 @@
 import { NgModule } from '@angular/core';
-import {
-  HTTP_INTERCEPTORS,
-  HttpClientModule
-} from '@angular/common/http';
+import { HTTP_INTERCEPTORS, HttpClientModule } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { BrowserModule } from '@angular/platform-browser';
 
 import {
   InteractionType,
   IPublicClientApplication,
-  PublicClientApplication
+  PublicClientApplication,
 } from '@azure/msal-browser';
 
-import {
-  RedirectComponent
-} from './redirect/redirect';
+import { RedirectComponent } from './redirect/redirect';
 
 import {
   MSAL_GUARD_CONFIG,
@@ -26,120 +21,78 @@ import {
   MsalInterceptor,
   MsalInterceptorConfiguration,
   MsalModule,
-  MsalService
+  MsalService,
 } from '@azure/msal-angular';
 
 import { AppRoutingModule } from './app-routing-module';
 import { App } from './app';
 
-import {
-  apiBaseUrl,
-  apiScope,
-  loginRequest,
-  msalConfig
-} from './auth-config';
+import { apiBaseUrl, apiScope, loginRequest, msalConfig } from './auth-config';
+import { DocumentsPage } from './features/documents/documents-page/documents-page';
 
-export function MSALInstanceFactory():
-  IPublicClientApplication
-{
-  return new PublicClientApplication(
-    msalConfig);
+export function MSALInstanceFactory(): IPublicClientApplication {
+  return new PublicClientApplication(msalConfig);
 }
 
-export function MSALGuardConfigFactory():
-  MsalGuardConfiguration
-{
+export function MSALGuardConfigFactory(): MsalGuardConfiguration {
   return {
-    interactionType:
-      InteractionType.Redirect,
+    interactionType: InteractionType.Redirect,
 
-    authRequest:
-      loginRequest
+    authRequest: loginRequest,
   };
 }
 
-export function MSALInterceptorConfigFactory():
-  MsalInterceptorConfiguration
-{
-  const protectedResourceMap =
-    new Map<string, Array<string>>();
+export function MSALInterceptorConfigFactory(): MsalInterceptorConfiguration {
+  const protectedResourceMap = new Map<string, Array<string>>();
 
-  protectedResourceMap.set(
-    `${apiBaseUrl}/api/*`,
-    [
-      apiScope
-    ]);
+  protectedResourceMap.set(`${apiBaseUrl}/api/*`, [apiScope]);
 
   return {
-    interactionType:
-      InteractionType.Redirect,
+    interactionType: InteractionType.Redirect,
 
     protectedResourceMap,
 
-    strictMatching:
-      true
+    strictMatching: true,
   };
 }
 
 @NgModule({
-  declarations: [
-    App,
-    RedirectComponent
-  ],
+  declarations: [App, RedirectComponent, DocumentsPage],
 
-  imports: [
-    BrowserModule,
-    CommonModule,
-    AppRoutingModule,
-    HttpClientModule,
-    MsalModule
-  ],
+  imports: [BrowserModule, CommonModule, AppRoutingModule, HttpClientModule, MsalModule],
 
   providers: [
     {
-      provide:
-        MSAL_INSTANCE,
+      provide: MSAL_INSTANCE,
 
-      useFactory:
-        MSALInstanceFactory
+      useFactory: MSALInstanceFactory,
     },
 
     {
-      provide:
-        MSAL_GUARD_CONFIG,
+      provide: MSAL_GUARD_CONFIG,
 
-      useFactory:
-        MSALGuardConfigFactory
+      useFactory: MSALGuardConfigFactory,
     },
 
     {
-      provide:
-        MSAL_INTERCEPTOR_CONFIG,
+      provide: MSAL_INTERCEPTOR_CONFIG,
 
-      useFactory:
-        MSALInterceptorConfigFactory
+      useFactory: MSALInterceptorConfigFactory,
     },
 
     {
-      provide:
-        HTTP_INTERCEPTORS,
+      provide: HTTP_INTERCEPTORS,
 
-      useClass:
-        MsalInterceptor,
+      useClass: MsalInterceptor,
 
-      multi:
-        true
+      multi: true,
     },
 
     MsalService,
     MsalGuard,
-    MsalBroadcastService
+    MsalBroadcastService,
   ],
 
-  bootstrap: [
-    App
-  ]
+  bootstrap: [App],
 })
-export class AppModule
-{
-}
+export class AppModule {}
