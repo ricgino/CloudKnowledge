@@ -4,7 +4,7 @@
       <p class="eyebrow">Knowledge base</p>
       <h2>Documents</h2>
       <p class="subtitle">
-        Upload documents and track their processing status.
+        Upload documents, search their content and ask grounded questions.
       </p>
     </div>
 
@@ -76,4 +76,94 @@
       }
     </div>
   }
+
+  <div class="knowledge-tools">
+    <section class="tool-card">
+      <p class="eyebrow">Semantic retrieval</p>
+      <h3>Search knowledge</h3>
+      <p class="tool-description">
+        Find the most relevant passages across documents you can access.
+      </p>
+
+      <div class="tool-controls">
+        <input
+          type="search"
+          placeholder="e.g. How are electronic documents signed?"
+          [value]="searchQuery"
+          (input)="onSearchQueryChanged($event)"
+          (keyup.enter)="search()"
+        />
+
+        <button
+          type="button"
+          class="primary-button"
+          (click)="search()"
+          [disabled]="!searchQuery.trim() || searching">
+          {{ searching ? 'Searching...' : 'Search' }}
+        </button>
+      </div>
+
+      @if (!searching && searchQuery && searchResults.length === 0) {
+        <p class="muted-result">No accessible passages found.</p>
+      }
+
+      @if (searchResults.length > 0) {
+        <div class="results-list">
+          @for (result of searchResults; track result.chunkId) {
+            <article class="result-card">
+              <div class="result-meta">
+                <strong>{{ documentName(result.documentId) }}</strong>
+                <span>{{ (result.similarity * 100).toFixed(1) }}% match</span>
+              </div>
+              <p>{{ result.content }}</p>
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="tool-card ask-card">
+      <p class="eyebrow">Grounded answer</p>
+      <h3>Ask CloudKnowledge</h3>
+      <p class="tool-description">
+        Ask a question and get an answer grounded only in documents you can access.
+      </p>
+
+      <textarea
+        rows="4"
+        placeholder="Ask a question about your knowledge base..."
+        [value]="question"
+        (input)="onQuestionChanged($event)"></textarea>
+
+      <div class="ask-actions">
+        <button
+          type="button"
+          class="primary-button"
+          (click)="ask()"
+          [disabled]="!question.trim() || asking">
+          {{ asking ? 'Thinking...' : 'Ask' }}
+        </button>
+      </div>
+
+      @if (answer) {
+        <div class="answer-card">
+          <h4>Answer</h4>
+          <p>{{ answer }}</p>
+
+          @if (answerSources.length > 0) {
+            <div class="sources">
+              <h4>Sources</h4>
+              @for (source of answerSources; track source.chunkId) {
+                <div class="source-row">
+                  <span class="source-label">{{ source.label }}</span>
+                  <span>{{ documentName(source.documentId) }}</span>
+                  <span>{{ (source.similarity * 100).toFixed(1) }}%</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+  </div>
 </section>
