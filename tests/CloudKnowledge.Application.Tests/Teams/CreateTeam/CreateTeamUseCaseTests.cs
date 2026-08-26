@@ -1,5 +1,6 @@
 using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Application.Teams.CreateTeam;
+using CloudKnowledge.Application.Teams.GetTeams;
 using CloudKnowledge.Application.Users;
 using CloudKnowledge.Domain.Teams;
 
@@ -110,6 +111,17 @@ public sealed class CreateTeamUseCaseTests
                 ownerMembership;
 
             return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<GetTeamsResult>> GetForUserAsync(
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyList<GetTeamsResult> result =
+                Array.Empty<GetTeamsResult>();
+
+            return Task.FromResult(
+                result);
         }
     }
 }
