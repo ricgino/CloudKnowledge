@@ -56,6 +56,79 @@ services:
     networks:
       - servicebus
 
+  api:
+    build:
+      context: .
+      dockerfile: src/CloudKnowledge.Api/Dockerfile
+    container_name: cloudknowledge-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Storage__ConnectionString: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+      Storage__ContainerName: documents
+      Messaging__ConnectionString: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+      Messaging__QueueName: document-processing
+      Ai__BaseUrl: http://host.docker.internal:11434
+      Ai__EmbeddingModel: nomic-embed-text-v2-moe
+      Ai__AnswerModel: qwen3:4b
+      Ai__EmbeddingDimensions: 768
+      Cors__AllowedOrigins__0: http://localhost:4200
+      Database__ApplyMigrationsOnStartup: "true"
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+      servicebus:
+        condition: service_started
+    networks:
+      - default
+      - servicebus
+
+  worker:
+    build:
+      context: .
+      dockerfile: src/CloudKnowledge.Worker/Dockerfile
+    container_name: cloudknowledge-worker
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Storage__ConnectionString: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+      Storage__ContainerName: documents
+      Messaging__ConnectionString: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+      Messaging__QueueName: document-processing
+      Messaging__MaxDeliveryCount: 3
+      Messaging__StartupRetrySeconds: 5
+      Ai__BaseUrl: http://host.docker.internal:11434
+      Ai__EmbeddingModel: nomic-embed-text-v2-moe
+      Ai__EmbeddingDimensions: 768
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      api:
+        condition: service_healthy
+      servicebus:
+        condition: service_started
+    networks:
+      - default
+      - servicebus
+
+  web:
+    build:
+      context: .
+      dockerfile: src/CloudKnowledge.Web/Dockerfile
+    container_name: cloudknowledge-web
+    ports:
+      - "4200:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   azurite_data:

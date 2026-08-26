@@ -4,11 +4,14 @@ import {
   LogLevel
 } from '@azure/msal-browser';
 
+const appBaseUrl =
+  window.location.origin;
+
 export const apiScope =
   'api://3553ddee-92f1-464e-a409-4395bddb3898/access_as_user';
 
 export const apiBaseUrl =
-  'https://localhost:7293';
+  appBaseUrl;
 
 export const msalConfig: Configuration = {
   auth: {
@@ -24,10 +27,10 @@ export const msalConfig: Configuration = {
     ],
 
     redirectUri:
-    'http://localhost:4200/redirect',
+      `${appBaseUrl}/redirect`,
 
     postLogoutRedirectUri:
-      'http://localhost:4200/redirect'
+      `${appBaseUrl}/redirect`
   },
 
   cache: {

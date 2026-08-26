@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using CloudKnowledge.Application.Documents;
-using CloudKnowledge.Application.Documents.ProcessDocument;
 using CloudKnowledge.Application.Documents.FailDocument;
+using CloudKnowledge.Application.Documents.ProcessDocument;
 using CloudKnowledge.Application.Documents.ProcessDocument.Exceptions;
 
 namespace CloudKnowledge.Worker;
@@ -36,22 +36,9 @@ public sealed class Worker : BackgroundService
                 "Service Bus queue name was not found.");
 
         _processor =
-            _serviceBusClient.CreateProcessor(
+            await StartProcessorWithRetryAsync(
                 queueName,
-                new ServiceBusProcessorOptions
-                {
-                    AutoCompleteMessages = false,
-                    MaxConcurrentCalls = 1
-                });
-
-        _processor.ProcessMessageAsync +=
-            ProcessMessageAsync;
-
-        _processor.ProcessErrorAsync +=
-            ProcessErrorAsync;
-
-        await _processor.StartProcessingAsync(
-            stoppingToken);
+                stoppingToken);
 
         _logger.LogInformation(
             "Document worker started. Listening on queue {QueueName}.",
@@ -69,10 +56,75 @@ public sealed class Worker : BackgroundService
         }
         finally
         {
-            await _processor.StopProcessingAsync(
-                CancellationToken.None);
+            if (_processor is not null)
+            {
+                await _processor.StopProcessingAsync(
+                    CancellationToken.None);
 
-            await _processor.DisposeAsync();
+                await _processor.DisposeAsync();
+            }
+        }
+    }
+
+    private async Task<ServiceBusProcessor> StartProcessorWithRetryAsync(
+        string queueName,
+        CancellationToken stoppingToken)
+    {
+        var retrySeconds =
+            _configuration.GetValue<int>(
+                "Messaging:StartupRetrySeconds");
+
+        if (retrySeconds <= 0)
+        {
+            retrySeconds = 5;
+        }
+
+        while (true)
+        {
+            stoppingToken.ThrowIfCancellationRequested();
+
+            var processor =
+                _serviceBusClient.CreateProcessor(
+                    queueName,
+                    new ServiceBusProcessorOptions
+                    {
+                        AutoCompleteMessages = false,
+                        MaxConcurrentCalls = 1
+                    });
+
+            processor.ProcessMessageAsync +=
+                ProcessMessageAsync;
+
+            processor.ProcessErrorAsync +=
+                ProcessErrorAsync;
+
+            try
+            {
+                await processor.StartProcessingAsync(
+                    stoppingToken);
+
+                return processor;
+            }
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
+            {
+                await processor.DisposeAsync();
+                throw;
+            }
+            catch (Exception exception)
+            {
+                await processor.DisposeAsync();
+
+                _logger.LogWarning(
+                    exception,
+                    "Service Bus is not ready. Retrying worker startup in {RetrySeconds} seconds.",
+                    retrySeconds);
+
+                await Task.Delay(
+                    TimeSpan.FromSeconds(
+                        retrySeconds),
+                    stoppingToken);
+            }
         }
     }
 
@@ -240,6 +292,7 @@ public sealed class Worker : BackgroundService
 
         return false;
     }
+
     private async Task MarkDocumentAsFailedAsync(
         Guid documentId,
         CancellationToken cancellationToken)
@@ -254,7 +307,8 @@ public sealed class Worker : BackgroundService
         await failDocumentUseCase.ExecuteAsync(
             documentId,
             cancellationToken);
-    }    
+    }
+
     private Task ProcessErrorAsync(
         ProcessErrorEventArgs args)
     {

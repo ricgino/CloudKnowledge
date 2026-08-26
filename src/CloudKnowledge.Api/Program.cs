@@ -61,6 +61,8 @@ builder.Services.AddCors(
     });
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddControllers();
+builder.Services.AddHealthChecks();
 
 builder.Services.AddScoped<
     IUserAccountRepository,
@@ -69,8 +71,6 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     ICurrentUser,
     HttpCurrentUser>();
-
-builder.Services.AddControllers();
 
 builder.Services.AddDbContext<CloudKnowledgeDbContext>(
     (serviceProvider, options) =>
@@ -271,6 +271,19 @@ builder.Services.AddScoped<
 
 var app = builder.Build();
 
+if (app.Configuration.GetValue<bool>(
+        "Database:ApplyMigrationsOnStartup"))
+{
+    await using var scope =
+        app.Services.CreateAsyncScope();
+
+    var dbContext =
+        scope.ServiceProvider
+            .GetRequiredService<CloudKnowledgeDbContext>();
+
+    await dbContext.Database.MigrateAsync();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
@@ -282,6 +295,9 @@ app.UseCors(
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapHealthChecks(
+    "/health");
 
 app.MapControllers();
 
