@@ -42,7 +42,9 @@ public sealed class HttpCurrentUser
             principal.FindFirst("iss")?.Value;
 
         var subject =
-            principal.FindFirst("sub")?.Value;
+            principal.FindFirst("sub")?.Value
+            ?? principal.FindFirst(
+                ClaimTypes.NameIdentifier)?.Value;
 
         if (string.IsNullOrWhiteSpace(issuer))
         {

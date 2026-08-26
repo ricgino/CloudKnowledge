@@ -33,6 +33,22 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddCors(
+    options =>
+    {
+        options.AddPolicy(
+            "CloudKnowledgeWeb",
+            policy =>
+            {
+                policy
+                    .WithOrigins(
+                        "http://localhost:4200")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            });
+    });
+
+
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<
@@ -207,8 +223,17 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     UnshareDocumentFromTeamUseCase>();
-    
+
+
 var app = builder.Build();
+
+app.UseHttpsRedirection();
+
+app.UseCors(
+    "CloudKnowledgeWeb");
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
