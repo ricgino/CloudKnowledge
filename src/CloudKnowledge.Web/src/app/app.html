@@ -19,8 +19,33 @@
     Call CloudKnowledge API
   </button>
 
+  <button (click)="createTestTeam()">
+    Create test team
+  </button>
+
   <button (click)="logout()">
     Sign out
+  </button>
+
+  <button (click)="addTestMember()">
+    Add test member
+  </button>
+
+  <input
+    type="file"
+    (change)="onFileSelected($event)"
+  />
+
+  <button (click)="uploadDocument()">
+    Upload document
+  </button>
+
+  <button (click)="shareTestDocument()">
+    Share test document
+  </button>
+
+  <button (click)="unshareTestDocument()">
+    Unshare test document
   </button>
 }
 

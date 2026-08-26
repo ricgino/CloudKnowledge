@@ -191,6 +191,74 @@ export class App
       });
   }
 
+  createTestTeam():
+    void
+  {
+    this.http
+      .post(
+        `${apiBaseUrl}/api/teams`,
+        {
+          name:
+            'Engineering'
+        })
+      .subscribe({
+        next:
+          result =>
+          {
+            this.apiResult =
+              JSON.stringify(
+                result,
+                null,
+                2);
+          },
+
+        error:
+          error =>
+          {
+            this.apiResult =
+              `HTTP ${error.status}\n` +
+              JSON.stringify(
+                error.error,
+                null,
+                2);
+          }
+      });
+  }
+
+  addTestMember():
+    void
+  {
+    this.http
+      .post(
+        `${apiBaseUrl}/api/teams/08446f1f-678d-4057-946c-a2df7637ea9a/members`,
+        {
+          email:
+            'rgino33@gmail.com'
+        })
+      .subscribe({
+        next:
+          result =>
+          {
+            this.apiResult =
+              JSON.stringify(
+                result,
+                null,
+                2);
+          },
+
+        error:
+          error =>
+          {
+            this.apiResult =
+              `HTTP ${error.status}\n` +
+              JSON.stringify(
+                error.error,
+                null,
+                2);
+          }
+      });
+  }
+
   showAccessTokenClaims():
     void
   {
@@ -308,4 +376,143 @@ export class App
     this.destroy$.next();
     this.destroy$.complete();
   }
+
+  selectedFile:
+    File | null =
+    null;
+
+  onFileSelected(
+    event: Event):
+    void
+  {
+    const input =
+      event.target as HTMLInputElement;
+
+    this.selectedFile =
+      input.files?.[0] ?? null;
+  }
+
+  uploadDocument():
+    void
+  {
+    if (!this.selectedFile)
+    {
+      this.apiResult =
+        'Select a file first.';
+
+      return;
+    }
+
+    const formData =
+      new FormData();
+
+    formData.append(
+      'File',
+      this.selectedFile);
+
+    this.http
+      .post(
+        `${apiBaseUrl}/api/documents`,
+        formData)
+      .subscribe({
+        next:
+          result =>
+          {
+            this.apiResult =
+              JSON.stringify(
+                result,
+                null,
+                2);
+          },
+
+        error:
+          error =>
+          {
+            this.apiResult =
+              `HTTP ${error.status}\n` +
+              JSON.stringify(
+                error.error,
+                null,
+                2);
+          }
+      });
+  }  
+
+  shareTestDocument():
+    void
+  {
+    const documentId =
+      'ab01e593-05d5-4fc9-bae8-ca3d50d8ab1b';
+
+    const teamId =
+      '08446f1f-678d-4057-946c-a2df7637ea9a';
+
+    this.http
+      .put(
+        `${apiBaseUrl}/api/documents/${documentId}/teams/${teamId}`,
+        null,
+        {
+          observe:
+            'response'
+        })
+      .subscribe({
+        next:
+          response =>
+          {
+            this.apiResult =
+              `HTTP ${response.status}\n` +
+              'Document shared with Engineering.';
+          },
+
+        error:
+          error =>
+          {
+            this.apiResult =
+              `HTTP ${error.status}\n` +
+              JSON.stringify(
+                error.error,
+                null,
+                2);
+          }
+      });
+  }  
+
+  unshareTestDocument():
+    void
+  {
+    const documentId =
+      'ab01e593-05d5-4fc9-bae8-ca3d50d8ab1b';
+
+    const teamId =
+      '08446f1f-678d-4057-946c-a2df7637ea9a';
+
+    this.http
+      .delete(
+        `${apiBaseUrl}/api/documents/${documentId}/teams/${teamId}`,
+        {
+          observe:
+            'response'
+        })
+      .subscribe({
+        next:
+          response =>
+          {
+            this.apiResult =
+              `HTTP ${response.status}\n` +
+              'Document unshared from Engineering.';
+          },
+
+        error:
+          error =>
+          {
+            this.apiResult =
+              `HTTP ${error.status}\n` +
+              JSON.stringify(
+                error.error,
+                null,
+                2);
+          }
+      });
+  }
+
 }
