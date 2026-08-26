@@ -1,0 +1,86 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f8f9fa;
+  color: #202124;
+  font-family: Arial, sans-serif;
+}
+
+.app-shell {
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2rem 0 3rem;
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.brand-kicker {
+  margin: 0 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.05;
+  max-width: 760px;
+}
+
+.signin-card {
+  max-width: 560px;
+  padding: 1.5rem;
+  border: 1px solid #dadce0;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.signin-card p {
+  color: #5f6368;
+}
+
+.eyebrow {
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+button {
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.primary-button {
+  border: 1px solid #1a73e8;
+  background: #1a73e8;
+  color: #fff;
+}
+
+.signout-button {
+  border: 1px solid #dadce0;
+  background: #fff;
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    flex-direction: column;
+  }
+}

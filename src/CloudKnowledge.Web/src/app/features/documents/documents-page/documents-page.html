@@ -1,1 +1,79 @@
-<p>documents-page works!</p>
+<section class="documents-page">
+  <div class="documents-header">
+    <div>
+      <p class="eyebrow">Knowledge base</p>
+      <h2>Documents</h2>
+      <p class="subtitle">
+        Upload documents and track their processing status.
+      </p>
+    </div>
+
+    <button
+      type="button"
+      class="secondary-button"
+      (click)="loadDocuments()"
+      [disabled]="loading">
+      {{ loading ? 'Refreshing...' : 'Refresh' }}
+    </button>
+  </div>
+
+  <div class="upload-card">
+    <div>
+      <h3>Upload a document</h3>
+      <p>PDF files are processed asynchronously and become searchable when ready.</p>
+    </div>
+
+    <div class="upload-controls">
+      <input
+        type="file"
+        accept="application/pdf"
+        (change)="onFileSelected($event)"
+      />
+
+      <button
+        type="button"
+        class="primary-button"
+        (click)="upload()"
+        [disabled]="!selectedFile || uploading">
+        {{ uploading ? 'Uploading...' : 'Upload' }}
+      </button>
+    </div>
+  </div>
+
+  @if (errorMessage) {
+    <div class="error-message">
+      {{ errorMessage }}
+    </div>
+  }
+
+  @if (loading && documents.length === 0) {
+    <div class="empty-state">
+      Loading documents...
+    </div>
+  } @else if (documents.length === 0) {
+    <div class="empty-state">
+      No documents yet. Upload your first PDF.
+    </div>
+  } @else {
+    <div class="documents-grid">
+      @for (document of documents; track document.id) {
+        <article class="document-card">
+          <div class="document-icon">PDF</div>
+
+          <div class="document-content">
+            <h3>{{ document.fileName }}</h3>
+            <p>{{ document.contentType }}</p>
+          </div>
+
+          <span
+            class="status"
+            [class.ready]="document.status === 'Ready'"
+            [class.pending]="document.status === 'Pending'"
+            [class.failed]="document.status === 'Failed'">
+            {{ document.status }}
+          </span>
+        </article>
+      }
+    </div>
+  }
+</section>

@@ -54,4 +54,21 @@ export class Documents
     return this.http.get<DocumentsPageResponse>(
       `${apiBaseUrl}/api/documents?page=${page}&pageSize=${pageSize}`);
   }
+
+
+  uploadDocument(
+    file: File):
+    Observable<DocumentItem>
+  {
+    const formData =
+      new FormData();
+
+    formData.append(
+      'File',
+      file);
+
+    return this.http.post<DocumentItem>(
+      `${apiBaseUrl}/api/documents`,
+      formData);
+  }
 }

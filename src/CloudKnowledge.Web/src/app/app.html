@@ -1,72 +1,40 @@
-<h1>CloudKnowledge</h1>
+<main class="app-shell">
+  <header class="topbar">
+    <div>
+      <p class="brand-kicker">CloudKnowledge</p>
+      <h1>Private knowledge, securely searchable.</h1>
+    </div>
 
-@if (!loggedIn) {
-  <button (click)="login()">
-    Sign in
-  </button>
-}
+    @if (loggedIn) {
+      <button
+        type="button"
+        class="signout-button"
+        (click)="logout()">
+        Sign out
+      </button>
+    }
+  </header>
 
-@if (loggedIn) {
-  <p>
-    Authenticated with Microsoft Entra External ID.
-  </p>
+  @if (!loggedIn) {
+    <section class="signin-card">
+      <p class="eyebrow">Secure workspace</p>
+      <h2>Sign in to your knowledge base</h2>
+      <p>
+        Access your private documents, team shares and permission-aware AI search.
+      </p>
 
-  <button (click)="showAccessTokenClaims()">
-    Show safe token claims
-  </button>
+      <button
+        type="button"
+        class="primary-button"
+        (click)="login()">
+        Sign in with Microsoft
+      </button>
+    </section>
+  }
 
-  <button (click)="loadDocuments()">
-    Call CloudKnowledge API
-  </button>
+  @if (loggedIn) {
+    <app-documents-page></app-documents-page>
+  }
 
-  <button (click)="createTestTeam()">
-    Create test team
-  </button>
-
-  <button (click)="logout()">
-    Sign out
-  </button>
-
-  <button (click)="addTestMember()">
-    Add test member
-  </button>
-
-  <input
-    type="file"
-    (change)="onFileSelected($event)"
-  />
-
-  <button (click)="uploadDocument()">
-    Upload document
-  </button>
-
-  <button (click)="shareTestDocument()">
-    Share test document
-  </button>
-
-  <button (click)="unshareTestDocument()">
-    Unshare test document
-  </button>
-
-  <button (click)="searchTestDocument()">
-    Search test document
-  </button>
-
-  <button (click)="askTestDocument()">
-    Ask test document
-  </button>
-}
-
-@if (tokenClaims) {
-  <h2>Access token claims</h2>
-
-  <pre>{{ tokenClaims | json }}</pre>
-}
-
-@if (apiResult) {
-  <h2>API response</h2>
-
-  <pre>{{ apiResult }}</pre>
-}
-
-<router-outlet></router-outlet>
+  <router-outlet></router-outlet>
+</main>
