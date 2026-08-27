@@ -19,11 +19,27 @@ public sealed class EfDocumentSemanticSearchRepository
             dbContext;
     }
 
+    public Task<IReadOnlyList<SemanticSearchResult>>
+        SearchAccessibleAsync(
+            Guid userId,
+            float[] queryEmbedding,
+            int take,
+            CancellationToken cancellationToken)
+    {
+        return SearchAccessibleAsync(
+            userId,
+            queryEmbedding,
+            take,
+            DocumentRetrievalScope.All,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<SemanticSearchResult>>
         SearchAccessibleAsync(
             Guid userId,
             float[] queryEmbedding,
             int take,
+            DocumentRetrievalScope scope,
             CancellationToken cancellationToken)
     {
         if (userId == Guid.Empty)
@@ -31,6 +47,15 @@ public sealed class EfDocumentSemanticSearchRepository
             throw new ArgumentException(
                 "User id cannot be empty.",
                 nameof(userId));
+        }
+
+        ArgumentNullException.ThrowIfNull(
+            scope);
+
+        if (scope.Kind != DocumentRetrievalScopeKind.All)
+        {
+            throw new NotSupportedException(
+                "Team-scoped semantic retrieval is not implemented yet.");
         }
 
         var queryVector =
