@@ -118,6 +118,64 @@ namespace CloudKnowledge.Infrastructure.Persistence.Migrations
                     b.ToTable("document_team_access", (string)null);
                 });
 
+            modelBuilder.Entity("CloudKnowledge.Domain.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("DeduplicationKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("deduplication_key");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("message");
+
+                    b.Property<DateTime?>("ReadAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at_utc");
+
+                    b.Property<string>("Target")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("target");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "DeduplicationKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_notifications_user_id_deduplication_key");
+
+                    b.HasIndex("UserId", "CreatedAtUtc", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("IX_notifications_user_id_created_at_utc_id");
+
+                    b.ToTable("notifications", (string)null);
+                });
+
             modelBuilder.Entity("CloudKnowledge.Domain.Teams.Team", b =>
                 {
                     b.Property<Guid>("Id")
@@ -261,6 +319,15 @@ namespace CloudKnowledge.Infrastructure.Persistence.Migrations
                     b.HasOne("CloudKnowledge.Domain.Teams.Team", null)
                         .WithMany()
                         .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CloudKnowledge.Domain.Notifications.Notification", b =>
+                {
+                    b.HasOne("CloudKnowledge.Domain.Users.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -26,6 +26,11 @@ import {
   loginRequest
 } from './auth-config';
 
+import {
+  NotificationItem,
+  Notifications
+} from './features/notifications/notifications';
+
 type AppSection =
   'knowledge' |
   'documents' |
@@ -46,12 +51,20 @@ export class App
   accountName = '';
   accountUsername = '';
 
+  notifications: NotificationItem[] = [];
+  notificationsOpen = false;
+  notificationsLoading = false;
+  notificationError = '';
+
+  private notificationsStarted = false;
+
   private readonly destroy$ =
     new Subject<void>();
 
   constructor(
     private readonly auth: MsalService,
     private readonly broadcast: MsalBroadcastService,
+    private readonly notificationsService: Notifications,
     private readonly cdr: ChangeDetectorRef)
   {
   }
@@ -121,11 +134,68 @@ export class App
         });
   }
 
+  get unreadNotificationCount(): number
+  {
+    return this.notifications
+      .filter(notification =>
+        !notification.isRead)
+      .length;
+  }
+
   selectSection(
     section: AppSection):
     void
   {
     this.activeSection = section;
+    this.notificationsOpen = false;
+  }
+
+  toggleNotifications(): void
+  {
+    this.notificationsOpen =
+      !this.notificationsOpen;
+  }
+
+  openNotification(
+    notification: NotificationItem):
+    void
+  {
+    if (!notification.isRead)
+    {
+      this.notificationsService
+        .markRead(
+          notification.id)
+        .subscribe({
+          next: () =>
+          {
+            this.notifications =
+              this.notifications.map(item =>
+                item.id === notification.id
+                  ? {
+                      ...item,
+                      isRead: true
+                    }
+                  : item);
+
+            this.cdr.detectChanges();
+          },
+          error: error =>
+          {
+            console.warn(
+              'Unable to mark notification as read.',
+              error);
+          }
+        });
+    }
+
+    if (notification.target ===
+        'documents')
+    {
+      this.activeSection =
+        'documents';
+    }
+
+    this.notificationsOpen = false;
   }
 
   login(): void
@@ -136,6 +206,7 @@ export class App
 
   logout(): void
   {
+    this.shutdownNotifications();
     this.auth.logoutRedirect();
   }
 
@@ -170,10 +241,83 @@ export class App
     this.accountUsername =
       activeAccount?.username ??
       '';
+
+    if (this.loggedIn)
+    {
+      this.initializeNotifications();
+    }
+    else
+    {
+      this.shutdownNotifications();
+    }
+  }
+
+  private initializeNotifications(): void
+  {
+    if (this.notificationsStarted)
+    {
+      return;
+    }
+
+    this.notificationsStarted = true;
+    this.notificationsLoading = true;
+    this.notificationError = '';
+
+    this.notificationsService
+      .getNotifications()
+      .subscribe({
+        next: notifications =>
+        {
+          this.notifications = notifications;
+          this.notificationsLoading = false;
+          this.cdr.detectChanges();
+        },
+        error: error =>
+        {
+          this.notificationsLoading = false;
+          this.notificationError =
+            `Unable to load notifications (HTTP ${error.status}).`;
+          this.cdr.detectChanges();
+        }
+      });
+
+    this.notificationsService.startRealtime(
+      notification =>
+      {
+        if (this.notifications.some(item =>
+            item.id === notification.id))
+        {
+          return;
+        }
+
+        this.notifications = [
+          notification,
+          ...this.notifications
+        ].slice(
+          0,
+          20);
+
+        this.cdr.detectChanges();
+      });
+  }
+
+  private shutdownNotifications(): void
+  {
+    if (!this.notificationsStarted)
+    {
+      return;
+    }
+
+    this.notificationsStarted = false;
+    this.notificationsOpen = false;
+    this.notifications = [];
+    this.notificationError = '';
+    this.notificationsService.stopRealtime();
   }
 
   ngOnDestroy(): void
   {
+    this.shutdownNotifications();
     this.destroy$.next();
     this.destroy$.complete();
   }

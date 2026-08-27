@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using Azure.Storage.Blobs;
 using CloudKnowledge.Api.Authentication;
+using CloudKnowledge.Api.Notifications;
 using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.Access;
 using CloudKnowledge.Application.Documents.AskDocuments;
@@ -11,12 +12,15 @@ using CloudKnowledge.Application.Documents.GetDocument;
 using CloudKnowledge.Application.Documents.GetDocuments;
 using CloudKnowledge.Application.Documents.SearchDocuments;
 using CloudKnowledge.Application.Documents.Sharing;
+using CloudKnowledge.Application.Notifications;
+using CloudKnowledge.Application.Notifications.DocumentReady;
 using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Application.Teams.AddTeamMember;
 using CloudKnowledge.Application.Teams.CreateTeam;
 using CloudKnowledge.Application.Teams.GetTeams;
 using CloudKnowledge.Application.Users;
 using CloudKnowledge.Infrastructure.Documents;
+using CloudKnowledge.Infrastructure.Notifications;
 using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Infrastructure.Teams;
 using CloudKnowledge.Infrastructure.Users;
@@ -176,6 +180,25 @@ builder.Services.AddScoped<
     IDocumentProcessingQueue,
     AzureServiceBusDocumentProcessingQueue>();
 
+builder.Services.AddSingleton<IDocumentReadyPublisher>(
+    serviceProvider =>
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var queueName =
+            configuration["Messaging:NotificationsQueueName"]
+            ?? throw new InvalidOperationException(
+                "Notifications queue name was not found.");
+
+        var client =
+            serviceProvider.GetRequiredService<ServiceBusClient>();
+
+        return new AzureServiceBusDocumentReadyPublisher(
+            client.CreateSender(
+                queueName));
+    });
+
 builder.Services.AddOpenApi();
 
 builder.Services.AddSingleton(
@@ -280,6 +303,27 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     UnshareDocumentFromTeamUseCase>();
+
+builder.Services.AddScoped<
+    INotificationRepository,
+    EfNotificationRepository>();
+
+builder.Services.AddScoped<
+    IDocumentReadyNotificationQuery,
+    EfDocumentReadyNotificationQuery>();
+
+builder.Services.AddScoped<GetNotificationsUseCase>();
+builder.Services.AddScoped<MarkNotificationReadUseCase>();
+builder.Services.AddScoped<CreateDocumentReadyNotificationsUseCase>();
+
+builder.Services.AddSingleton<NotificationStreamBroker>();
+
+if (builder.Configuration.GetValue<bool>(
+        "Messaging:NotificationsEnabled"))
+{
+    builder.Services.AddHostedService<
+        DocumentReadyNotificationsWorker>();
+}
 
 var app = builder.Build();
 

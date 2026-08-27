@@ -1,4 +1,5 @@
 using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Notifications.DocumentReady;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -44,7 +45,10 @@ public sealed class CloudKnowledgeApiFactory
                             _storageConnectionString,
 
                         ["Storage:ContainerName"] =
-                            "documents"
+                            "documents",
+
+                        ["Messaging:NotificationsEnabled"] =
+                            "false"
                     });
             });
 
@@ -52,6 +56,7 @@ public sealed class CloudKnowledgeApiFactory
             services =>
             {
                 services.RemoveAll<IDocumentProcessingQueue>();
+                services.RemoveAll<IDocumentReadyPublisher>();
 
                 services
                     .AddAuthentication(
@@ -73,6 +78,9 @@ public sealed class CloudKnowledgeApiFactory
 
                 services.AddSingleton<IDocumentProcessingQueue>(
                     ProcessingQueue);
+
+                services.AddSingleton<IDocumentReadyPublisher>(
+                    new FakeDocumentReadyPublisher());
             });
     }
 
@@ -87,6 +95,17 @@ public sealed class CloudKnowledgeApiFactory
         {
             PublishedDocumentId = documentId;
 
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeDocumentReadyPublisher
+        : IDocumentReadyPublisher
+    {
+        public Task PublishAsync(
+            Guid documentId,
+            CancellationToken cancellationToken)
+        {
             return Task.CompletedTask;
         }
     }

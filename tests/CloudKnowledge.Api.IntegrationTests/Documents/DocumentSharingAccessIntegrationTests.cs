@@ -1,4 +1,5 @@
 using CloudKnowledge.Application.Documents.Sharing;
+using CloudKnowledge.Application.Notifications.DocumentReady;
 using CloudKnowledge.Application.Users;
 using CloudKnowledge.Domain.Documents;
 using CloudKnowledge.Domain.Teams;
@@ -101,6 +102,13 @@ public sealed class DocumentSharingAccessIntegrationTests
             new EfDocumentAccessRepository(
                 dbContext);
 
+        var documentRepository =
+            new EfDocumentRepository(
+                dbContext);
+
+        var documentReadyPublisher =
+            new FakeDocumentReadyPublisher();
+
         var currentUser =
             new FakeCurrentUser(
                 alice.Id);
@@ -109,6 +117,8 @@ public sealed class DocumentSharingAccessIntegrationTests
             new ShareDocumentWithTeamUseCase(
                 documentSharingRepository,
                 teamMembershipRepository,
+                documentRepository,
+                documentReadyPublisher,
                 currentUser);
 
         var unshareUseCase =
@@ -206,6 +216,17 @@ public sealed class DocumentSharingAccessIntegrationTests
         {
             return Task.FromResult(
                 _userId);
+        }
+    }
+
+    private sealed class FakeDocumentReadyPublisher
+        : IDocumentReadyPublisher
+    {
+        public Task PublishAsync(
+            Guid documentId,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
         }
     }
 }

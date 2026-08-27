@@ -1,4 +1,5 @@
 using CloudKnowledge.Domain.Documents;
+using CloudKnowledge.Domain.Notifications;
 using CloudKnowledge.Domain.Teams;
 using CloudKnowledge.Domain.Users;
 using CloudKnowledge.Infrastructure.Persistence.Models;
@@ -34,6 +35,9 @@ public sealed class CloudKnowledgeDbContext : DbContext
 
     public DbSet<DocumentTeamAccess> DocumentTeamAccess =>
         Set<DocumentTeamAccess>();
+
+    public DbSet<Notification> Notifications =>
+        Set<Notification>();
 
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)

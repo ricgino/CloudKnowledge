@@ -1,1 +1,195 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global styles shared by the application shell. */
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.notification-center {
+  position: relative;
+}
+
+.notification-button {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dce2ec;
+  border-radius: 11px;
+  background: #fff;
+  color: #4d596d;
+}
+
+.notification-button:hover,
+.notification-button.active {
+  border-color: #c8d3f4;
+  background: #f2f5ff;
+  color: #2948bd;
+}
+
+.notification-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -6px;
+  right: -7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #d84040;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.notification-panel {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 0.65rem);
+  right: 0;
+  width: min(390px, calc(100vw - 2rem));
+  overflow: hidden;
+  border: 1px solid #dde3ed;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 22px 60px rgba(30, 43, 72, 0.18);
+}
+
+.notification-panel-heading {
+  padding: 1rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.notification-panel-heading strong,
+.notification-panel-heading span {
+  display: block;
+}
+
+.notification-panel-heading strong {
+  font-size: 0.95rem;
+}
+
+.notification-panel-heading div > span {
+  margin-top: 0.15rem;
+  color: #858fa0;
+  font-size: 0.74rem;
+}
+
+.live-indicator {
+  padding: 0.28rem 0.5rem;
+  border-radius: 999px;
+  background: #e8f6ed;
+  color: #267344;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.notification-list {
+  max-height: 430px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 0.7rem;
+  border: 0;
+  border-bottom: 1px solid #f0f2f6;
+  background: #fff;
+  color: #283348;
+  text-align: left;
+}
+
+.notification-item:hover {
+  background: #f8f9fc;
+}
+
+.notification-item.unread {
+  background: #f5f7ff;
+}
+
+.notification-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.notification-item.unread .notification-dot {
+  background: #3155d8;
+}
+
+.notification-copy,
+.notification-copy strong,
+.notification-copy span,
+.notification-copy small {
+  display: block;
+}
+
+.notification-copy strong {
+  font-size: 0.83rem;
+}
+
+.notification-copy span {
+  margin-top: 0.26rem;
+  color: #667286;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.notification-copy small {
+  margin-top: 0.42rem;
+  color: #9aa2b1;
+  font-size: 0.68rem;
+}
+
+.notification-empty {
+  padding: 1.2rem;
+  color: #7b8598;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.notification-empty.error {
+  color: #9a3f3f;
+}
+
+@media (max-width: 700px) {
+  .topbar-actions {
+    margin-left: auto;
+    gap: 0.55rem;
+  }
+
+  .notification-panel {
+    position: fixed;
+    top: 72px;
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+  }
+}
