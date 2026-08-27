@@ -21,11 +21,27 @@ public sealed class AskDocumentsUseCase
             answerGenerator;
     }
 
-    public async Task<AskDocumentsResult> ExecuteAsync(
+    public Task<AskDocumentsResult> ExecuteAsync(
         string question,
         int take,
         CancellationToken cancellationToken)
     {
+        return ExecuteAsync(
+            question,
+            take,
+            DocumentRetrievalScope.All,
+            cancellationToken);
+    }
+
+    public async Task<AskDocumentsResult> ExecuteAsync(
+        string question,
+        int take,
+        DocumentRetrievalScope scope,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(
+            scope);
+
         if (string.IsNullOrWhiteSpace(question))
         {
             throw new ArgumentException(
@@ -44,6 +60,7 @@ public sealed class AskDocumentsUseCase
             await _searchDocumentsUseCase.ExecuteAsync(
                 question,
                 take,
+                scope,
                 cancellationToken);
 
         if (searchResults.Count == 0)
