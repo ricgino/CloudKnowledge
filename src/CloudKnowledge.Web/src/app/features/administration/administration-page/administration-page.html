@@ -195,12 +195,24 @@
                   </span>
                 </div>
 
-                <span
-                  class="role-badge"
-                  [class.owner]="team.role === 'Owner'"
-                  [class.admin]="team.role === 'Admin'">
-                  {{ team.isMember ? (team.role ?? 'Member') : 'Folder' }}
-                </span>
+                <aside class="row-actions">
+                  <span
+                    class="role-badge"
+                    [class.owner]="team.role === 'Owner'"
+                    [class.admin]="team.role === 'Admin'">
+                    {{ team.isMember ? (team.role ?? 'Member') : 'Folder' }}
+                  </span>
+
+                  @if (canDeleteTeam(team)) {
+                    <button
+                      type="button"
+                      class="danger-button compact-button"
+                      (click)="deleteTeam(team)"
+                      [disabled]="deletingTeamId === team.id">
+                      {{ deletingTeamId === team.id ? 'Deleting...' : 'Delete team' }}
+                    </button>
+                  }
+                </aside>
               </article>
             }
           </div>
