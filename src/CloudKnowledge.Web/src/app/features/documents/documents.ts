@@ -14,6 +14,10 @@ import {
   apiBaseUrl
 } from '../../auth-config';
 
+import {
+  KnowledgeRetrievalScope
+} from '../knowledge/knowledge-scope';
+
 export type DocumentListScope =
   'all' |
   'owned' |
@@ -232,27 +236,45 @@ export class Documents
 
   search(
     query: string,
-    take = 5):
+    take = 5,
+    scope?: KnowledgeRetrievalScope):
     Observable<SearchDocumentResult[]>
   {
+    const retrievalScope: KnowledgeRetrievalScope =
+      scope ?? {
+        scope: 'all',
+        teamId: null,
+        includeDescendants: false
+      };
+
     return this.http.post<SearchDocumentResult[]>(
       `${apiBaseUrl}/api/search`,
       {
         query,
-        take
+        take,
+        ...retrievalScope
       });
   }
 
   ask(
     question: string,
-    take = 5):
+    take = 5,
+    scope?: KnowledgeRetrievalScope):
     Observable<AskDocumentsResponse>
   {
+    const retrievalScope: KnowledgeRetrievalScope =
+      scope ?? {
+        scope: 'all',
+        teamId: null,
+        includeDescendants: false
+      };
+
     return this.http.post<AskDocumentsResponse>(
       `${apiBaseUrl}/api/ask`,
       {
         question,
-        take
+        take,
+        ...retrievalScope
       });
   }
 }
