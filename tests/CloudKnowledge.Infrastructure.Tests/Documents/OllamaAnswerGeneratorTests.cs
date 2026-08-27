@@ -2,15 +2,15 @@ using System.Net;
 using System.Text;
 using CloudKnowledge.Application.Documents.AskDocuments;
 using CloudKnowledge.Infrastructure.Documents;
+using Microsoft.Extensions.Logging;
 
 namespace CloudKnowledge.Infrastructure.Tests.Documents;
 
 public sealed class OllamaAnswerGeneratorTests
 {
     [Fact]
-    public async Task GenerateAsync_WhenOllamaReturnsThinking_ShouldReturnOnlyFinalAnswer()
+    public async Task GenerateAsync_ShouldBoundGenerationAndLogOllamaTiming()
     {
-        // Arrange
         var handler =
             new FakeOllamaHandler();
 
@@ -21,10 +21,16 @@ public sealed class OllamaAnswerGeneratorTests
                     new Uri("http://localhost:11434")
             };
 
+        var logger =
+            new RecordingLogger<OllamaAnswerGenerator>();
+
         var sut =
             new OllamaAnswerGenerator(
                 httpClient,
-                "qwen3:4b");
+                "qwen3:4b",
+                temperature: 0.1,
+                maxTokens: 256,
+                logger);
 
         var sources =
             new[]
@@ -37,14 +43,12 @@ public sealed class OllamaAnswerGeneratorTests
                     "Alperia Smart Services Srl.")
             };
 
-        // Act
         var result =
             await sut.GenerateAsync(
                 "Qual è l'azienda?",
                 sources,
                 CancellationToken.None);
 
-        // Assert
         Assert.Equal(
             "Alperia Smart Services Srl. [S1]",
             result);
@@ -60,13 +64,45 @@ public sealed class OllamaAnswerGeneratorTests
         Assert.NotNull(
             handler.RequestBody);
 
+        var requestBody =
+            handler.RequestBody!;
+
         Assert.Contains(
             "\"think\":false",
-            handler.RequestBody!.ToLowerInvariant());
+            requestBody.ToLowerInvariant());
 
         Assert.Contains(
             "/no_think",
-            handler.RequestBody);
+            requestBody);
+
+        Assert.Contains(
+            "\"temperature\":0.1",
+            requestBody);
+
+        Assert.Contains(
+            "\"num_predict\":256",
+            requestBody);
+
+        Assert.Contains(
+            logger.Messages,
+            message =>
+                message.Contains(
+                    "promptTokens=1200",
+                    StringComparison.OrdinalIgnoreCase));
+
+        Assert.Contains(
+            logger.Messages,
+            message =>
+                message.Contains(
+                    "outputTokens=80",
+                    StringComparison.OrdinalIgnoreCase));
+
+        Assert.Contains(
+            logger.Messages,
+            message =>
+                message.Contains(
+                    "doneReason=stop",
+                    StringComparison.OrdinalIgnoreCase));
     }
 
     private sealed class FakeOllamaHandler
@@ -89,7 +125,14 @@ public sealed class OllamaAnswerGeneratorTests
                   "message": {
                     "role": "assistant",
                     "content": "<think>internal reasoning</think>\nAlperia Smart Services Srl. [S1]"
-                  }
+                  },
+                  "total_duration": 4500000000,
+                  "load_duration": 200000000,
+                  "prompt_eval_count": 1200,
+                  "prompt_eval_duration": 1500000000,
+                  "eval_count": 80,
+                  "eval_duration": 2700000000,
+                  "done_reason": "stop"
                 }
                 """;
 
@@ -102,6 +145,39 @@ public sealed class OllamaAnswerGeneratorTests
                         Encoding.UTF8,
                         "application/json")
             };
+        }
+    }
+
+    private sealed class RecordingLogger<T>
+        : ILogger<T>
+    {
+        public List<string> Messages { get; } =
+            new();
+
+        public IDisposable? BeginScope<TState>(
+            TState state)
+            where TState : notnull
+        {
+            return null;
+        }
+
+        public bool IsEnabled(
+            LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(
+                formatter(
+                    state,
+                    exception));
         }
     }
 }
