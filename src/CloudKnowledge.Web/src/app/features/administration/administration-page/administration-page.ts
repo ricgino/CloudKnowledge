@@ -11,6 +11,7 @@ import {
 
 import {
   buildTeamTreeRows,
+  canDeleteTeam as canDeleteTeamItem,
   TeamItem,
   TeamTreeRow,
   Teams
@@ -42,6 +43,7 @@ export class AdministrationPage
   newTeamName = '';
   newTeamParentId = '';
   creatingTeam = false;
+  deletingTeamId = '';
 
   selectedDocumentId = '';
   selectedShareTeamId = '';
@@ -256,6 +258,75 @@ export class AdministrationPage
           this.errorMessage =
             error.error?.message ??
             `Unable to create team (HTTP ${error.status}).`;
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  canDeleteTeam(
+    team: TeamItem):
+    boolean
+  {
+    return canDeleteTeamItem(team);
+  }
+
+  deleteTeam(
+    team: TeamItem):
+    void
+  {
+    if (!this.canDeleteTeam(team))
+    {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Delete ${team.name}? Team-owned documents and their search data will be permanently removed. Personal documents only shared with this team will be preserved.`);
+
+    if (!confirmed)
+    {
+      return;
+    }
+
+    this.deletingTeamId = team.id;
+    this.clearMessages();
+
+    this.teamsService
+      .deleteTeam(team.id)
+      .subscribe({
+        next: () =>
+        {
+          this.deletingTeamId = '';
+          this.successMessage =
+            `${team.name} deleted together with its team-owned documents.`;
+          this.refresh();
+        },
+        error: error =>
+        {
+          this.deletingTeamId = '';
+
+          if (error.status === 409)
+          {
+            this.errorMessage =
+              error.error?.message ??
+              'Delete child teams before deleting this team.';
+          }
+          else if (error.status === 403)
+          {
+            this.errorMessage =
+              'Only a direct team owner can delete this team.';
+          }
+          else if (error.status === 404)
+          {
+            this.errorMessage =
+              'Team not found or no longer visible to your account.';
+          }
+          else
+          {
+            this.errorMessage =
+              `Unable to delete team (HTTP ${error.status}).`;
+          }
+
           this.cdr.detectChanges();
         }
       });
