@@ -23,6 +23,17 @@ public sealed class TeamConfiguration
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(team => team.ParentTeamId)
+            .HasColumnName("parent_team_id");
+
+        builder.HasOne<Team>()
+            .WithMany()
+            .HasForeignKey(team => team.ParentTeamId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(team => team.ParentTeamId)
+            .HasDatabaseName("ix_teams_parent_team_id");
+
         builder.Property(team => team.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")

@@ -6,20 +6,25 @@ public sealed class Team
 
     public string Name { get; private set; }
 
+    public Guid? ParentTeamId { get; private set; }
+
     public DateTime CreatedAtUtc { get; private set; }
 
     private Team(
         Guid id,
         string name,
+        Guid? parentTeamId,
         DateTime createdAtUtc)
     {
         Id = id;
         Name = name;
+        ParentTeamId = parentTeamId;
         CreatedAtUtc = createdAtUtc;
     }
 
     public static Team Create(
-        string name)
+        string name,
+        Guid? parentTeamId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -31,6 +36,7 @@ public sealed class Team
         return new Team(
             Guid.NewGuid(),
             name.Trim(),
+            parentTeamId,
             DateTime.UtcNow);
     }
 }
