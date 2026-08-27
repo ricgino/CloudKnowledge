@@ -1,0 +1,60 @@
+name: Scaffold team hierarchy migration
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  scaffold:
+    if: github.head_ref == 'feat/team-hierarchy-document-library'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore CloudKnowledge.slnx
+
+      - name: Restore local tools
+        run: dotnet tool restore
+
+      - name: Scaffold migration
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__Postgres: Host=localhost;Port=5432;Database=cloudknowledge_scaffold;Username=cloudknowledge;Password=cloudknowledge
+        run: |
+          if find src/CloudKnowledge.Infrastructure/Persistence/Migrations -maxdepth 1 -name '*_AddTeamHierarchy.cs' | grep -q .; then
+            echo 'AddTeamHierarchy migration already exists; skipping scaffold.'
+          else
+            dotnet ef migrations add AddTeamHierarchy \
+              --project src/CloudKnowledge.Infrastructure \
+              --startup-project src/CloudKnowledge.Api
+          fi
+
+      - name: Verify generated migration
+        run: |
+          git status --short
+          find src/CloudKnowledge.Infrastructure/Persistence/Migrations -maxdepth 1 -name '*_AddTeamHierarchy*' -print
+          git diff -- src/CloudKnowledge.Infrastructure/Persistence/Migrations
+
+      - name: Commit generated migration and remove temporary workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/scaffold-team-hierarchy-migration.yml
+          git add src/CloudKnowledge.Infrastructure/Persistence/Migrations
+          git commit -m 'feat: add team hierarchy migration'
+          git push origin HEAD:${{ github.head_ref }}
