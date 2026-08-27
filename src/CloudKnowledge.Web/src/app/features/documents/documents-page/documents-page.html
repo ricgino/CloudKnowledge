@@ -42,18 +42,18 @@
   <section class="upload-card">
     <div>
       <p class="eyebrow">Add knowledge</p>
-      <h2>Upload a PDF</h2>
+      <h2>Upload a document</h2>
       <p>
-        Keep it personal or share it with a team where you have direct membership. Structural parent teams never grant implicit access.
+        PDF, DOCX and TXT are supported. Keep the document personal or share it with a team where you have direct membership. Structural parent teams never grant implicit access.
       </p>
     </div>
 
     <div class="upload-controls">
       <label class="file-picker">
-        <span>{{ selectedFile?.name ?? 'Choose PDF' }}</span>
+        <span>{{ selectedFile?.name ?? 'Choose PDF, DOCX or TXT' }}</span>
         <input
           type="file"
-          accept="application/pdf"
+          accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
           (change)="onFileSelected($event)"
         />
       </label>
@@ -204,7 +204,7 @@
         <div class="document-list">
           @for (document of documents; track document.id) {
             <article class="document-row">
-              <div class="document-icon">PDF</div>
+              <div class="document-icon">{{ documentTypeLabel(document.fileName) }}</div>
 
               <div class="document-copy">
                 <strong>{{ document.fileName }}</strong>
