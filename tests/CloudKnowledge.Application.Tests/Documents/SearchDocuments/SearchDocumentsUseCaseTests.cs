@@ -7,20 +7,17 @@ namespace CloudKnowledge.Application.Tests.Documents.SearchDocuments;
 public sealed class SearchDocumentsUseCaseTests
 {
     [Fact]
-    public async Task ExecuteAsync_WhenQueryIsValid_ShouldSearchOnlyForCurrentUser()
+    public async Task ExecuteAsync_DefaultOverload_ShouldSearchAllAccessibleKnowledge()
     {
         var currentUserId =
             Guid.NewGuid();
-
-        var embeddingGenerator =
-            new FakeEmbeddingGenerator();
 
         var searchRepository =
             new FakeSemanticSearchRepository();
 
         var useCase =
             new SearchDocumentsUseCase(
-                embeddingGenerator,
+                new FakeEmbeddingGenerator(),
                 searchRepository,
                 new FakeCurrentUser(
                     currentUserId));
@@ -34,20 +31,67 @@ public sealed class SearchDocumentsUseCaseTests
         Assert.Single(
             result);
 
+        Assert.Equal(
+            currentUserId,
+            searchRepository.ReceivedUserId);
+
         Assert.NotNull(
             searchRepository.ReceivedEmbedding);
 
         Assert.Equal(
             3,
-            searchRepository.ReceivedEmbedding.Length);
+            searchRepository.ReceivedEmbedding!.Length);
 
         Assert.Equal(
             5,
             searchRepository.ReceivedTake);
 
         Assert.Equal(
-            currentUserId,
-            searchRepository.ReceivedUserId);
+            DocumentRetrievalScope.All,
+            searchRepository.ReceivedScope);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteAsync_TeamScope_ShouldForwardExactScopeToRepository(
+        bool includeDescendants)
+    {
+        var teamId =
+            Guid.NewGuid();
+
+        var scope =
+            DocumentRetrievalScope.ForTeam(
+                teamId,
+                includeDescendants);
+
+        var searchRepository =
+            new FakeSemanticSearchRepository();
+
+        var useCase =
+            new SearchDocumentsUseCase(
+                new FakeEmbeddingGenerator(),
+                searchRepository,
+                new FakeCurrentUser(
+                    Guid.NewGuid()));
+
+        await useCase.ExecuteAsync(
+            "workflow approval",
+            5,
+            scope,
+            CancellationToken.None);
+
+        Assert.Equal(
+            scope,
+            searchRepository.ReceivedScope);
+
+        Assert.Equal(
+            teamId,
+            searchRepository.ReceivedScope?.TeamId);
+
+        Assert.Equal(
+            includeDescendants,
+            searchRepository.ReceivedScope?.IncludeDescendants);
     }
 
     private sealed class FakeCurrentUser
@@ -118,11 +162,18 @@ public sealed class SearchDocumentsUseCaseTests
             private set;
         }
 
+        public DocumentRetrievalScope? ReceivedScope
+        {
+            get;
+            private set;
+        }
+
         public Task<IReadOnlyList<SemanticSearchResult>>
             SearchAccessibleAsync(
                 Guid userId,
                 float[] queryEmbedding,
                 int take,
+                DocumentRetrievalScope scope,
                 CancellationToken cancellationToken)
         {
             ReceivedUserId =
@@ -133,6 +184,9 @@ public sealed class SearchDocumentsUseCaseTests
 
             ReceivedTake =
                 take;
+
+            ReceivedScope =
+                scope;
 
             IReadOnlyList<SemanticSearchResult> result =
                 new[]
