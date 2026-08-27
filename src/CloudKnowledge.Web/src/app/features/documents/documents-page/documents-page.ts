@@ -5,6 +5,7 @@ import {
 } from '@angular/core';
 
 import {
+  buildUploadSuccessMessage,
   DocumentItem,
   DocumentListScope,
   Documents,
@@ -336,9 +337,10 @@ export class DocumentsPage
         {
           this.uploading = false;
           this.selectedFile = null;
-          this.successMessage = teamName
-            ? `${fileName} uploaded and shared with ${teamName}. Processing continues in the background.`
-            : `${fileName} uploaded as a personal document. Processing continues in the background.`;
+          this.successMessage =
+            buildUploadSuccessMessage(
+              fileName,
+              teamName);
           this.page = 1;
           this.loadDocuments();
         },
