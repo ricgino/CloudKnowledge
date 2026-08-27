@@ -1,6 +1,9 @@
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json.Serialization;
 using CloudKnowledge.Application.Documents.AskDocuments;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CloudKnowledge.Infrastructure.Documents;
 
@@ -9,16 +12,70 @@ public sealed class OllamaAnswerGenerator
 {
     private readonly HttpClient _httpClient;
     private readonly string _model;
+    private readonly double _temperature;
+    private readonly int _maxTokens;
+    private readonly ILogger<OllamaAnswerGenerator> _logger;
 
     public OllamaAnswerGenerator(
         HttpClient httpClient,
         string model)
+        : this(
+            httpClient,
+            model,
+            temperature: 0.1,
+            maxTokens: 256,
+            NullLogger<OllamaAnswerGenerator>.Instance)
     {
+    }
+
+    public OllamaAnswerGenerator(
+        HttpClient httpClient,
+        string model,
+        double temperature,
+        int maxTokens,
+        ILogger<OllamaAnswerGenerator> logger)
+    {
+        ArgumentNullException.ThrowIfNull(
+            httpClient);
+
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            throw new ArgumentException(
+                "Model cannot be empty.",
+                nameof(model));
+        }
+
+        if (temperature < 0 ||
+            temperature > 2)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(temperature),
+                "Temperature must be between 0 and 2.");
+        }
+
+        if (maxTokens < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxTokens),
+                "Maximum token count must be greater than zero.");
+        }
+
         _httpClient =
             httpClient;
 
         _model =
-            model;
+            model.Trim();
+
+        _temperature =
+            temperature;
+
+        _maxTokens =
+            maxTokens;
+
+        _logger =
+            logger ??
+            throw new ArgumentNullException(
+                nameof(logger));
     }
 
     public async Task<string> GenerateAsync(
@@ -79,7 +136,10 @@ public sealed class OllamaAnswerGenerator
                         userPrompt)
                 },
                 Stream: false,
-                Think: false);
+                Think: false,
+                new OllamaChatOptions(
+                    _temperature,
+                    _maxTokens));
 
         using var response =
             await _httpClient.PostAsJsonAsync(
@@ -103,7 +163,33 @@ public sealed class OllamaAnswerGenerator
                 "Ollama returned an empty answer.");
         }
 
+        LogTimings(
+            result!);
+
         return RemoveThinkingContent(answer);
+    }
+
+    private void LogTimings(
+        OllamaChatResponse result)
+    {
+        _logger.LogInformation(
+            "Ollama answer timing model={Model} totalMs={TotalMs} loadMs={LoadMs} promptTokens={PromptTokens} promptMs={PromptMs} outputTokens={OutputTokens} evalMs={EvalMs} doneReason={DoneReason}",
+            _model,
+            ToMilliseconds(result.TotalDuration),
+            ToMilliseconds(result.LoadDuration),
+            result.PromptEvalCount,
+            ToMilliseconds(result.PromptEvalDuration),
+            result.EvalCount,
+            ToMilliseconds(result.EvalDuration),
+            result.DoneReason);
+    }
+
+    private static double? ToMilliseconds(
+        long? nanoseconds)
+    {
+        return nanoseconds.HasValue
+            ? nanoseconds.Value / 1_000_000d
+            : null;
     }
 
     private static string RemoveThinkingContent(
@@ -154,12 +240,32 @@ public sealed class OllamaAnswerGenerator
         string Model,
         OllamaChatMessage[] Messages,
         bool Stream,
-        bool Think);
+        bool Think,
+        OllamaChatOptions Options);
+
+    private sealed record OllamaChatOptions(
+        double Temperature,
+        [property: JsonPropertyName("num_predict")]
+        int NumPredict);
 
     private sealed record OllamaChatMessage(
         string Role,
         string Content);
 
     private sealed record OllamaChatResponse(
-        OllamaChatMessage? Message);
+        OllamaChatMessage? Message,
+        [property: JsonPropertyName("total_duration")]
+        long? TotalDuration,
+        [property: JsonPropertyName("load_duration")]
+        long? LoadDuration,
+        [property: JsonPropertyName("prompt_eval_count")]
+        int? PromptEvalCount,
+        [property: JsonPropertyName("prompt_eval_duration")]
+        long? PromptEvalDuration,
+        [property: JsonPropertyName("eval_count")]
+        int? EvalCount,
+        [property: JsonPropertyName("eval_duration")]
+        long? EvalDuration,
+        [property: JsonPropertyName("done_reason")]
+        string? DoneReason);
 }
