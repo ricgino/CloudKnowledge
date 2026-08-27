@@ -5,6 +5,7 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 namespace CloudKnowledge.Infrastructure.Documents;
 
 public sealed class PdfPigDocumentTextExtractor
+    : IPdfNativeTextExtractor
 {
     public string Extract(
         Stream content,
