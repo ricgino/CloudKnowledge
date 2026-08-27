@@ -6,8 +6,6 @@ using CloudKnowledge.Application.Documents.DownloadDocument;
 using CloudKnowledge.Application.Documents.GetDocument;
 using CloudKnowledge.Application.Documents.GetDocuments;
 using CloudKnowledge.Application.Documents.Sharing;
-using CloudKnowledge.Application.Teams;
-using CloudKnowledge.Application.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Identity.Web.Resource;
@@ -27,8 +25,6 @@ public sealed class DocumentsController : ControllerBase
     private readonly UnshareDocumentFromTeamUseCase _unshareDocumentFromTeamUseCase;
     private readonly DeleteDocumentUseCase _deleteDocumentUseCase;
     private readonly DownloadDocumentUseCase _downloadDocumentUseCase;
-    private readonly ITeamMembershipRepository _teamMembershipRepository;
-    private readonly ICurrentUser _currentUser;
 
     public DocumentsController(
         CreateDocumentUseCase createDocumentUseCase,
@@ -37,9 +33,7 @@ public sealed class DocumentsController : ControllerBase
         ShareDocumentWithTeamUseCase shareDocumentWithTeamUseCase,
         UnshareDocumentFromTeamUseCase unshareDocumentFromTeamUseCase,
         DeleteDocumentUseCase deleteDocumentUseCase,
-        DownloadDocumentUseCase downloadDocumentUseCase,
-        ITeamMembershipRepository teamMembershipRepository,
-        ICurrentUser currentUser)
+        DownloadDocumentUseCase downloadDocumentUseCase)
     {
         _createDocumentUseCase = createDocumentUseCase;
         _getDocumentUseCase = getDocumentUseCase;
@@ -48,8 +42,6 @@ public sealed class DocumentsController : ControllerBase
         _unshareDocumentFromTeamUseCase = unshareDocumentFromTeamUseCase;
         _deleteDocumentUseCase = deleteDocumentUseCase;
         _downloadDocumentUseCase = downloadDocumentUseCase;
-        _teamMembershipRepository = teamMembershipRepository;
-        _currentUser = currentUser;
     }
 
     [HttpPost]
@@ -73,52 +65,26 @@ public sealed class DocumentsController : ControllerBase
             });
         }
 
-        if (request.TeamId.HasValue)
-        {
-            var userId =
-                await _currentUser.GetUserIdAsync(
-                    cancellationToken);
-
-            var isTeamMember =
-                await _teamMembershipRepository.IsMemberAsync(
-                    request.TeamId.Value,
-                    userId,
-                    cancellationToken);
-
-            if (!isTeamMember)
-            {
-                return BadRequest(new
-                {
-                    message = "The selected team is not available to the current user."
-                });
-            }
-        }
-
         await using var stream =
             request.File.OpenReadStream();
 
-        var result = await _createDocumentUseCase.ExecuteAsync(
-            request.File.FileName,
-            request.File.ContentType,
-            stream,
-            cancellationToken);
+        CreateDocumentResult result;
 
-        if (request.TeamId.HasValue)
+        try
         {
-            var shareStatus =
-                await _shareDocumentWithTeamUseCase.ExecuteAsync(
-                    result.Id,
-                    request.TeamId.Value,
-                    cancellationToken);
-
-            if (shareStatus is not ShareDocumentStatus.Shared &&
-                shareStatus is not ShareDocumentStatus.AlreadyShared)
+            result = await _createDocumentUseCase.ExecuteAsync(
+                request.File.FileName,
+                request.File.ContentType,
+                stream,
+                request.TeamId,
+                cancellationToken);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return BadRequest(new
             {
-                return Conflict(new
-                {
-                    message = "The document was uploaded but could not be shared with the selected team."
-                });
-            }
+                message = exception.Message
+            });
         }
 
         var response = new DocumentResponse(
@@ -126,7 +92,7 @@ public sealed class DocumentsController : ControllerBase
             result.FileName,
             result.ContentType,
             result.Status.ToString(),
-            true);
+            !request.TeamId.HasValue);
 
         return CreatedAtAction(
             nameof(GetById),
