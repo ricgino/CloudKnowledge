@@ -23,6 +23,14 @@ internal static class DocumentAccessQueryExtensions
 
                 ||
 
+                (document.OwnerTeamId.HasValue
+                 && dbContext.TeamMembers.Any(
+                     member =>
+                         member.TeamId == document.OwnerTeamId.Value
+                         && member.UserId == userId))
+
+                ||
+
                 dbContext.DocumentTeamAccess.Any(
                     access =>
                         access.DocumentId == document.Id
