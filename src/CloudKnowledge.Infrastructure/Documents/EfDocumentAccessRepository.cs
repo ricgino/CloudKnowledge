@@ -1,6 +1,7 @@
-using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.Access;
 using CloudKnowledge.Application.Documents.GetDocuments;
+using CloudKnowledge.Domain.Documents;
+using CloudKnowledge.Domain.Teams;
 using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,30 +10,101 @@ namespace CloudKnowledge.Infrastructure.Documents;
 public sealed class EfDocumentAccessRepository
     : IDocumentAccessRepository
 {
-    private readonly CloudKnowledgeDbContext _dbContext;
+    private readonly CloudKnowledgeDbContext
+        _dbContext;
 
     public EfDocumentAccessRepository(
         CloudKnowledgeDbContext dbContext)
     {
-        _dbContext = dbContext;
+        _dbContext =
+            dbContext;
     }
 
-    public Task<bool> CanAccessAsync(
+    public async Task<bool> CanAccessAsync(
         Guid userId,
         Guid documentId,
         CancellationToken cancellationToken)
     {
-        return _dbContext.Documents
+        if (documentId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Document id cannot be empty.",
+                nameof(documentId));
+        }
+
+        return await _dbContext.Documents
             .AsNoTracking()
             .WhereAccessibleTo(
                 _dbContext,
                 userId)
             .AnyAsync(
-                document => document.Id == documentId,
+                document =>
+                    document.Id == documentId,
                 cancellationToken);
     }
 
-    public async Task<IReadOnlyList<DocumentAccessResult>> GetPageAsync(
+    public async Task<Document?> GetByIdAsync(
+        Guid userId,
+        Guid documentId,
+        CancellationToken cancellationToken)
+    {
+        if (documentId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Document id cannot be empty.",
+                nameof(documentId));
+        }
+
+        return await _dbContext.Documents
+            .AsNoTracking()
+            .WhereAccessibleTo(
+                _dbContext,
+                userId)
+            .SingleOrDefaultAsync(
+                document =>
+                    document.Id == documentId,
+                cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Document>> GetPageAsync(
+        Guid userId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Documents
+            .AsNoTracking()
+            .WhereAccessibleTo(
+                _dbContext,
+                userId)
+            .OrderByDescending(
+                document =>
+                    document.CreatedAtUtc)
+            .ThenBy(
+                document =>
+                    document.Id)
+            .Skip(
+                skip)
+            .Take(
+                take)
+            .ToListAsync(
+                cancellationToken);
+    }
+
+    public async Task<int> CountAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Documents
+            .AsNoTracking()
+            .WhereAccessibleTo(
+                _dbContext,
+                userId)
+            .CountAsync(
+                cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Document>> GetPageAsync(
         Guid userId,
         int skip,
         int take,
@@ -40,39 +112,39 @@ public sealed class EfDocumentAccessRepository
         CancellationToken cancellationToken)
     {
         var documents =
-            ApplyFilters(
-                    userId,
-                    query)
-                .OrderByDescending(
-                    document => document.CreatedAtUtc)
-                .ThenByDescending(
-                    document => document.Id)
-                .Skip(skip)
-                .Take(take);
+            await BuildFilteredQueryAsync(
+                userId,
+                query,
+                cancellationToken);
 
         return await documents
-            .Select(document =>
-                new DocumentAccessResult(
-                    document.Id,
-                    document.FileName,
-                    document.ContentType,
-                    document.Status,
-                    document.OwnerUserId == userId,
-                    Array.Empty<DocumentAccessTeamResult>()))
+            .OrderByDescending(
+                document =>
+                    document.CreatedAtUtc)
+            .ThenBy(
+                document =>
+                    document.Id)
+            .Skip(
+                skip)
+            .Take(
+                take)
             .ToListAsync(
                 cancellationToken);
     }
 
-    public Task<int> CountAsync(
+    public async Task<int> CountAsync(
         Guid userId,
         GetDocumentsQuery query,
         CancellationToken cancellationToken)
     {
-        return ApplyFilters(
+        var documents =
+            await BuildFilteredQueryAsync(
                 userId,
-                query)
-            .CountAsync(
+                query,
                 cancellationToken);
+
+        return await documents.CountAsync(
+            cancellationToken);
     }
 
     public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<DocumentAccessTeamResult>>>
@@ -83,6 +155,7 @@ public sealed class EfDocumentAccessRepository
     {
         var distinctDocumentIds =
             documentIds
+                .Where(documentId => documentId != Guid.Empty)
                 .Distinct()
                 .ToArray();
 
@@ -154,152 +227,227 @@ public sealed class EfDocumentAccessRepository
             teams.ToDictionary(
                 team => team.Id);
 
-        foreach (var group in
-                 visibleTeamAccess
-                     .GroupBy(
-                         access => access.DocumentId))
+        foreach (var group in visibleTeamAccess.GroupBy(
+                     access => access.DocumentId))
         {
-            var accessTeams =
+            var sharedTeams =
                 group
-                    .Select(access =>
-                    {
-                        if (!teamsById.TryGetValue(
-                                access.TeamId,
-                                out var team))
+                    .Where(
+                        access =>
+                            teamsById.ContainsKey(
+                                access.TeamId))
+                    .Select(
+                        access =>
                         {
-                            return null;
-                        }
+                            var team =
+                                teamsById[access.TeamId];
 
-                        return new DocumentAccessTeamResult(
-                            team.Id,
-                            team.Name,
-                            BuildTeamPath(
-                                team,
-                                teamsById));
-                    })
-                    .Where(team => team is not null)
-                    .Select(team => team!)
-                    .OrderBy(team => team.Path)
-                    .ThenBy(team => team.Name)
+                            return new DocumentAccessTeamResult(
+                                team.Id,
+                                team.Name,
+                                BuildPath(
+                                    team,
+                                    teamsById));
+                        })
+                    .OrderBy(
+                        team => team.Path)
+                    .ThenBy(
+                        team => team.Id)
                     .ToArray();
 
             result[group.Key] =
-                accessTeams;
+                sharedTeams;
         }
 
         return result;
     }
 
-    private IQueryable<CloudKnowledge.Domain.Documents.Document> ApplyFilters(
+    private async Task<IQueryable<Document>> BuildFilteredQueryAsync(
         Guid userId,
-        GetDocumentsQuery query)
+        GetDocumentsQuery query,
+        CancellationToken cancellationToken)
     {
-        IQueryable<CloudKnowledge.Domain.Documents.Document> documents =
+        IQueryable<Document> documents =
             _dbContext.Documents
-                .AsNoTracking()
-                .WhereAccessibleTo(
-                    _dbContext,
-                    userId);
+                .AsNoTracking();
+
+        switch (query.Scope)
+        {
+            case DocumentListScope.All:
+                documents =
+                    documents.WhereAccessibleTo(
+                        _dbContext,
+                        userId);
+                break;
+
+            case DocumentListScope.Owned:
+                documents =
+                    documents.Where(
+                        document =>
+                            document.OwnerUserId == userId);
+                break;
+
+            case DocumentListScope.Team:
+                var allowedTeamIds =
+                    await ResolveAllowedTeamIdsAsync(
+                        userId,
+                        query.TeamId!.Value,
+                        query.IncludeDescendants,
+                        cancellationToken);
+
+                if (allowedTeamIds.Length == 0)
+                {
+                    documents =
+                        documents.Where(
+                            _ => false);
+                    break;
+                }
+
+                documents =
+                    documents.Where(
+                        document =>
+                            (document.OwnerTeamId.HasValue
+                             && allowedTeamIds.Contains(
+                                 document.OwnerTeamId.Value))
+
+                            ||
+
+                            _dbContext.DocumentTeamAccess.Any(
+                                access =>
+                                    access.DocumentId == document.Id
+                                    && allowedTeamIds.Contains(
+                                        access.TeamId)));
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(query.Scope),
+                    query.Scope,
+                    "Unknown document list scope.");
+        }
 
         if (!string.IsNullOrWhiteSpace(
                 query.SearchQuery))
         {
-            var search =
-                query.SearchQuery.Trim();
+            var pattern =
+                $"%{query.SearchQuery.Trim()}%";
 
             documents =
                 documents.Where(
                     document =>
                         EF.Functions.ILike(
                             document.FileName,
-                            $"%{search}%"));
-        }
-
-        if (query.Scope == DocumentListScope.Owned)
-        {
-            documents =
-                documents.Where(
-                    document =>
-                        document.OwnerUserId == userId);
-        }
-        else if (query.Scope == DocumentListScope.Team)
-        {
-            var teamId =
-                query.TeamId!.Value;
-
-            var selectedTeamIds =
-                GetSelectedTeamIds(
-                    teamId,
-                    query.IncludeDescendants);
-
-            var authorizedTeamIds =
-                _dbContext.TeamMembers
-                    .AsNoTracking()
-                    .Where(
-                        member =>
-                            member.UserId == userId &&
-                            selectedTeamIds.Contains(
-                                member.TeamId))
-                    .Select(
-                        member => member.TeamId);
-
-            documents =
-                documents.Where(
-                    document =>
-                        document.OwnerTeamId.HasValue &&
-                        authorizedTeamIds.Contains(
-                            document.OwnerTeamId.Value) ||
-                        _dbContext.DocumentTeamAccess.Any(
-                            access =>
-                                access.DocumentId == document.Id &&
-                                authorizedTeamIds.Contains(
-                                    access.TeamId)));
+                            pattern));
         }
 
         return documents;
     }
 
-    private IQueryable<Guid> GetSelectedTeamIds(
-        Guid teamId,
-        bool includeDescendants)
+    private async Task<Guid[]> ResolveAllowedTeamIdsAsync(
+        Guid userId,
+        Guid selectedTeamId,
+        bool includeDescendants,
+        CancellationToken cancellationToken)
     {
         if (!includeDescendants)
         {
-            return _dbContext.Teams
-                .AsNoTracking()
-                .Where(team => team.Id == teamId)
-                .Select(team => team.Id);
+            var isDirectMember =
+                await _dbContext.TeamMembers
+                    .AsNoTracking()
+                    .AnyAsync(
+                        membership =>
+                            membership.UserId == userId
+                            && membership.TeamId == selectedTeamId,
+                        cancellationToken);
+
+            return isDirectMember
+                ? new[] { selectedTeamId }
+                : Array.Empty<Guid>();
         }
 
-        var descendants =
-            _dbContext.Teams
-                .FromSqlInterpolated(
-                    $"""
-                    WITH RECURSIVE team_tree AS (
-                        SELECT id, parent_team_id
-                        FROM teams
-                        WHERE id = {teamId}
-
-                        UNION ALL
-
-                        SELECT child.id, child.parent_team_id
-                        FROM teams child
-                        INNER JOIN team_tree parent
-                            ON child.parent_team_id = parent.id
-                    )
-                    SELECT id, name, parent_team_id, created_at_utc
-                    FROM teams
-                    WHERE id IN (SELECT id FROM team_tree)
-                    """)
+        var teams =
+            await _dbContext.Teams
                 .AsNoTracking()
-                .Select(team => team.Id);
+                .Select(
+                    team =>
+                        new
+                        {
+                            team.Id,
+                            team.ParentTeamId
+                        })
+                .ToListAsync(
+                    cancellationToken);
 
-        return descendants;
+        if (!teams.Any(
+                team => team.Id == selectedTeamId))
+        {
+            return Array.Empty<Guid>();
+        }
+
+        var branchTeamIds =
+            new HashSet<Guid>
+            {
+                selectedTeamId
+            };
+
+        var pendingParents =
+            new Queue<Guid>();
+
+        pendingParents.Enqueue(
+            selectedTeamId);
+
+        var childrenByParent =
+            teams
+                .Where(
+                    team => team.ParentTeamId.HasValue)
+                .GroupBy(
+                    team => team.ParentTeamId!.Value)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .Select(team => team.Id)
+                        .ToArray());
+
+        while (pendingParents.Count > 0)
+        {
+            var parentId =
+                pendingParents.Dequeue();
+
+            if (!childrenByParent.TryGetValue(
+                    parentId,
+                    out var childIds))
+            {
+                continue;
+            }
+
+            foreach (var childId in childIds)
+            {
+                if (branchTeamIds.Add(
+                        childId))
+                {
+                    pendingParents.Enqueue(
+                        childId);
+                }
+            }
+        }
+
+        return await _dbContext.TeamMembers
+            .AsNoTracking()
+            .Where(
+                membership =>
+                    membership.UserId == userId
+                    && branchTeamIds.Contains(
+                        membership.TeamId))
+            .Select(
+                membership => membership.TeamId)
+            .Distinct()
+            .ToArrayAsync(
+                cancellationToken);
     }
 
-    private static string BuildTeamPath(
-        CloudKnowledge.Domain.Teams.Team team,
-        IReadOnlyDictionary<Guid, CloudKnowledge.Domain.Teams.Team> teamsById)
+    private static string BuildPath(
+        Team team,
+        IReadOnlyDictionary<Guid, Team> teamsById)
     {
         var names =
             new List<string>();
@@ -307,21 +455,25 @@ public sealed class EfDocumentAccessRepository
         var visited =
             new HashSet<Guid>();
 
-        var current = team;
+        var current =
+            team;
 
-        while (visited.Add(current.Id))
+        while (visited.Add(
+                   current.Id))
         {
-            names.Add(current.Name);
+            names.Add(
+                current.Name);
 
-            if (!current.ParentTeamId.HasValue ||
+            if (current.ParentTeamId is not Guid parentTeamId ||
                 !teamsById.TryGetValue(
-                    current.ParentTeamId.Value,
+                    parentTeamId,
                     out var parent))
             {
                 break;
             }
 
-            current = parent;
+            current =
+                parent;
         }
 
         names.Reverse();
