@@ -255,10 +255,22 @@ builder.Services.AddSingleton<IAnswerGenerator>(
             ?? throw new InvalidOperationException(
                 "AI answer model was not found.");
 
+        var temperature =
+            configuration.GetValue<double>(
+                "Ai:AnswerTemperature");
+
+        var maxTokens =
+            configuration.GetValue<int>(
+                "Ai:AnswerMaxTokens");
+
         return new OllamaAnswerGenerator(
             serviceProvider
                 .GetRequiredService<HttpClient>(),
-            model);
+            model,
+            temperature,
+            maxTokens,
+            serviceProvider
+                .GetRequiredService<ILogger<OllamaAnswerGenerator>>());
     });
 
 builder.Services.AddScoped<AskDocumentsUseCase>();
