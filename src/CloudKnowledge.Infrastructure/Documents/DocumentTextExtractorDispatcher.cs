@@ -5,7 +5,7 @@ namespace CloudKnowledge.Infrastructure.Documents;
 public sealed class DocumentTextExtractorDispatcher
     : IDocumentTextExtractor
 {
-    private readonly PdfPigDocumentTextExtractor
+    private readonly PdfDocumentTextExtractor
         _pdfExtractor;
 
     private readonly OpenXmlDocumentTextExtractor
@@ -15,7 +15,7 @@ public sealed class DocumentTextExtractorDispatcher
         _textExtractor;
 
     public DocumentTextExtractorDispatcher(
-        PdfPigDocumentTextExtractor pdfExtractor,
+        PdfDocumentTextExtractor pdfExtractor,
         OpenXmlDocumentTextExtractor docxExtractor,
         PlainTextDocumentTextExtractor textExtractor)
     {
