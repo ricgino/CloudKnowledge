@@ -3,7 +3,7 @@
 }
 
 .teams-page {
-  width: min(1180px, 100%);
+  width: min(1000px, 100%);
   margin: 0 auto;
 }
 
@@ -53,16 +53,16 @@
 }
 
 .teams-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
 .team-card {
   min-width: 0;
-  padding: 1.2rem;
+  padding: 1rem 1.1rem;
   border: 1px solid #e1e6ef;
-  border-radius: 15px;
+  border-radius: 13px;
   background: #fff;
 }
 
@@ -74,14 +74,14 @@
 }
 
 .team-icon {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
-  border-radius: 11px;
+  border-radius: 10px;
   background: #ebeffd;
   color: #3450b2;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0.04em;
 }
@@ -106,21 +106,20 @@
 }
 
 .team-card h2 {
-  margin: 1rem 0 0.45rem;
-  font-size: 1.12rem;
+  margin: 0.8rem 0 0.35rem;
+  font-size: 1.06rem;
 }
 
 .team-card > p {
-  min-height: 2.6em;
   margin: 0;
   color: #748095;
-  font-size: 0.83rem;
-  line-height: 1.55;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .team-id {
-  margin-top: 1rem;
-  padding-top: 0.85rem;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
   border-top: 1px solid #edf0f5;
 }
 
@@ -130,9 +129,9 @@
 }
 
 .team-id span {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.2rem;
   color: #949dac;
-  font-size: 0.67rem;
+  font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -141,7 +140,7 @@
 .team-id code {
   overflow: hidden;
   color: #687286;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -161,8 +160,12 @@
   color: #9a3f3f;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 700px) {
   .page-header {
     flex-direction: column;
+  }
+
+  .team-card {
+    margin-left: 0 !important;
   }
 }

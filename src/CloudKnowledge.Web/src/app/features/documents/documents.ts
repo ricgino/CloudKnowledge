@@ -14,6 +14,28 @@ import {
   apiBaseUrl
 } from '../../auth-config';
 
+export type DocumentListScope =
+  'all' |
+  'owned' |
+  'team';
+
+export interface DocumentsQuery
+{
+  page: number;
+  pageSize: number;
+  scope: DocumentListScope;
+  teamId?: string;
+  includeDescendants?: boolean;
+  query?: string;
+}
+
+export interface DocumentAccessTeam
+{
+  id: string;
+  name: string;
+  path: string;
+}
+
 export interface DocumentItem
 {
   id: string;
@@ -21,6 +43,7 @@ export interface DocumentItem
   contentType: string;
   status: string;
   isOwner: boolean;
+  sharedTeams?: DocumentAccessTeam[] | null;
 }
 
 export interface DocumentsPageResponse
@@ -52,6 +75,52 @@ export interface AskDocumentsResponse
   sources: AskDocumentSource[];
 }
 
+export function buildDocumentsQueryString(
+  query: DocumentsQuery):
+  string
+{
+  const parameters =
+    new URLSearchParams();
+
+  parameters.set(
+    'page',
+    query.page.toString());
+  parameters.set(
+    'pageSize',
+    query.pageSize.toString());
+  parameters.set(
+    'scope',
+    query.scope);
+
+  if (
+    query.scope === 'team' &&
+    query.teamId)
+  {
+    parameters.set(
+      'teamId',
+      query.teamId);
+
+    if (query.includeDescendants)
+    {
+      parameters.set(
+        'includeDescendants',
+        'true');
+    }
+  }
+
+  const filenameQuery =
+    query.query?.trim();
+
+  if (filenameQuery)
+  {
+    parameters.set(
+      'query',
+      filenameQuery);
+  }
+
+  return parameters.toString();
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -64,12 +133,21 @@ export class Documents
   }
 
   getDocuments(
-    page = 1,
-    pageSize = 20):
+    options: Partial<DocumentsQuery> = {}):
     Observable<DocumentsPageResponse>
   {
+    const query: DocumentsQuery = {
+      page: options.page ?? 1,
+      pageSize: options.pageSize ?? 20,
+      scope: options.scope ?? 'all',
+      teamId: options.teamId,
+      includeDescendants:
+        options.includeDescendants ?? false,
+      query: options.query
+    };
+
     return this.http.get<DocumentsPageResponse>(
-      `${apiBaseUrl}/api/documents?page=${page}&pageSize=${pageSize}`);
+      `${apiBaseUrl}/api/documents?${buildDocumentsQueryString(query)}`);
   }
 
   uploadDocument(

@@ -10,7 +10,9 @@ import {
 } from '../../documents/documents';
 
 import {
+  buildTeamTreeRows,
   TeamItem,
+  TeamTreeRow,
   Teams
 } from '../../teams/teams';
 
@@ -38,6 +40,7 @@ export class AdministrationPage
   addingMember = false;
 
   newTeamName = '';
+  newTeamParentId = '';
   creatingTeam = false;
 
   selectedDocumentId = '';
@@ -60,13 +63,22 @@ export class AdministrationPage
     this.refresh();
   }
 
+  get teamRows(): TeamTreeRow[]
+  {
+    return buildTeamTreeRows(
+      this.teams);
+  }
+
   get manageableTeams(): TeamItem[]
   {
     return this.teams
-      .filter(
-        team =>
-          team.role === 'Owner' ||
-          team.role === 'Admin');
+      .filter(team => team.canManage)
+      .sort(
+        (left, right) =>
+          left.name.localeCompare(
+            right.name,
+            undefined,
+            { sensitivity: 'base' }));
   }
 
   get readyDocuments(): DocumentItem[]
@@ -199,6 +211,14 @@ export class AdministrationPage
       (event.target as HTMLInputElement).value;
   }
 
+  onTeamParentChanged(
+    event: Event):
+    void
+  {
+    this.newTeamParentId =
+      (event.target as HTMLSelectElement).value;
+  }
+
   createTeam(): void
   {
     const name =
@@ -209,18 +229,25 @@ export class AdministrationPage
       return;
     }
 
+    const parent =
+      this.teams.find(
+        team => team.id === this.newTeamParentId);
+
     this.creatingTeam = true;
     this.clearMessages();
 
     this.teamsService
-      .createTeam(name)
+      .createTeam(
+        name,
+        this.newTeamParentId || undefined)
       .subscribe({
         next: team =>
         {
           this.newTeamName = '';
           this.creatingTeam = false;
-          this.successMessage =
-            `${team.name} created. You are the owner.`;
+          this.successMessage = parent
+            ? `${team.name} created under ${parent.name}. You are the owner of the new team.`
+            : `${team.name} created as a root team. You are the owner.`;
           this.refresh();
         },
         error: error =>
@@ -317,6 +344,14 @@ export class AdministrationPage
     {
       this.selectedMemberTeamId =
         this.manageableTeams[0]?.id ?? '';
+    }
+
+    if (
+      this.newTeamParentId &&
+      !manageableTeamIds.has(
+        this.newTeamParentId))
+    {
+      this.newTeamParentId = '';
     }
 
     if (

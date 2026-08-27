@@ -4,7 +4,7 @@
       <p class="eyebrow">Collaboration</p>
       <h1>Teams</h1>
       <p class="page-description">
-        See the teams that grant you access to shared knowledge. Membership changes are handled from Administration.
+        Browse your team hierarchy. Structural ancestors are shown for orientation only and never imply inherited access.
       </p>
     </div>
 
@@ -31,8 +31,10 @@
     </div>
   } @else {
     <div class="teams-grid">
-      @for (team of teams; track team.id) {
-        <article class="team-card">
+      @for (team of teamRows; track team.id) {
+        <article
+          class="team-card"
+          [style.margin-left.rem]="team.depth * 1.25">
           <div class="team-heading">
             <div class="team-icon">
               {{ team.name.substring(0, 2).toUpperCase() }}
@@ -42,15 +44,15 @@
               class="role-badge"
               [class.owner]="team.role === 'Owner'"
               [class.admin]="team.role === 'Admin'">
-              {{ team.role }}
+              {{ team.isMember ? (team.role ?? 'Member') : 'Folder' }}
             </span>
           </div>
 
-          <h2>{{ team.name }}</h2>
-          <p>{{ roleDescription(team.role) }}</p>
+          <h2>{{ team.depth > 0 ? '↳ ' : '' }}{{ team.name }}</h2>
+          <p>{{ roleDescription(team) }}</p>
 
           <div class="team-id">
-            <span>Team ID</span>
+            <span>{{ team.isMember ? 'Direct team' : 'Structural ancestor' }}</span>
             <code>{{ team.id }}</code>
           </div>
         </article>

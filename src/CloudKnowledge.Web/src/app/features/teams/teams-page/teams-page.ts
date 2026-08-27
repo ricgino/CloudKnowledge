@@ -5,7 +5,9 @@ import {
 } from '@angular/core';
 
 import {
+  buildTeamTreeRows,
   TeamItem,
+  TeamTreeRow,
   Teams
 } from '../teams';
 
@@ -26,6 +28,12 @@ export class TeamsPage
     private readonly teamsService: Teams,
     private readonly cdr: ChangeDetectorRef)
   {
+  }
+
+  get teamRows(): TeamTreeRow[]
+  {
+    return buildTeamTreeRows(
+      this.teams);
   }
 
   ngOnInit(): void
@@ -58,19 +66,24 @@ export class TeamsPage
   }
 
   roleDescription(
-    role: string):
+    team: TeamItem):
     string
   {
-    switch (role)
+    if (!team.isMember)
+    {
+      return 'Structural ancestor shown only to preserve the team path. It grants no membership or document access.';
+    }
+
+    switch (team.role)
     {
       case 'Owner':
-        return 'You own this team and can manage its membership.';
+        return 'You own this team and can manage membership and create sub-teams.';
       case 'Admin':
-        return 'You can manage this team and its members.';
+        return 'You can manage this team, its members and create sub-teams.';
       case 'Member':
-        return 'Shared team documents are available to your knowledge search.';
+        return 'Documents explicitly shared with this team are available to you.';
       default:
-        return 'Team membership';
+        return 'Direct team membership.';
     }
   }
 }

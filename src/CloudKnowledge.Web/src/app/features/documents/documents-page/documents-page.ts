@@ -6,11 +6,14 @@ import {
 
 import {
   DocumentItem,
+  DocumentListScope,
   Documents
 } from '../documents';
 
 import {
+  buildTeamTreeRows,
   TeamItem,
+  TeamTreeRow,
   Teams
 } from '../../teams/teams';
 
@@ -25,6 +28,18 @@ export class DocumentsPage
 {
   documents: DocumentItem[] = [];
   teams: TeamItem[] = [];
+  teamRows: TeamTreeRow[] = [];
+
+  scope: DocumentListScope = 'all';
+  selectedLibraryTeamId = '';
+  includeDescendants = false;
+  searchInput = '';
+  activeSearchQuery = '';
+
+  page = 1;
+  pageSize = 20;
+  totalCount = 0;
+  totalPages = 0;
 
   loading = false;
   uploading = false;
@@ -45,8 +60,20 @@ export class DocumentsPage
 
   ngOnInit(): void
   {
-    this.loadDocuments();
     this.loadTeams();
+    this.loadDocuments();
+  }
+
+  get uploadTeams(): TeamItem[]
+  {
+    return this.teams
+      .filter(team => team.isMember)
+      .sort(
+        (left, right) =>
+          left.name.localeCompare(
+            right.name,
+            undefined,
+            { sensitivity: 'base' }));
   }
 
   get readyCount(): number
@@ -73,23 +100,59 @@ export class DocumentsPage
       .length;
   }
 
+  get selectedScopeLabel(): string
+  {
+    if (this.scope === 'owned')
+    {
+      return 'My documents';
+    }
+
+    if (this.scope === 'team')
+    {
+      return this.teams.find(
+        team => team.id === this.selectedLibraryTeamId)
+        ?.name ?? 'Team documents';
+    }
+
+    return 'All documents';
+  }
+
   loadDocuments(): void
   {
     this.loading = true;
     this.errorMessage = '';
 
     this.documentsService
-      .getDocuments()
+      .getDocuments({
+        page: this.page,
+        pageSize: this.pageSize,
+        scope: this.scope,
+        teamId:
+          this.scope === 'team'
+            ? this.selectedLibraryTeamId
+            : undefined,
+        includeDescendants:
+          this.scope === 'team'
+            ? this.includeDescendants
+            : false,
+        query:
+          this.activeSearchQuery || undefined
+      })
       .subscribe({
         next: response =>
         {
           this.documents = response.items;
+          this.page = response.page;
+          this.pageSize = response.pageSize;
+          this.totalCount = response.totalCount;
+          this.totalPages = response.totalPages;
           this.loading = false;
           this.cdr.detectChanges();
         },
         error: error =>
         {
           this.errorMessage =
+            error.error?.message ??
             `Unable to load documents (HTTP ${error.status}).`;
           this.loading = false;
           this.cdr.detectChanges();
@@ -105,14 +168,100 @@ export class DocumentsPage
         next: teams =>
         {
           this.teams = teams;
+          this.teamRows =
+            buildTeamTreeRows(teams);
           this.cdr.detectChanges();
         },
         error: () =>
         {
           this.teams = [];
+          this.teamRows = [];
           this.cdr.detectChanges();
         }
       });
+  }
+
+  selectAllDocuments(): void
+  {
+    this.scope = 'all';
+    this.selectedLibraryTeamId = '';
+    this.includeDescendants = false;
+    this.page = 1;
+    this.loadDocuments();
+  }
+
+  selectMyDocuments(): void
+  {
+    this.scope = 'owned';
+    this.selectedLibraryTeamId = '';
+    this.includeDescendants = false;
+    this.page = 1;
+    this.loadDocuments();
+  }
+
+  selectTeamScope(
+    team: TeamTreeRow):
+    void
+  {
+    this.scope = 'team';
+    this.selectedLibraryTeamId = team.id;
+    this.includeDescendants = team.hasChildren;
+    this.page = 1;
+    this.loadDocuments();
+  }
+
+  onSearchInput(
+    event: Event):
+    void
+  {
+    this.searchInput =
+      (event.target as HTMLInputElement).value;
+  }
+
+  applySearch(): void
+  {
+    this.activeSearchQuery =
+      this.searchInput.trim();
+    this.page = 1;
+    this.loadDocuments();
+  }
+
+  clearSearch(): void
+  {
+    if (!this.searchInput && !this.activeSearchQuery)
+    {
+      return;
+    }
+
+    this.searchInput = '';
+    this.activeSearchQuery = '';
+    this.page = 1;
+    this.loadDocuments();
+  }
+
+  previousPage(): void
+  {
+    if (this.page <= 1 || this.loading)
+    {
+      return;
+    }
+
+    this.page--;
+    this.loadDocuments();
+  }
+
+  nextPage(): void
+  {
+    if (
+      this.loading ||
+      this.totalPages === 0 ||
+      this.page >= this.totalPages)
+    {
+      return;
+    }
+
+    this.page++;
+    this.loadDocuments();
   }
 
   onFileSelected(
@@ -167,7 +316,7 @@ export class DocumentsPage
           this.successMessage = teamName
             ? `${fileName} uploaded and shared with ${teamName}. Processing continues in the background.`
             : `${fileName} uploaded as a personal document. Processing continues in the background.`;
-          this.cdr.detectChanges();
+          this.page = 1;
           this.loadDocuments();
         },
         error: error =>
@@ -252,6 +401,14 @@ export class DocumentsPage
           this.deletingDocumentId = '';
           this.successMessage =
             `${document.fileName} deleted.`;
+
+          if (
+            this.documents.length === 1 &&
+            this.page > 1)
+          {
+            this.page--;
+          }
+
           this.loadDocuments();
         },
         error: error =>

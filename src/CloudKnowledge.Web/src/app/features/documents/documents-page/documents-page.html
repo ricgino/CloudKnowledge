@@ -4,7 +4,7 @@
       <p class="eyebrow">Knowledge library</p>
       <h1>Documents</h1>
       <p class="page-description">
-        Upload PDFs, choose whether they stay personal or are shared with a team, and manage the files you own.
+        Organize large document sets by ownership and team hierarchy, search by filename, and keep authorization enforced server-side.
       </p>
     </div>
 
@@ -19,22 +19,22 @@
 
   <div class="summary-grid">
     <article class="summary-card">
-      <span>Total</span>
-      <strong>{{ documents.length }}</strong>
+      <span>Results</span>
+      <strong>{{ totalCount }}</strong>
     </article>
 
     <article class="summary-card ready-summary">
-      <span>Ready</span>
+      <span>Ready on page</span>
       <strong>{{ readyCount }}</strong>
     </article>
 
     <article class="summary-card processing-summary">
-      <span>Processing</span>
+      <span>Processing on page</span>
       <strong>{{ processingCount }}</strong>
     </article>
 
     <article class="summary-card failed-summary">
-      <span>Failed</span>
+      <span>Failed on page</span>
       <strong>{{ failedCount }}</strong>
     </article>
   </div>
@@ -44,7 +44,7 @@
       <p class="eyebrow">Add knowledge</p>
       <h2>Upload a PDF</h2>
       <p>
-        Keep it personal or make it available to one of your teams immediately. Processing continues asynchronously after upload.
+        Keep it personal or share it with a team where you have direct membership. Structural parent teams never grant implicit access.
       </p>
     </div>
 
@@ -64,7 +64,7 @@
           [value]="selectedTeamId"
           (change)="onSelectedTeamChanged($event)">
           <option value="">Personal only</option>
-          @for (team of teams; track team.id) {
+          @for (team of uploadTeams; track team.id) {
             <option [value]="team.id">
               Team · {{ team.name }}
             </option>
@@ -94,63 +94,190 @@
     </div>
   }
 
-  <section class="library-card">
-    <div class="library-heading">
-      <div>
-        <h2>Your accessible documents</h2>
-        <p>Download anything you can access. Documents you own can also be permanently deleted.</p>
-      </div>
-    </div>
+  <section class="library-shell">
+    <aside class="library-navigation">
+      <p class="navigation-title">Library</p>
 
-    @if (loading && documents.length === 0) {
-      <div class="empty-state">Loading documents...</div>
-    } @else if (documents.length === 0) {
-      <div class="empty-state">
-        No accessible documents yet. Upload your first PDF to start building the knowledge base.
-      </div>
-    } @else {
-      <div class="document-list">
-        @for (document of documents; track document.id) {
-          <article class="document-row">
-            <div class="document-icon">PDF</div>
+      <button
+        type="button"
+        class="scope-button"
+        [class.active]="scope === 'all'"
+        (click)="selectAllDocuments()">
+        <span>All documents</span>
+      </button>
 
-            <div class="document-copy">
-              <strong>{{ document.fileName }}</strong>
-              <span>
-                {{ statusDescription(document.status) }} · {{ document.isOwner ? 'Owned by you' : 'Shared with you' }}
-              </span>
-            </div>
+      <button
+        type="button"
+        class="scope-button"
+        [class.active]="scope === 'owned'"
+        (click)="selectMyDocuments()">
+        <span>My documents</span>
+      </button>
 
-            <span
-              class="status-badge"
-              [class.ready]="document.status === 'Ready'"
-              [class.processing]="document.status === 'Processing' || document.status === 'Pending'"
-              [class.failed]="document.status === 'Failed'">
-              {{ document.status }}
+      <p class="navigation-title teams-title">Teams</p>
+
+      @if (teamRows.length === 0) {
+        <p class="navigation-empty">No team access yet.</p>
+      } @else {
+        @for (team of teamRows; track team.id) {
+          <button
+            type="button"
+            class="scope-button team-scope-button"
+            [class.active]="scope === 'team' && selectedLibraryTeamId === team.id"
+            [class.structural]="!team.isMember"
+            [style.padding-left.rem]="0.75 + team.depth * 1.05"
+            (click)="selectTeamScope(team)">
+            <span class="tree-marker">{{ team.hasChildren ? '▾' : '•' }}</span>
+            <span class="team-scope-copy">
+              <strong>{{ team.name }}</strong>
+              <small>
+                {{ team.isMember ? (team.role ?? 'Member') : 'Folder' }}
+              </small>
             </span>
+          </button>
+        }
+      }
+    </aside>
 
-            <div class="document-actions">
-              <button
-                type="button"
-                class="secondary-button compact-button"
-                (click)="downloadDocument(document)"
-                [disabled]="downloadingDocumentId === document.id">
-                {{ downloadingDocumentId === document.id ? 'Downloading...' : 'Download' }}
-              </button>
+    <div class="library-card">
+      <div class="library-heading">
+        <div>
+          <p class="eyebrow">Current view</p>
+          <h2>{{ selectedScopeLabel }}</h2>
+          <p>
+            @if (scope === 'team' && includeDescendants) {
+              Includes authorized descendant teams only.
+            } @else if (scope === 'team') {
+              Documents explicitly shared with this team.
+            } @else if (scope === 'owned') {
+              Documents owned by your account.
+            } @else {
+              Every document your account is authorized to retrieve.
+            }
+          </p>
+        </div>
+      </div>
 
-              @if (document.isOwner) {
-                <button
-                  type="button"
-                  class="danger-button compact-button"
-                  (click)="deleteDocument(document)"
-                  [disabled]="deletingDocumentId === document.id">
-                  {{ deletingDocumentId === document.id ? 'Deleting...' : 'Delete' }}
-                </button>
-              }
-            </div>
-          </article>
+      <div class="library-toolbar">
+        <div class="search-box">
+          <input
+            type="search"
+            placeholder="Search filename..."
+            [value]="searchInput"
+            (input)="onSearchInput($event)"
+            (keyup.enter)="applySearch()"
+          />
+
+          <button
+            type="button"
+            class="primary-button compact-button"
+            (click)="applySearch()"
+            [disabled]="loading">
+            Search
+          </button>
+
+          @if (activeSearchQuery) {
+            <button
+              type="button"
+              class="secondary-button compact-button"
+              (click)="clearSearch()"
+              [disabled]="loading">
+              Clear
+            </button>
+          }
+        </div>
+
+        @if (activeSearchQuery) {
+          <span class="active-search">
+            Filename contains “{{ activeSearchQuery }}”
+          </span>
         }
       </div>
-    }
+
+      @if (loading && documents.length === 0) {
+        <div class="empty-state">Loading documents...</div>
+      } @else if (documents.length === 0) {
+        <div class="empty-state">
+          No documents match this scope and search.
+        </div>
+      } @else {
+        <div class="document-list">
+          @for (document of documents; track document.id) {
+            <article class="document-row">
+              <div class="document-icon">PDF</div>
+
+              <div class="document-copy">
+                <strong>{{ document.fileName }}</strong>
+                <span>{{ statusDescription(document.status) }}</span>
+
+                <div class="access-chips">
+                  @if (document.isOwner) {
+                    <span class="access-chip mine-chip">Mine</span>
+                  }
+
+                  @for (team of document.sharedTeams ?? []; track team.id) {
+                    <span class="access-chip" [title]="team.path">
+                      {{ team.path }}
+                    </span>
+                  }
+                </div>
+              </div>
+
+              <span
+                class="status-badge"
+                [class.ready]="document.status === 'Ready'"
+                [class.processing]="document.status === 'Processing' || document.status === 'Pending'"
+                [class.failed]="document.status === 'Failed'">
+                {{ document.status }}
+              </span>
+
+              <div class="document-actions">
+                <button
+                  type="button"
+                  class="secondary-button compact-button"
+                  (click)="downloadDocument(document)"
+                  [disabled]="downloadingDocumentId === document.id">
+                  {{ downloadingDocumentId === document.id ? 'Downloading...' : 'Download' }}
+                </button>
+
+                @if (document.isOwner) {
+                  <button
+                    type="button"
+                    class="danger-button compact-button"
+                    (click)="deleteDocument(document)"
+                    [disabled]="deletingDocumentId === document.id">
+                    {{ deletingDocumentId === document.id ? 'Deleting...' : 'Delete' }}
+                  </button>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+
+      <footer class="pagination-bar">
+        <span>
+          Page {{ totalPages === 0 ? 0 : page }} of {{ totalPages }} · {{ totalCount }} result{{ totalCount === 1 ? '' : 's' }}
+        </span>
+
+        <div>
+          <button
+            type="button"
+            class="secondary-button compact-button"
+            (click)="previousPage()"
+            [disabled]="page <= 1 || loading">
+            Previous
+          </button>
+
+          <button
+            type="button"
+            class="secondary-button compact-button"
+            (click)="nextPage()"
+            [disabled]="totalPages === 0 || page >= totalPages || loading">
+            Next
+          </button>
+        </div>
+      </footer>
+    </div>
   </section>
 </section>
