@@ -112,6 +112,16 @@ public sealed class DocumentLibraryFiltersTests
                 "outside.pdf",
                 otherUser.Id);
 
+        var deskOwned =
+            CreateTeamOwnedDocument(
+                "desk-team-owned.pdf",
+                deskSharing.Id);
+
+        var bookingOwned =
+            CreateTeamOwnedDocument(
+                "booking-team-owned.pdf",
+                booking.Id);
+
         dbContext.Documents.AddRange(
             mine,
             desk,
@@ -119,7 +129,9 @@ public sealed class DocumentLibraryFiltersTests
             bookingSecret,
             mixed,
             multi,
-            outside);
+            outside,
+            deskOwned,
+            bookingOwned);
 
         await dbContext.SaveChangesAsync();
 
@@ -164,7 +176,7 @@ public sealed class DocumentLibraryFiltersTests
                 CancellationToken.None);
 
         Assert.Equal(
-            5,
+            6,
             all.Count);
         Assert.Contains(
             all,
@@ -181,15 +193,21 @@ public sealed class DocumentLibraryFiltersTests
         Assert.Contains(
             all,
             document => document.Id == multi.Id);
+        Assert.Contains(
+            all,
+            document => document.Id == deskOwned.Id);
         Assert.DoesNotContain(
             all,
             document => document.Id == bookingSecret.Id);
         Assert.DoesNotContain(
             all,
+            document => document.Id == bookingOwned.Id);
+        Assert.DoesNotContain(
+            all,
             document => document.Id == outside.Id);
 
         Assert.Equal(
-            5,
+            6,
             await repository.CountAsync(
                 currentUser.Id,
                 allQuery,
@@ -222,7 +240,7 @@ public sealed class DocumentLibraryFiltersTests
                 CancellationToken.None);
 
         Assert.Equal(
-            3,
+            4,
             deskOnly.Count);
         Assert.Contains(
             deskOnly,
@@ -233,6 +251,9 @@ public sealed class DocumentLibraryFiltersTests
         Assert.Contains(
             deskOnly,
             document => document.Id == multi.Id);
+        Assert.Contains(
+            deskOnly,
+            document => document.Id == deskOwned.Id);
 
         var raiBranchQuery =
             Query(
@@ -241,7 +262,7 @@ public sealed class DocumentLibraryFiltersTests
                 includeDescendants: true);
 
         Assert.Equal(
-            4,
+            5,
             await repository.CountAsync(
                 currentUser.Id,
                 raiBranchQuery,
@@ -293,7 +314,8 @@ public sealed class DocumentLibraryFiltersTests
                 {
                     mine.Id,
                     mixed.Id,
-                    multi.Id
+                    multi.Id,
+                    deskOwned.Id
                 },
                 CancellationToken.None);
 
@@ -325,6 +347,15 @@ public sealed class DocumentLibraryFiltersTests
                 "Rai / HR Portal"
             },
             multiPaths);
+
+        Assert.Equal(
+            new[]
+            {
+                "Rai / DeskSharing"
+            },
+            provenance[deskOwned.Id]
+                .Select(team => team.Path)
+                .ToArray());
     }
 
     private static GetDocumentsQuery Query(
@@ -353,6 +384,21 @@ public sealed class DocumentLibraryFiltersTests
 
         document.AssignOwner(
             ownerUserId);
+
+        return document;
+    }
+
+    private static Document CreateTeamOwnedDocument(
+        string fileName,
+        Guid ownerTeamId)
+    {
+        var document =
+            Document.Create(
+                fileName,
+                "application/pdf");
+
+        document.AssignTeamOwner(
+            ownerTeamId);
 
         return document;
     }
