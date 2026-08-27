@@ -66,6 +66,8 @@ public sealed class NonPdfDocumentProcessingTests
         : IDocumentTextExtractor
     {
         public string Extract(
+            string fileName,
+            string contentType,
             Stream content,
             CancellationToken cancellationToken) =>
             "Enterprise document text.";
