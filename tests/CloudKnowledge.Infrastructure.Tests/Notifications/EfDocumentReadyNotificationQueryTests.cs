@@ -102,12 +102,17 @@ public sealed class EfDocumentReadyNotificationQueryTests
             "Engineering",
             audience.OwnerDisplayName);
 
-        Assert.Equal(
+        var expectedRecipients =
             new[]
             {
                 ownerMember.Id,
                 sharedMember.Id
-            },
+            }
+            .OrderBy(id => id)
+            .ToArray();
+
+        Assert.Equal(
+            expectedRecipients,
             audience.RecipientUserIds
                 .OrderBy(id => id)
                 .ToArray());
