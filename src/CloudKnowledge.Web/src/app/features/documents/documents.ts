@@ -83,6 +83,16 @@ export function isSupportedDocumentFileName(
     fileName.trim());
 }
 
+export function buildUploadSuccessMessage(
+  fileName: string,
+  teamName?: string):
+  string
+{
+  return teamName
+    ? `${fileName} uploaded as a team-owned document in ${teamName}. Processing continues in the background.`
+    : `${fileName} uploaded as a personal document. Processing continues in the background.`;
+}
+
 export function buildDocumentsQueryString(
   query: DocumentsQuery):
   string
