@@ -30,6 +30,12 @@ export interface TeamTreeRow extends TeamItem
   hasChildren: boolean;
 }
 
+export interface KnowledgeTeamOption
+{
+  id: string;
+  label: string;
+}
+
 export interface TeamMemberItem
 {
   userId: string;
@@ -127,6 +133,51 @@ export function buildTeamTreeRows(
   }
 
   return rows;
+}
+
+export function buildKnowledgeTeamOptions(
+  teams: readonly TeamItem[]):
+  KnowledgeTeamOption[]
+{
+  const teamsById =
+    new Map(
+      teams.map(team => [
+        team.id,
+        team
+      ]));
+
+  const buildPath =
+    (team: TeamItem): string =>
+    {
+      const names: string[] = [];
+      const visited = new Set<string>();
+
+      let current: TeamItem | undefined =
+        team;
+
+      while (
+        current &&
+        !visited.has(current.id))
+      {
+        visited.add(current.id);
+        names.push(current.name);
+
+        current =
+          current.parentTeamId
+            ? teamsById.get(current.parentTeamId)
+            : undefined;
+      }
+
+      names.reverse();
+
+      return names.join(' / ');
+    };
+
+  return buildTeamTreeRows(teams)
+    .map(team => ({
+      id: team.id,
+      label: buildPath(team)
+    }));
 }
 
 @Injectable({
