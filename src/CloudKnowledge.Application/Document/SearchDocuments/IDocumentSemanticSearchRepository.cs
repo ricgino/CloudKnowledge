@@ -6,5 +6,6 @@ public interface IDocumentSemanticSearchRepository
         Guid userId,
         float[] queryEmbedding,
         int take,
+        DocumentRetrievalScope scope,
         CancellationToken cancellationToken);
 }
