@@ -187,6 +187,12 @@ select:focus {
   color: #a04343;
 }
 
+.compact-button {
+  min-height: 34px;
+  padding: 0 0.7rem;
+  font-size: 0.72rem;
+}
+
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -252,6 +258,13 @@ button:disabled {
   font-size: 0.72rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.row-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
 }
 
 .role-badge,
@@ -328,5 +341,10 @@ button:disabled {
 
   .create-row {
     grid-template-columns: 1fr;
+  }
+
+  .row-actions {
+    align-items: flex-end;
+    flex-direction: column;
   }
 }
