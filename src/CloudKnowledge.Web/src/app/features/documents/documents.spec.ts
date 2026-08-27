@@ -36,14 +36,14 @@ describe('document library filters', () => {
 
 describe('document upload formats', () => {
   it('accepts pdf, docx and txt case-insensitively', () => {
-    expect(isSupportedDocumentFileName('manual.pdf')).toBeTrue();
-    expect(isSupportedDocumentFileName('handbook.DOCX')).toBeTrue();
-    expect(isSupportedDocumentFileName('notes.Txt')).toBeTrue();
+    expect(isSupportedDocumentFileName('manual.pdf')).toBe(true);
+    expect(isSupportedDocumentFileName('handbook.DOCX')).toBe(true);
+    expect(isSupportedDocumentFileName('notes.Txt')).toBe(true);
   });
 
   it('rejects unsupported extensions', () => {
-    expect(isSupportedDocumentFileName('archive.zip')).toBeFalse();
-    expect(isSupportedDocumentFileName('legacy.doc')).toBeFalse();
-    expect(isSupportedDocumentFileName('payload.exe')).toBeFalse();
+    expect(isSupportedDocumentFileName('archive.zip')).toBe(false);
+    expect(isSupportedDocumentFileName('legacy.doc')).toBe(false);
+    expect(isSupportedDocumentFileName('payload.exe')).toBe(false);
   });
 });
