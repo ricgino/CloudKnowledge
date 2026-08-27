@@ -5,6 +5,7 @@ using CloudKnowledge.Domain.Users;
 using CloudKnowledge.Infrastructure.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Infrastructure.Persistence.Models;
+using CloudKnowledge.Infrastructure.Teams;
 using Microsoft.EntityFrameworkCore;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
@@ -191,7 +192,9 @@ public sealed class ScopedSemanticSearchTests
 
         var repository =
             new EfDocumentSemanticSearchRepository(
-                dbContext);
+                dbContext,
+                new EfTeamScopeResolver(
+                    dbContext));
 
         var queryEmbedding =
             CreateVector(1.0f, 0.0f);
