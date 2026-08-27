@@ -75,6 +75,14 @@ export interface AskDocumentsResponse
   sources: AskDocumentSource[];
 }
 
+export function isSupportedDocumentFileName(
+  fileName: string):
+  boolean
+{
+  return /\.(pdf|docx|txt)$/i.test(
+    fileName.trim());
+}
+
 export function buildDocumentsQueryString(
   query: DocumentsQuery):
   string
