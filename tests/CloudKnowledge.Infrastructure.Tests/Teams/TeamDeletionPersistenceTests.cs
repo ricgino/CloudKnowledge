@@ -5,6 +5,7 @@ using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Infrastructure.Persistence.Models;
 using CloudKnowledge.Infrastructure.Teams;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -223,10 +224,15 @@ public sealed class TeamDeletionPersistenceTests
                 parent.Id,
                 CancellationToken.None));
 
-        await Assert.ThrowsAsync<DbUpdateException>(
-            () => repository.DeleteLeafAsync(
-                parent.Id,
-                CancellationToken.None));
+        var exception =
+            await Assert.ThrowsAsync<PostgresException>(
+                () => repository.DeleteLeafAsync(
+                    parent.Id,
+                    CancellationToken.None));
+
+        Assert.Equal(
+            "23001",
+            exception.SqlState);
     }
 
     private static DocumentChunkEmbeddingRow CreateEmbedding(
