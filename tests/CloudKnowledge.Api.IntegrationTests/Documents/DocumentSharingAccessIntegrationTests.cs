@@ -100,7 +100,9 @@ public sealed class DocumentSharingAccessIntegrationTests
 
         var documentAccessRepository =
             new EfDocumentAccessRepository(
-                dbContext);
+                dbContext,
+                new EfTeamScopeResolver(
+                    dbContext));
 
         var documentRepository =
             new EfDocumentRepository(
@@ -127,16 +129,12 @@ public sealed class DocumentSharingAccessIntegrationTests
                 teamMembershipRepository,
                 currentUser);
 
-        // Bob is in the team,
-        // but the document is still private.
         Assert.False(
             await documentAccessRepository.CanAccessAsync(
                 bob.Id,
                 document.Id,
                 CancellationToken.None));
 
-        // Alice owns the document and belongs to the team,
-        // so she can share it.
         var shareResult =
             await shareUseCase.ExecuteAsync(
                 document.Id,
@@ -147,7 +145,6 @@ public sealed class DocumentSharingAccessIntegrationTests
             ShareDocumentStatus.Shared,
             shareResult);
 
-        // Sharing must now exist in the real database.
         Assert.True(
             await dbContext.DocumentTeamAccess
                 .AsNoTracking()
@@ -156,14 +153,12 @@ public sealed class DocumentSharingAccessIntegrationTests
                         access.DocumentId == document.Id &&
                         access.TeamId == engineering.Id));
 
-        // Bob immediately gains access through team membership.
         Assert.True(
             await documentAccessRepository.CanAccessAsync(
                 bob.Id,
                 document.Id,
                 CancellationToken.None));
 
-        // Alice revokes the share.
         var unshareResult =
             await unshareUseCase.ExecuteAsync(
                 document.Id,
@@ -174,7 +169,6 @@ public sealed class DocumentSharingAccessIntegrationTests
             UnshareDocumentStatus.Unshared,
             unshareResult);
 
-        // The sharing row must really be gone.
         Assert.False(
             await dbContext.DocumentTeamAccess
                 .AsNoTracking()
@@ -183,14 +177,12 @@ public sealed class DocumentSharingAccessIntegrationTests
                         access.DocumentId == document.Id &&
                         access.TeamId == engineering.Id));
 
-        // Bob loses access again.
         Assert.False(
             await documentAccessRepository.CanAccessAsync(
                 bob.Id,
                 document.Id,
                 CancellationToken.None));
 
-        // Alice never loses access because she is the owner.
         Assert.True(
             await documentAccessRepository.CanAccessAsync(
                 alice.Id,
