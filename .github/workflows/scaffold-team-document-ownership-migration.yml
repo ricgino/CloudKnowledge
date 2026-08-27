@@ -30,6 +30,8 @@ jobs:
         run: dotnet restore CloudKnowledge.slnx
 
       - name: Generate migration
+        env:
+          ConnectionStrings__Postgres: Host=localhost;Port=5432;Database=cloudknowledge;Username=cloudknowledge;Password=cloudknowledge
         run: >-
           dotnet ef migrations add AddTeamDocumentOwnership
           --project src/CloudKnowledge.Infrastructure
