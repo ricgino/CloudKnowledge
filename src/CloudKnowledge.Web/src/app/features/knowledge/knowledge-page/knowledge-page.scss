@@ -95,6 +95,7 @@
 
 textarea,
 input {
+  box-sizing: border-box;
   width: 100%;
   border: 1px solid #d7deea;
   border-radius: 10px;
@@ -104,9 +105,12 @@ input {
 }
 
 textarea {
+  height: 128px;
   min-height: 128px;
+  max-height: 128px;
   padding: 0.85rem;
-  resize: vertical;
+  resize: none;
+  overflow-y: auto;
   line-height: 1.55;
 }
 
