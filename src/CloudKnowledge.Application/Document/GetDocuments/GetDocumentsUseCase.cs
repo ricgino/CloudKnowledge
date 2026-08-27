@@ -74,7 +74,8 @@ public sealed class GetDocumentsUseCase
                             document.Id,
                             document.FileName,
                             document.ContentType,
-                            document.Status))
+                            document.Status,
+                            document.OwnerUserId == userId))
                 .ToList();
 
         var totalPages =

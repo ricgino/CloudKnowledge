@@ -7,4 +7,6 @@ public sealed class CreateDocumentRequest
 {
     [Required]
     public IFormFile File { get; init; } = default!;
+
+    public Guid? TeamId { get; init; }
 }

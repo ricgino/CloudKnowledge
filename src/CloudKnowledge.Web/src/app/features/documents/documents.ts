@@ -20,6 +20,7 @@ export interface DocumentItem
   fileName: string;
   contentType: string;
   status: string;
+  isOwner: boolean;
 }
 
 export interface DocumentsPageResponse
@@ -72,7 +73,8 @@ export class Documents
   }
 
   uploadDocument(
-    file: File):
+    file: File,
+    teamId?: string):
     Observable<DocumentItem>
   {
     const formData =
@@ -82,9 +84,35 @@ export class Documents
       'File',
       file);
 
+    if (teamId)
+    {
+      formData.append(
+        'TeamId',
+        teamId);
+    }
+
     return this.http.post<DocumentItem>(
       `${apiBaseUrl}/api/documents`,
       formData);
+  }
+
+  deleteDocument(
+    documentId: string):
+    Observable<void>
+  {
+    return this.http.delete<void>(
+      `${apiBaseUrl}/api/documents/${documentId}`);
+  }
+
+  downloadDocument(
+    documentId: string):
+    Observable<Blob>
+  {
+    return this.http.get(
+      `${apiBaseUrl}/api/documents/${documentId}/download`,
+      {
+        responseType: 'blob'
+      });
   }
 
   shareWithTeam(

@@ -4,7 +4,7 @@
       <p class="eyebrow">Knowledge library</p>
       <h1>Documents</h1>
       <p class="page-description">
-        Upload PDFs and monitor their processing state. Sharing and membership management live in Administration.
+        Upload PDFs, choose whether they stay personal or are shared with a team, and manage the files you own.
       </p>
     </div>
 
@@ -44,7 +44,7 @@
       <p class="eyebrow">Add knowledge</p>
       <h2>Upload a PDF</h2>
       <p>
-        The upload returns immediately. Text extraction, chunking and embeddings are handled asynchronously by the worker.
+        Keep it personal or make it available to one of your teams immediately. Processing continues asynchronously after upload.
       </p>
     </div>
 
@@ -56,6 +56,20 @@
           accept="application/pdf"
           (change)="onFileSelected($event)"
         />
+      </label>
+
+      <label class="visibility-picker">
+        <span>Access</span>
+        <select
+          [value]="selectedTeamId"
+          (change)="onSelectedTeamChanged($event)">
+          <option value="">Personal only</option>
+          @for (team of teams; track team.id) {
+            <option [value]="team.id">
+              Team · {{ team.name }}
+            </option>
+          }
+        </select>
       </label>
 
       <button
@@ -84,7 +98,7 @@
     <div class="library-heading">
       <div>
         <h2>Your accessible documents</h2>
-        <p>Includes documents you own and documents shared with one of your teams.</p>
+        <p>Download anything you can access. Documents you own can also be permanently deleted.</p>
       </div>
     </div>
 
@@ -102,7 +116,9 @@
 
             <div class="document-copy">
               <strong>{{ document.fileName }}</strong>
-              <span>{{ statusDescription(document.status) }}</span>
+              <span>
+                {{ statusDescription(document.status) }} · {{ document.isOwner ? 'Owned by you' : 'Shared with you' }}
+              </span>
             </div>
 
             <span
@@ -112,6 +128,26 @@
               [class.failed]="document.status === 'Failed'">
               {{ document.status }}
             </span>
+
+            <div class="document-actions">
+              <button
+                type="button"
+                class="secondary-button compact-button"
+                (click)="downloadDocument(document)"
+                [disabled]="downloadingDocumentId === document.id">
+                {{ downloadingDocumentId === document.id ? 'Downloading...' : 'Download' }}
+              </button>
+
+              @if (document.isOwner) {
+                <button
+                  type="button"
+                  class="danger-button compact-button"
+                  (click)="deleteDocument(document)"
+                  [disabled]="deletingDocumentId === document.id">
+                  {{ deletingDocumentId === document.id ? 'Deleting...' : 'Delete' }}
+                </button>
+              }
+            </div>
           </article>
         }
       </div>
