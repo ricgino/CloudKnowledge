@@ -1,12 +1,10 @@
 using System.Text;
-using CloudKnowledge.Application.Documents;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace CloudKnowledge.Infrastructure.Documents;
 
 public sealed class PdfPigDocumentTextExtractor
-    : IDocumentTextExtractor
 {
     public string Extract(
         Stream content,
