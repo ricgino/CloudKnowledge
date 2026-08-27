@@ -1,4 +1,5 @@
 import {
+  buildKnowledgeTeamOptions,
   buildTeamTreeRows,
   canDeleteTeam,
   TeamItem
@@ -51,6 +52,114 @@ describe('team tree', () => {
         ['finance', 1, false],
         ['reporting', 2, true]
       ]);
+  });
+
+  it('builds unambiguous full paths for knowledge scope options', () => {
+    const teams: TeamItem[] = [
+      {
+        id: 'rai',
+        name: 'Rai',
+        parentTeamId: null,
+        isMember: false,
+        role: null,
+        canManage: false
+      },
+      {
+        id: 'desk-sharing',
+        name: 'DeskSharing',
+        parentTeamId: 'rai',
+        isMember: true,
+        role: 'Member',
+        canManage: false
+      },
+      {
+        id: 'stellantis',
+        name: 'Stellantis',
+        parentTeamId: null,
+        isMember: false,
+        role: null,
+        canManage: false
+      },
+      {
+        id: 'finance',
+        name: 'Finance',
+        parentTeamId: 'stellantis',
+        isMember: false,
+        role: null,
+        canManage: false
+      },
+      {
+        id: 'reporting',
+        name: 'Reporting',
+        parentTeamId: 'finance',
+        isMember: true,
+        role: 'Member',
+        canManage: false
+      }
+    ];
+
+    expect(
+      buildKnowledgeTeamOptions(teams))
+      .toEqual([
+        {
+          id: 'rai',
+          label: 'Rai'
+        },
+        {
+          id: 'desk-sharing',
+          label: 'Rai / DeskSharing'
+        },
+        {
+          id: 'stellantis',
+          label: 'Stellantis'
+        },
+        {
+          id: 'finance',
+          label: 'Stellantis / Finance'
+        },
+        {
+          id: 'reporting',
+          label: 'Stellantis / Finance / Reporting'
+        }
+      ]);
+  });
+
+  it('keeps malformed orphan and cyclic teams usable without recursion loops', () => {
+    const malformed: TeamItem[] = [
+      {
+        id: 'orphan',
+        name: 'Orphan',
+        parentTeamId: 'missing',
+        isMember: true,
+        role: 'Member',
+        canManage: false
+      },
+      {
+        id: 'cycle-a',
+        name: 'Cycle A',
+        parentTeamId: 'cycle-b',
+        isMember: false,
+        role: null,
+        canManage: false
+      },
+      {
+        id: 'cycle-b',
+        name: 'Cycle B',
+        parentTeamId: 'cycle-a',
+        isMember: true,
+        role: 'Member',
+        canManage: false
+      }
+    ];
+
+    const options =
+      buildKnowledgeTeamOptions(malformed);
+
+    expect(options).toHaveLength(3);
+    expect(options.find(option => option.id === 'orphan')?.label)
+      .toBe('Orphan');
+    expect(options.every(option => option.label.length > 0))
+      .toBe(true);
   });
 
   it('allows team deletion only for direct owners', () => {
