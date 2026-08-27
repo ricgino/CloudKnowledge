@@ -25,12 +25,15 @@ import {
 } from './app';
 
 import {
+  NotificationItem,
   Notifications
 } from './features/notifications/notifications';
 
 describe('App', () => {
   const msalSubject$ =
     new Subject<never>();
+
+  let markedNotificationIds: string[] = [];
 
   const authMock = {
     handleRedirectObservable: () =>
@@ -53,13 +56,18 @@ describe('App', () => {
   const notificationsMock = {
     getNotifications: () =>
       of([]),
-    markRead: () =>
-      of(undefined),
+    markRead: (notificationId: string) =>
+    {
+      markedNotificationIds.push(notificationId);
+      return of(undefined);
+    },
     startRealtime: () => undefined,
     stopRealtime: () => undefined
   };
 
   beforeEach(async () => {
+    markedNotificationIds = [];
+
     await TestBed.configureTestingModule({
       imports: [
         RouterModule.forRoot([])
@@ -110,5 +118,49 @@ describe('App', () => {
         ?.textContent)
       .toContain(
         'Private knowledge, securely searchable.');
+  });
+
+  it('marks currently visible unread notifications as read when the panel opens', () => {
+    const fixture =
+      TestBed.createComponent(App);
+
+    const app =
+      fixture.componentInstance;
+
+    const unread: NotificationItem = {
+      id: 'notification-unread',
+      type: 'document-ready',
+      title: 'Document ready',
+      message: 'architecture.pdf is ready.',
+      target: 'documents',
+      createdAtUtc: '2026-08-27T20:00:00Z',
+      isRead: false
+    };
+
+    const alreadyRead: NotificationItem = {
+      ...unread,
+      id: 'notification-read',
+      isRead: true
+    };
+
+    app.notifications = [
+      unread,
+      alreadyRead
+    ];
+
+    app.toggleNotifications();
+
+    expect(app.notificationsOpen).toBe(true);
+    expect(markedNotificationIds)
+      .toEqual([
+        'notification-unread'
+      ]);
+    expect(app.unreadNotificationCount)
+      .toBe(0);
+    expect(
+      app.notifications.find(item =>
+        item.id === 'notification-unread')
+        ?.isRead)
+      .toBe(true);
   });
 });
