@@ -187,7 +187,32 @@ public sealed class EfDocumentAccessRepository
                 .ToListAsync(
                     cancellationToken);
 
-        if (visibleShares.Count == 0)
+        var visibleOwnership =
+            await (
+                from document in _dbContext.Documents.AsNoTracking()
+                join membership in _dbContext.TeamMembers.AsNoTracking()
+                    on document.OwnerTeamId equals membership.TeamId
+                where distinctDocumentIds.Contains(document.Id)
+                      && document.OwnerTeamId.HasValue
+                      && membership.UserId == userId
+                select new
+                {
+                    DocumentId = document.Id,
+                    TeamId = document.OwnerTeamId.Value
+                })
+                .Distinct()
+                .ToListAsync(
+                    cancellationToken);
+
+        var visibleTeamAccess =
+            visibleShares
+                .Concat(visibleOwnership)
+                .DistinctBy(
+                    access =>
+                        (access.DocumentId, access.TeamId))
+                .ToArray();
+
+        if (visibleTeamAccess.Length == 0)
         {
             return result;
         }
@@ -202,20 +227,20 @@ public sealed class EfDocumentAccessRepository
             teams.ToDictionary(
                 team => team.Id);
 
-        foreach (var group in visibleShares.GroupBy(
-                     share => share.DocumentId))
+        foreach (var group in visibleTeamAccess.GroupBy(
+                     access => access.DocumentId))
         {
             var sharedTeams =
                 group
                     .Where(
-                        share =>
+                        access =>
                             teamsById.ContainsKey(
-                                share.TeamId))
+                                access.TeamId))
                     .Select(
-                        share =>
+                        access =>
                         {
                             var team =
-                                teamsById[share.TeamId];
+                                teamsById[access.TeamId];
 
                             return new DocumentAccessTeamResult(
                                 team.Id,
@@ -281,6 +306,12 @@ public sealed class EfDocumentAccessRepository
                 documents =
                     documents.Where(
                         document =>
+                            (document.OwnerTeamId.HasValue
+                             && allowedTeamIds.Contains(
+                                 document.OwnerTeamId.Value))
+
+                            ||
+
                             _dbContext.DocumentTeamAccess.Any(
                                 access =>
                                     access.DocumentId == document.Id
