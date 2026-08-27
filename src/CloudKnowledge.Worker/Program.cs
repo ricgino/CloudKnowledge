@@ -61,9 +61,12 @@ builder.Services.AddScoped<
     IDocumentStorage,
     AzureBlobDocumentStorage>();
 
+builder.Services.AddScoped<PdfPigDocumentTextExtractor>();
+builder.Services.AddScoped<OpenXmlDocumentTextExtractor>();
+builder.Services.AddScoped<PlainTextDocumentTextExtractor>();
 builder.Services.AddScoped<
     IDocumentTextExtractor,
-    PdfPigDocumentTextExtractor>();
+    DocumentTextExtractorDispatcher>();
 
 builder.Services.AddScoped<
     IDocumentRepository,
