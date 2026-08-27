@@ -1,6 +1,11 @@
 import {
+  of
+} from 'rxjs';
+
+import {
   buildDocumentsQueryString,
   buildUploadSuccessMessage,
+  Documents,
   isSupportedDocumentFileName
 } from './documents';
 
@@ -32,6 +37,97 @@ describe('document library filters', () => {
     expect(query)
       .toBe(
         'page=1&pageSize=20&scope=owned');
+  });
+});
+
+describe('knowledge request scope', () => {
+  it('serializes the same selected team scope for search and ask', () => {
+    const requests: unknown[] = [];
+
+    const http = {
+      post: (_url: string, body: unknown) =>
+      {
+        requests.push(body);
+        return of([]);
+      }
+    };
+
+    const documents =
+      new Documents(http as never);
+
+    const scope = {
+      scope: 'team' as const,
+      teamId: 'desk-sharing',
+      includeDescendants: true
+    };
+
+    documents
+      .search(
+        'architecture',
+        5,
+        scope)
+      .subscribe();
+
+    documents
+      .ask(
+        'What is the architecture?',
+        5,
+        scope)
+      .subscribe();
+
+    expect(requests)
+      .toEqual([
+        {
+          query: 'architecture',
+          take: 5,
+          scope: 'team',
+          teamId: 'desk-sharing',
+          includeDescendants: true
+        },
+        {
+          question: 'What is the architecture?',
+          take: 5,
+          scope: 'team',
+          teamId: 'desk-sharing',
+          includeDescendants: true
+        }
+      ]);
+  });
+
+  it('defaults omitted search and ask scope to all accessible knowledge', () => {
+    const requests: unknown[] = [];
+
+    const http = {
+      post: (_url: string, body: unknown) =>
+      {
+        requests.push(body);
+        return of([]);
+      }
+    };
+
+    const documents =
+      new Documents(http as never);
+
+    documents.search('architecture').subscribe();
+    documents.ask('What is the architecture?').subscribe();
+
+    expect(requests)
+      .toEqual([
+        {
+          query: 'architecture',
+          take: 5,
+          scope: 'all',
+          teamId: null,
+          includeDescendants: false
+        },
+        {
+          question: 'What is the architecture?',
+          take: 5,
+          scope: 'all',
+          teamId: null,
+          includeDescendants: false
+        }
+      ]);
   });
 });
 
