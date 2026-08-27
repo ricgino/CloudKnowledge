@@ -49,17 +49,101 @@ public sealed class EfTeamRepository
         Guid userId,
         CancellationToken cancellationToken)
     {
-        return await (
-            from team in _dbContext.Teams.AsNoTracking()
-            join membership in _dbContext.TeamMembers.AsNoTracking()
-                on team.Id equals membership.TeamId
-            where membership.UserId == userId
-            orderby team.Name, team.Id
-            select new GetTeamsResult(
-                team.Id,
-                team.Name,
-                membership.Role))
-            .ToListAsync(
-                cancellationToken);
+        var teams =
+            await _dbContext.Teams
+                .AsNoTracking()
+                .ToListAsync(
+                    cancellationToken);
+
+        var memberships =
+            await _dbContext.TeamMembers
+                .AsNoTracking()
+                .Where(
+                    membership =>
+                        membership.UserId == userId)
+                .ToListAsync(
+                    cancellationToken);
+
+        if (memberships.Count == 0)
+        {
+            return Array.Empty<GetTeamsResult>();
+        }
+
+        var teamsById =
+            teams.ToDictionary(
+                team => team.Id);
+
+        var membershipsByTeamId =
+            memberships.ToDictionary(
+                membership => membership.TeamId);
+
+        var visibleTeamIds =
+            new HashSet<Guid>(
+                membershipsByTeamId.Keys);
+
+        foreach (var membership in memberships)
+        {
+            if (!teamsById.TryGetValue(
+                    membership.TeamId,
+                    out var currentTeam))
+            {
+                continue;
+            }
+
+            var visitedAncestors =
+                new HashSet<Guid>();
+
+            while (currentTeam.ParentTeamId is Guid parentTeamId &&
+                   teamsById.TryGetValue(
+                       parentTeamId,
+                       out var parentTeam))
+            {
+                if (!visitedAncestors.Add(
+                        parentTeamId))
+                {
+                    break;
+                }
+
+                visibleTeamIds.Add(
+                    parentTeamId);
+
+                currentTeam =
+                    parentTeam;
+            }
+        }
+
+        return visibleTeamIds
+            .Select(
+                teamId =>
+                {
+                    var team =
+                        teamsById[teamId];
+
+                    var isMember =
+                        membershipsByTeamId.TryGetValue(
+                            teamId,
+                            out var membership);
+
+                    TeamRole? role =
+                        isMember
+                            ? membership!.Role
+                            : null;
+
+                    var canManage =
+                        role is TeamRole.Admin or TeamRole.Owner;
+
+                    return new GetTeamsResult(
+                        team.Id,
+                        team.Name,
+                        team.ParentTeamId,
+                        isMember,
+                        role,
+                        canManage);
+                })
+            .OrderBy(
+                result => result.Name)
+            .ThenBy(
+                result => result.Id)
+            .ToList();
     }
 }

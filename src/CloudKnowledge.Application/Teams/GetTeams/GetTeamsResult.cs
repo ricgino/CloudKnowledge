@@ -5,4 +5,7 @@ namespace CloudKnowledge.Application.Teams.GetTeams;
 public sealed record GetTeamsResult(
     Guid Id,
     string Name,
-    TeamRole Role);
+    Guid? ParentTeamId,
+    bool IsMember,
+    TeamRole? Role,
+    bool CanManage);

@@ -53,7 +53,10 @@ public sealed class TeamsController
                     new TeamResponse(
                         result.Id,
                         result.Name,
-                        result.Role.ToString()))
+                        result.ParentTeamId,
+                        result.IsMember,
+                        result.Role?.ToString(),
+                        result.CanManage))
                 .ToArray();
 
         return Ok(response);
@@ -78,7 +81,10 @@ public sealed class TeamsController
                     new TeamResponse(
                         result.Id!.Value,
                         result.Name!,
-                        result.Role!.Value.ToString()));
+                        result.ParentTeamId,
+                        true,
+                        result.Role!.Value.ToString(),
+                        true));
 
             case CreateTeamStatus.ParentNotFoundOrNotMember:
                 return NotFound();
