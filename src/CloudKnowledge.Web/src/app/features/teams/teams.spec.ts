@@ -1,5 +1,6 @@
 import {
   buildTeamTreeRows,
+  canDeleteTeam,
   TeamItem
 } from './teams';
 
@@ -50,5 +51,36 @@ describe('team tree', () => {
         ['finance', 1, false],
         ['reporting', 2, true]
       ]);
+  });
+
+  it('allows team deletion only for direct owners', () => {
+    const baseTeam: TeamItem = {
+      id: 'team',
+      name: 'Team',
+      parentTeamId: null,
+      isMember: true,
+      role: 'Owner',
+      canManage: true
+    };
+
+    expect(canDeleteTeam(baseTeam)).toBeTrue();
+
+    expect(canDeleteTeam({
+      ...baseTeam,
+      role: 'Admin'
+    })).toBeFalse();
+
+    expect(canDeleteTeam({
+      ...baseTeam,
+      role: 'Member',
+      canManage: false
+    })).toBeFalse();
+
+    expect(canDeleteTeam({
+      ...baseTeam,
+      isMember: false,
+      role: null,
+      canManage: false
+    })).toBeFalse();
   });
 });
