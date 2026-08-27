@@ -4,6 +4,7 @@ using CloudKnowledge.Domain.Teams;
 using CloudKnowledge.Domain.Users;
 using CloudKnowledge.Infrastructure.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
+using CloudKnowledge.Infrastructure.Teams;
 using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -162,7 +163,9 @@ public sealed class DocumentLibraryFiltersTests
 
         var repository =
             new EfDocumentAccessRepository(
-                dbContext);
+                dbContext,
+                new EfTeamScopeResolver(
+                    dbContext));
 
         var allQuery =
             Query(DocumentListScope.All);
