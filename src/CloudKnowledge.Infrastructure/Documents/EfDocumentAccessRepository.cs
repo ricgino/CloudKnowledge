@@ -1,5 +1,6 @@
 using CloudKnowledge.Application.Documents.Access;
 using CloudKnowledge.Application.Documents.GetDocuments;
+using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Domain.Documents;
 using CloudKnowledge.Domain.Teams;
 using CloudKnowledge.Infrastructure.Persistence;
@@ -13,11 +14,18 @@ public sealed class EfDocumentAccessRepository
     private readonly CloudKnowledgeDbContext
         _dbContext;
 
+    private readonly ITeamScopeResolver
+        _teamScopeResolver;
+
     public EfDocumentAccessRepository(
-        CloudKnowledgeDbContext dbContext)
+        CloudKnowledgeDbContext dbContext,
+        ITeamScopeResolver teamScopeResolver)
     {
         _dbContext =
             dbContext;
+
+        _teamScopeResolver =
+            teamScopeResolver;
     }
 
     public async Task<bool> CanAccessAsync(
@@ -289,7 +297,7 @@ public sealed class EfDocumentAccessRepository
 
             case DocumentListScope.Team:
                 var allowedTeamIds =
-                    await ResolveAllowedTeamIdsAsync(
+                    await _teamScopeResolver.ResolveAllowedTeamIdsAsync(
                         userId,
                         query.TeamId!.Value,
                         query.IncludeDescendants,
@@ -341,108 +349,6 @@ public sealed class EfDocumentAccessRepository
         }
 
         return documents;
-    }
-
-    private async Task<Guid[]> ResolveAllowedTeamIdsAsync(
-        Guid userId,
-        Guid selectedTeamId,
-        bool includeDescendants,
-        CancellationToken cancellationToken)
-    {
-        if (!includeDescendants)
-        {
-            var isDirectMember =
-                await _dbContext.TeamMembers
-                    .AsNoTracking()
-                    .AnyAsync(
-                        membership =>
-                            membership.UserId == userId
-                            && membership.TeamId == selectedTeamId,
-                        cancellationToken);
-
-            return isDirectMember
-                ? new[] { selectedTeamId }
-                : Array.Empty<Guid>();
-        }
-
-        var teams =
-            await _dbContext.Teams
-                .AsNoTracking()
-                .Select(
-                    team =>
-                        new
-                        {
-                            team.Id,
-                            team.ParentTeamId
-                        })
-                .ToListAsync(
-                    cancellationToken);
-
-        if (!teams.Any(
-                team => team.Id == selectedTeamId))
-        {
-            return Array.Empty<Guid>();
-        }
-
-        var branchTeamIds =
-            new HashSet<Guid>
-            {
-                selectedTeamId
-            };
-
-        var pendingParents =
-            new Queue<Guid>();
-
-        pendingParents.Enqueue(
-            selectedTeamId);
-
-        var childrenByParent =
-            teams
-                .Where(
-                    team => team.ParentTeamId.HasValue)
-                .GroupBy(
-                    team => team.ParentTeamId!.Value)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group
-                        .Select(team => team.Id)
-                        .ToArray());
-
-        while (pendingParents.Count > 0)
-        {
-            var parentId =
-                pendingParents.Dequeue();
-
-            if (!childrenByParent.TryGetValue(
-                    parentId,
-                    out var childIds))
-            {
-                continue;
-            }
-
-            foreach (var childId in childIds)
-            {
-                if (branchTeamIds.Add(
-                        childId))
-                {
-                    pendingParents.Enqueue(
-                        childId);
-                }
-            }
-        }
-
-        return await _dbContext.TeamMembers
-            .AsNoTracking()
-            .Where(
-                membership =>
-                    membership.UserId == userId
-                    && branchTeamIds.Contains(
-                        membership.TeamId))
-            .Select(
-                membership => membership.TeamId)
-            .Distinct()
-            .ToArrayAsync(
-                cancellationToken);
     }
 
     private static string BuildPath(
