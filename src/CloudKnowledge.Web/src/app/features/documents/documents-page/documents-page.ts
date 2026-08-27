@@ -7,7 +7,8 @@ import {
 import {
   DocumentItem,
   DocumentListScope,
-  Documents
+  Documents,
+  isSupportedDocumentFileName
 } from '../documents';
 
 import {
@@ -271,10 +272,24 @@ export class DocumentsPage
     const input =
       event.target as HTMLInputElement;
 
-    this.selectedFile =
+    const file =
       input.files?.[0] ?? null;
 
     this.successMessage = '';
+
+    if (
+      file &&
+      !isSupportedDocumentFileName(file.name))
+    {
+      this.selectedFile = null;
+      this.errorMessage =
+        'Supported document formats are PDF, DOCX and TXT.';
+      input.value = '';
+      return;
+    }
+
+    this.selectedFile = file;
+    this.errorMessage = '';
   }
 
   onSelectedTeamChanged(
@@ -289,6 +304,14 @@ export class DocumentsPage
   {
     if (!this.selectedFile)
     {
+      return;
+    }
+
+    if (!isSupportedDocumentFileName(
+        this.selectedFile.name))
+    {
+      this.errorMessage =
+        'Supported document formats are PDF, DOCX and TXT.';
       return;
     }
 
@@ -421,6 +444,19 @@ export class DocumentsPage
           this.cdr.detectChanges();
         }
       });
+  }
+
+  documentTypeLabel(
+    fileName: string):
+    string
+  {
+    const extension =
+      fileName
+        .split('.')
+        .pop()
+        ?.toUpperCase();
+
+    return extension || 'DOC';
   }
 
   statusDescription(
