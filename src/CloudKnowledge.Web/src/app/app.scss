@@ -1,86 +1,343 @@
 :host {
   display: block;
   min-height: 100vh;
-  background: #f8f9fa;
-  color: #202124;
-  font-family: Arial, sans-serif;
+  background: #f5f7fb;
+  color: #172033;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-.app-shell {
-  width: min(1120px, calc(100% - 2rem));
-  margin: 0 auto;
-  padding: 2rem 0 3rem;
+* {
+  box-sizing: border-box;
 }
 
-.topbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.brand-kicker {
-  margin: 0 0 0.25rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-h1,
-h2,
-p {
-  margin-top: 0;
-}
-
-h1 {
-  margin-bottom: 0;
-  font-size: clamp(2rem, 5vw, 3.25rem);
-  line-height: 1.05;
-  max-width: 760px;
-}
-
-.signin-card {
-  max-width: 560px;
-  padding: 1.5rem;
-  border: 1px solid #dadce0;
-  border-radius: 16px;
-  background: #fff;
-}
-
-.signin-card p {
-  color: #5f6368;
-}
-
-.eyebrow {
-  margin-bottom: 0.35rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 button {
-  border-radius: 8px;
-  padding: 0.65rem 1rem;
-  font: inherit;
   cursor: pointer;
 }
 
-.primary-button {
-  border: 1px solid #1a73e8;
-  background: #1a73e8;
-  color: #fff;
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
-.signout-button {
-  border: 1px solid #dadce0;
+.app-shell {
+  min-height: 100vh;
+}
+
+.signin-layout {
+  width: min(1120px, calc(100% - 2rem));
+  min-height: 100vh;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  align-items: center;
+  gap: 4rem;
+  padding: 4rem 0;
+}
+
+.signin-copy h1 {
+  max-width: 760px;
+  margin: 0;
+  font-size: clamp(2.8rem, 7vw, 5.7rem);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.signin-description {
+  max-width: 650px;
+  margin: 1.5rem 0 0;
+  color: #5c667a;
+  font-size: 1.08rem;
+  line-height: 1.7;
+}
+
+.brand-kicker,
+.eyebrow {
+  margin: 0 0 0.65rem;
+  color: #3658d6;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.signin-card {
+  padding: 2rem;
+  border: 1px solid #e0e5ef;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(34, 48, 78, 0.1);
+}
+
+.signin-card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.65rem;
+}
+
+.signin-card p:not(.eyebrow) {
+  margin: 0 0 1.5rem;
+  color: #687286;
+  line-height: 1.6;
+}
+
+.topbar {
+  min-height: 74px;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e4e8f0;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.brand-block,
+.account-block {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #233a91;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.brand-name,
+.brand-subtitle,
+.account-copy strong,
+.account-copy span {
+  display: block;
+  margin: 0;
+}
+
+.brand-name {
+  font-weight: 800;
+}
+
+.brand-subtitle,
+.account-copy span {
+  margin-top: 0.12rem;
+  color: #7a8497;
+  font-size: 0.78rem;
+}
+
+.account-copy {
+  text-align: right;
+}
+
+.account-copy strong {
+  max-width: 260px;
+  overflow: hidden;
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-shell {
+  min-height: calc(100vh - 74px);
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+}
+
+.sidebar {
+  padding: 1.5rem 1rem;
+  border-right: 1px solid #e4e8f0;
   background: #fff;
 }
 
-@media (max-width: 720px) {
+.nav-group + .nav-group {
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #edf0f5;
+}
+
+.nav-label {
+  margin: 0 0 0.55rem 0.65rem;
+  color: #929bab;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.nav-item {
+  width: 100%;
+  margin: 0.18rem 0;
+  padding: 0.7rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: #435066;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: #f6f8fc;
+}
+
+.nav-item.active {
+  border-color: #d8e0fb;
+  background: #eef2ff;
+  color: #213a98;
+}
+
+.nav-icon {
+  min-width: 42px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #edf0f5;
+  color: #69758b;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.nav-item.active .nav-icon {
+  background: #dfe6ff;
+  color: #2543a9;
+}
+
+.admin-item .nav-icon {
+  background: #f1eafa;
+  color: #6b3ba0;
+}
+
+.nav-item span:last-child {
+  min-width: 0;
+}
+
+.nav-item strong,
+.nav-item small {
+  display: block;
+}
+
+.nav-item strong {
+  font-size: 0.88rem;
+}
+
+.nav-item small {
+  margin-top: 0.12rem;
+  color: #8b94a5;
+  font-size: 0.72rem;
+}
+
+.workspace-content {
+  min-width: 0;
+  padding: 2rem;
+}
+
+.primary-button,
+.secondary-button,
+.signout-button {
+  border-radius: 9px;
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+}
+
+.primary-button {
+  border: 1px solid #3155d8;
+  background: #3155d8;
+  color: #fff;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #2948bd;
+}
+
+.secondary-button,
+.signout-button {
+  border: 1px solid #d9deea;
+  background: #fff;
+  color: #344056;
+}
+
+.secondary-button:hover:not(:disabled),
+.signout-button:hover {
+  background: #f6f8fc;
+}
+
+@media (max-width: 900px) {
+  .workspace-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid #e4e8f0;
+  }
+
+  .nav-group {
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  .nav-group + .nav-group {
+    margin: 0;
+    padding: 0 0 0 0.5rem;
+    border-top: 0;
+    border-left: 1px solid #edf0f5;
+  }
+
+  .nav-label,
+  .nav-item small {
+    display: none;
+  }
+
+  .nav-item {
+    width: auto;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 700px) {
+  .signin-layout {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    padding: 2rem 0;
+  }
+
   .topbar {
-    flex-direction: column;
+    padding: 0.8rem 1rem;
+    align-items: flex-start;
+  }
+
+  .brand-subtitle,
+  .account-copy {
+    display: none;
+  }
+
+  .workspace-content {
+    padding: 1rem;
+  }
+
+  .sidebar {
+    padding: 0.75rem;
+  }
+
+  .nav-icon {
+    display: none;
   }
 }

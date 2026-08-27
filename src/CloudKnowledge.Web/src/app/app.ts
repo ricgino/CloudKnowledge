@@ -26,6 +26,12 @@ import {
   loginRequest
 } from './auth-config';
 
+type AppSection =
+  'knowledge' |
+  'documents' |
+  'teams' |
+  'administration';
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.html',
@@ -36,6 +42,9 @@ export class App
   implements OnInit, OnDestroy
 {
   loggedIn = false;
+  activeSection: AppSection = 'knowledge';
+  accountName = '';
+  accountUsername = '';
 
   private readonly destroy$ =
     new Subject<void>();
@@ -112,6 +121,13 @@ export class App
         });
   }
 
+  selectSection(
+    section: AppSection):
+    void
+  {
+    this.activeSection = section;
+  }
+
   login(): void
   {
     this.auth.loginRedirect(
@@ -139,8 +155,21 @@ export class App
           accounts[0]);
     }
 
+    const activeAccount =
+      this.auth.instance
+        .getActiveAccount();
+
     this.loggedIn =
       accounts.length > 0;
+
+    this.accountName =
+      activeAccount?.name ??
+      activeAccount?.username ??
+      '';
+
+    this.accountUsername =
+      activeAccount?.username ??
+      '';
   }
 
   ngOnDestroy(): void

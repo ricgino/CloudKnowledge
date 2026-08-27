@@ -1,0 +1,148 @@
+<section class="knowledge-page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Knowledge workspace</p>
+      <h1>Ask what your documents know.</h1>
+      <p class="page-description">
+        Search permission-aware passages or get a grounded answer with the source chunks used to generate it.
+      </p>
+    </div>
+  </header>
+
+  @if (errorMessage) {
+    <div class="message error-message">
+      {{ errorMessage }}
+    </div>
+  }
+
+  <div class="knowledge-grid">
+    <section class="panel ask-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Grounded answer</p>
+          <h2>Ask CloudKnowledge</h2>
+        </div>
+        <span class="feature-badge">RAG</span>
+      </div>
+
+      <p class="panel-description">
+        Answers are generated only from documents your account is allowed to retrieve.
+      </p>
+
+      <textarea
+        rows="5"
+        placeholder="Ask a question about your accessible knowledge..."
+        [value]="question"
+        (input)="onQuestionChanged($event)"></textarea>
+
+      <div class="actions">
+        <button
+          type="button"
+          class="primary-button"
+          (click)="ask()"
+          [disabled]="!question.trim() || asking">
+          {{ asking ? 'Generating answer...' : 'Ask' }}
+        </button>
+      </div>
+
+      @if (answer) {
+        <article class="answer-card">
+          <div class="answer-heading">
+            <h3>Answer</h3>
+            <span>{{ answerSources.length }} source{{ answerSources.length === 1 ? '' : 's' }}</span>
+          </div>
+
+          <p class="answer-text">{{ answer }}</p>
+
+          @if (answerSources.length > 0) {
+            <div class="sources">
+              <h4>Sources used</h4>
+
+              @for (source of answerSources; track source.chunkId) {
+                <article class="source-card">
+                  <div class="source-heading">
+                    <div>
+                      <span class="source-label">{{ source.label }}</span>
+                      <strong>{{ documentName(source.documentId) }}</strong>
+                    </div>
+                    <span class="match-value">
+                      {{ (source.similarity * 100).toFixed(1) }}%
+                    </span>
+                  </div>
+                  <p>{{ source.content }}</p>
+                </article>
+              }
+            </div>
+          }
+        </article>
+      }
+    </section>
+
+    <section class="panel search-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Semantic retrieval</p>
+          <h2>Search passages</h2>
+        </div>
+      </div>
+
+      <p class="panel-description">
+        Inspect the chunks retrieved before generation and see how strongly each passage matched the query.
+      </p>
+
+      <div class="search-controls">
+        <input
+          type="search"
+          placeholder="Search your knowledge base..."
+          [value]="searchQuery"
+          (input)="onSearchQueryChanged($event)"
+          (keyup.enter)="search()"
+        />
+
+        <button
+          type="button"
+          class="primary-button"
+          (click)="search()"
+          [disabled]="!searchQuery.trim() || searching">
+          {{ searching ? 'Searching...' : 'Search' }}
+        </button>
+      </div>
+
+      @if (searching) {
+        <div class="empty-state">Retrieving the most relevant accessible passages...</div>
+      } @else if (searchSubmitted && searchResults.length === 0) {
+        <div class="empty-state">No accessible passages were found for this query.</div>
+      }
+
+      @if (searchResults.length > 0) {
+        <div class="results-list">
+          @for (result of searchResults; track result.chunkId) {
+            <article class="result-card">
+              <div class="result-heading">
+                <div>
+                  <strong>{{ documentName(result.documentId) }}</strong>
+                  <span>Chunk {{ result.position + 1 }}</span>
+                </div>
+
+                <div class="match-group">
+                  <span
+                    class="relevance-badge"
+                    [class.high]="result.similarity >= 0.6"
+                    [class.medium]="result.similarity >= 0.3 && result.similarity < 0.6"
+                    [class.low]="result.similarity < 0.3">
+                    {{ relevanceLabel(result.similarity) }}
+                  </span>
+                  <span class="match-value">
+                    {{ (result.similarity * 100).toFixed(1) }}%
+                  </span>
+                </div>
+              </div>
+
+              <p>{{ result.content }}</p>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  </div>
+</section>

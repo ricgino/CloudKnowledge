@@ -1,0 +1,276 @@
+<section class="administration-page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Workspace management</p>
+      <h1>Administration</h1>
+      <p class="page-description">
+        Manage the teams, users and document access that your current permissions allow. Backend ownership rules remain authoritative.
+      </p>
+    </div>
+
+    <button
+      type="button"
+      class="secondary-button"
+      (click)="refresh()"
+      [disabled]="loading">
+      {{ loading ? 'Refreshing...' : 'Refresh data' }}
+    </button>
+  </header>
+
+  <div class="overview-grid">
+    <article>
+      <span>Teams</span>
+      <strong>{{ teams.length }}</strong>
+      <small>{{ manageableTeams.length }} manageable</small>
+    </article>
+
+    <article>
+      <span>Documents</span>
+      <strong>{{ documents.length }}</strong>
+      <small>{{ readyDocuments.length }} ready</small>
+    </article>
+
+    <article>
+      <span>Access model</span>
+      <strong>Scoped</strong>
+      <small>Ownership and team roles enforced by API</small>
+    </article>
+  </div>
+
+  <nav class="admin-tabs" aria-label="Administration sections">
+    <button
+      type="button"
+      [class.active]="activeTab === 'users'"
+      (click)="selectTab('users')">
+      Users & access
+    </button>
+
+    <button
+      type="button"
+      [class.active]="activeTab === 'teams'"
+      (click)="selectTab('teams')">
+      Teams
+    </button>
+
+    <button
+      type="button"
+      [class.active]="activeTab === 'documents'"
+      (click)="selectTab('documents')">
+      Document access
+    </button>
+  </nav>
+
+  @if (successMessage) {
+    <div class="message success-message">
+      {{ successMessage }}
+    </div>
+  }
+
+  @if (errorMessage) {
+    <div class="message error-message">
+      {{ errorMessage }}
+    </div>
+  }
+
+  @switch (activeTab) {
+    @case ('users') {
+      <section class="admin-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Membership</p>
+            <h2>Add an existing user to a team</h2>
+          </div>
+        </div>
+
+        <p class="panel-description">
+          Users are provisioned when they first sign in to CloudKnowledge. Owners and team admins can then grant team membership by email.
+        </p>
+
+        @if (manageableTeams.length === 0) {
+          <div class="empty-state">
+            You do not currently own or administer a team. Create one from the Teams tab first.
+          </div>
+        } @else {
+          <div class="form-grid">
+            <label>
+              Team
+              <select
+                [value]="selectedMemberTeamId"
+                (change)="onMemberTeamChanged($event)">
+                @for (team of manageableTeams; track team.id) {
+                  <option [value]="team.id">
+                    {{ team.name }} · {{ team.role }}
+                  </option>
+                }
+              </select>
+            </label>
+
+            <label>
+              User email
+              <input
+                type="email"
+                placeholder="member@example.com"
+                [value]="memberEmail"
+                (input)="onMemberEmailChanged($event)"
+                (keyup.enter)="addMember()"
+              />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button
+              type="button"
+              class="primary-button"
+              (click)="addMember()"
+              [disabled]="!selectedMemberTeamId || !memberEmail.trim() || addingMember">
+              {{ addingMember ? 'Adding user...' : 'Add user to team' }}
+            </button>
+          </div>
+        }
+
+        <aside class="info-callout">
+          <strong>Current limitation</strong>
+          <p>
+            This first administration view manages existing CloudKnowledge accounts through team membership. A platform-wide user directory, invitations and account disabling need dedicated administration APIs and roles; they are the next backend extension if we want full tenant administration.
+          </p>
+        </aside>
+      </section>
+    }
+
+    @case ('teams') {
+      <section class="admin-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Collaboration structure</p>
+            <h2>Create and review teams</h2>
+          </div>
+        </div>
+
+        <div class="create-row">
+          <input
+            type="text"
+            placeholder="New team name"
+            [value]="newTeamName"
+            (input)="onTeamNameChanged($event)"
+            (keyup.enter)="createTeam()"
+          />
+
+          <button
+            type="button"
+            class="primary-button"
+            (click)="createTeam()"
+            [disabled]="!newTeamName.trim() || creatingTeam">
+            {{ creatingTeam ? 'Creating...' : 'Create team' }}
+          </button>
+        </div>
+
+        @if (teams.length === 0) {
+          <div class="empty-state">No teams are visible to your account.</div>
+        } @else {
+          <div class="resource-list">
+            @for (team of teams; track team.id) {
+              <article class="resource-row">
+                <div>
+                  <strong>{{ team.name }}</strong>
+                  <span>{{ team.id }}</span>
+                </div>
+
+                <span
+                  class="role-badge"
+                  [class.owner]="team.role === 'Owner'"
+                  [class.admin]="team.role === 'Admin'">
+                  {{ team.role }}
+                </span>
+              </article>
+            }
+          </div>
+        }
+      </section>
+    }
+
+    @case ('documents') {
+      <section class="admin-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Permission management</p>
+            <h2>Grant or revoke team document access</h2>
+          </div>
+        </div>
+
+        <p class="panel-description">
+          Select a document and a team you manage. The API only applies changes when your account owns the document and is eligible to manage the target team.
+        </p>
+
+        @if (documents.length === 0 || manageableTeams.length === 0) {
+          <div class="empty-state">
+            You need at least one accessible document and one team you can manage before changing document access.
+          </div>
+        } @else {
+          <div class="form-grid">
+            <label>
+              Document
+              <select
+                [value]="selectedDocumentId"
+                (change)="onDocumentChanged($event)">
+                @for (document of documents; track document.id) {
+                  <option [value]="document.id">
+                    {{ document.fileName }} · {{ document.status }}
+                  </option>
+                }
+              </select>
+            </label>
+
+            <label>
+              Team
+              <select
+                [value]="selectedShareTeamId"
+                (change)="onShareTeamChanged($event)">
+                @for (team of manageableTeams; track team.id) {
+                  <option [value]="team.id">
+                    {{ team.name }} · {{ team.role }}
+                  </option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <div class="actions split-actions">
+            <button
+              type="button"
+              class="primary-button"
+              (click)="shareDocument()"
+              [disabled]="!selectedDocumentId || !selectedShareTeamId || updatingShare">
+              {{ updatingShare ? 'Updating...' : 'Grant access' }}
+            </button>
+
+            <button
+              type="button"
+              class="danger-button"
+              (click)="unshareDocument()"
+              [disabled]="!selectedDocumentId || !selectedShareTeamId || updatingShare">
+              Revoke access
+            </button>
+          </div>
+        }
+
+        <div class="resource-list document-resource-list">
+          @for (document of documents; track document.id) {
+            <article class="resource-row">
+              <div>
+                <strong>{{ document.fileName }}</strong>
+                <span>{{ document.contentType }}</span>
+              </div>
+
+              <span
+                class="status-badge"
+                [class.ready]="document.status === 'Ready'"
+                [class.failed]="document.status === 'Failed'">
+                {{ document.status }}
+              </span>
+            </article>
+          }
+        </div>
+      </section>
+    }
+  }
+</section>

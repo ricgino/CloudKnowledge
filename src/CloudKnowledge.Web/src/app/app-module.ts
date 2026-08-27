@@ -28,7 +28,9 @@ import { AppRoutingModule } from './app-routing-module';
 import { App } from './app';
 
 import { apiBaseUrl, apiScope, loginRequest, msalConfig } from './auth-config';
+import { AdministrationPage } from './features/administration/administration-page/administration-page';
 import { DocumentsPage } from './features/documents/documents-page/documents-page';
+import { KnowledgePage } from './features/knowledge/knowledge-page/knowledge-page';
 import { TeamsPage } from './features/teams/teams-page/teams-page';
 
 export function MSALInstanceFactory(): IPublicClientApplication {
@@ -58,7 +60,14 @@ export function MSALInterceptorConfigFactory(): MsalInterceptorConfiguration {
 }
 
 @NgModule({
-  declarations: [App, RedirectComponent, DocumentsPage, TeamsPage],
+  declarations: [
+    App,
+    RedirectComponent,
+    KnowledgePage,
+    DocumentsPage,
+    TeamsPage,
+    AdministrationPage,
+  ],
 
   imports: [BrowserModule, CommonModule, AppRoutingModule, HttpClientModule, MsalModule],
 
