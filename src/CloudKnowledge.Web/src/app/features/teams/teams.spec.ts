@@ -63,24 +63,24 @@ describe('team tree', () => {
       canManage: true
     };
 
-    expect(canDeleteTeam(baseTeam)).toBeTrue();
+    expect(canDeleteTeam(baseTeam)).toBe(true);
 
     expect(canDeleteTeam({
       ...baseTeam,
       role: 'Admin'
-    })).toBeFalse();
+    })).toBe(false);
 
     expect(canDeleteTeam({
       ...baseTeam,
       role: 'Member',
       canManage: false
-    })).toBeFalse();
+    })).toBe(false);
 
     expect(canDeleteTeam({
       ...baseTeam,
       isMember: false,
       role: null,
       canManage: false
-    })).toBeFalse();
+    })).toBe(false);
   });
 });
