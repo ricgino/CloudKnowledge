@@ -3,7 +3,9 @@ using Azure.Storage.Blobs;
 using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.FailDocument;
 using CloudKnowledge.Application.Documents.ProcessDocument;
+using CloudKnowledge.Application.Notifications.DocumentReady;
 using CloudKnowledge.Infrastructure.Documents;
+using CloudKnowledge.Infrastructure.Notifications;
 using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -135,6 +137,25 @@ builder.Services.AddSingleton(
 
         return new ServiceBusClient(
             connectionString);
+    });
+
+builder.Services.AddSingleton<IDocumentReadyPublisher>(
+    serviceProvider =>
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var queueName =
+            configuration["Messaging:NotificationsQueueName"]
+            ?? throw new InvalidOperationException(
+                "Notifications queue name was not found.");
+
+        var client =
+            serviceProvider.GetRequiredService<ServiceBusClient>();
+
+        return new AzureServiceBusDocumentReadyPublisher(
+            client.CreateSender(
+                queueName));
     });
 
 builder.Services.AddHostedService<Worker>();

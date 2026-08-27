@@ -1,4 +1,6 @@
+using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.Sharing;
+using CloudKnowledge.Application.Notifications.DocumentReady;
 using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Application.Users;
 using CloudKnowledge.Domain.Documents;
@@ -26,6 +28,31 @@ public sealed class DocumentSharingUseCaseTests
 
         Assert.NotNull(
             fixture.SharingRepository.AddedAccess);
+
+        Assert.Null(
+            fixture.ReadyPublisher.PublishedDocumentId);
+    }
+
+    [Fact]
+    public async Task Share_WhenDocumentAlreadyReady_ShouldPublishReadyEvent()
+    {
+        var fixture =
+            new Fixture(
+                documentReady: true);
+
+        var result =
+            await fixture.ShareUseCase.ExecuteAsync(
+                fixture.DocumentId,
+                fixture.TeamId,
+                CancellationToken.None);
+
+        Assert.Equal(
+            ShareDocumentStatus.Shared,
+            result);
+
+        Assert.Equal(
+            fixture.DocumentId,
+            fixture.ReadyPublisher.PublishedDocumentId);
     }
 
     [Fact]
@@ -69,7 +96,8 @@ public sealed class DocumentSharingUseCaseTests
     {
         var fixture =
             new Fixture(
-                isShared: true);
+                isShared: true,
+                documentReady: true);
 
         var result =
             await fixture.ShareUseCase.ExecuteAsync(
@@ -83,6 +111,9 @@ public sealed class DocumentSharingUseCaseTests
 
         Assert.Null(
             fixture.SharingRepository.AddedAccess);
+
+        Assert.Null(
+            fixture.ReadyPublisher.PublishedDocumentId);
     }
 
     [Fact]
@@ -175,27 +206,29 @@ public sealed class DocumentSharingUseCaseTests
         public Guid DocumentId
         {
             get;
-        } = Guid.NewGuid();
+        }
 
         public Guid TeamId
         {
             get;
         } = Guid.NewGuid();
 
-        public FakeDocumentSharingRepository
-            SharingRepository
+        public FakeDocumentSharingRepository SharingRepository
         {
             get;
         }
 
-        public ShareDocumentWithTeamUseCase
-            ShareUseCase
+        public FakeDocumentReadyPublisher ReadyPublisher
         {
             get;
         }
 
-        public UnshareDocumentFromTeamUseCase
-            UnshareUseCase
+        public ShareDocumentWithTeamUseCase ShareUseCase
+        {
+            get;
+        }
+
+        public UnshareDocumentFromTeamUseCase UnshareUseCase
         {
             get;
         }
@@ -203,8 +236,23 @@ public sealed class DocumentSharingUseCaseTests
         public Fixture(
             bool ownsDocument = true,
             bool isTeamMember = true,
-            bool isShared = false)
+            bool isShared = false,
+            bool documentReady = false)
         {
+            var document =
+                Document.Create(
+                    "shared.pdf",
+                    "application/pdf");
+
+            if (documentReady)
+            {
+                document.MarkAsProcessing();
+                document.MarkAsReady();
+            }
+
+            DocumentId =
+                document.Id;
+
             SharingRepository =
                 new FakeDocumentSharingRepository(
                     ownsDocument,
@@ -218,10 +266,19 @@ public sealed class DocumentSharingUseCaseTests
                 new FakeCurrentUser(
                     UserId);
 
+            var documentRepository =
+                new FakeDocumentRepository(
+                    document);
+
+            ReadyPublisher =
+                new FakeDocumentReadyPublisher();
+
             ShareUseCase =
                 new ShareDocumentWithTeamUseCase(
                     SharingRepository,
                     membershipRepository,
+                    documentRepository,
+                    ReadyPublisher,
                     currentUser);
 
             UnshareUseCase =
@@ -235,14 +292,12 @@ public sealed class DocumentSharingUseCaseTests
     private sealed class FakeCurrentUser
         : ICurrentUser
     {
-        private readonly Guid
-            _userId;
+        private readonly Guid _userId;
 
         public FakeCurrentUser(
             Guid userId)
         {
-            _userId =
-                userId;
+            _userId = userId;
         }
 
         public Task<Guid> GetUserIdAsync(
@@ -256,14 +311,12 @@ public sealed class DocumentSharingUseCaseTests
     private sealed class FakeTeamMembershipRepository
         : ITeamMembershipRepository
     {
-        private readonly bool
-            _isMember;
+        private readonly bool _isMember;
 
         public FakeTeamMembershipRepository(
             bool isMember)
         {
-            _isMember =
-                isMember;
+            _isMember = isMember;
         }
 
         public Task<bool> IsMemberAsync(
@@ -295,21 +348,15 @@ public sealed class DocumentSharingUseCaseTests
     private sealed class FakeDocumentSharingRepository
         : IDocumentSharingRepository
     {
-        private readonly bool
-            _ownsDocument;
-
-        private bool
-            _isShared;
+        private readonly bool _ownsDocument;
+        private bool _isShared;
 
         public FakeDocumentSharingRepository(
             bool ownsDocument,
             bool isShared)
         {
-            _ownsDocument =
-                ownsDocument;
-
-            _isShared =
-                isShared;
+            _ownsDocument = ownsDocument;
+            _isShared = isShared;
         }
 
         public DocumentTeamAccess? AddedAccess
@@ -346,11 +393,8 @@ public sealed class DocumentSharingUseCaseTests
             DocumentTeamAccess access,
             CancellationToken cancellationToken)
         {
-            AddedAccess =
-                access;
-
-            _isShared =
-                true;
+            AddedAccess = access;
+            _isShared = true;
 
             return Task.CompletedTask;
         }
@@ -360,11 +404,79 @@ public sealed class DocumentSharingUseCaseTests
             Guid teamId,
             CancellationToken cancellationToken)
         {
-            Removed =
-                true;
+            Removed = true;
+            _isShared = false;
 
-            _isShared =
-                false;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeDocumentRepository
+        : IDocumentRepository
+    {
+        private readonly Document _document;
+
+        public FakeDocumentRepository(
+            Document document)
+        {
+            _document = document;
+        }
+
+        public Task AddAsync(
+            Document document,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task UpdateAsync(
+            Document document,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<Document?> GetByIdAsync(
+            Guid id,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Document?>(
+                id == _document.Id
+                    ? _document
+                    : null);
+        }
+
+        public Task<IReadOnlyList<Document>> GetPageAsync(
+            int skip,
+            int take,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<Document>>(
+                Array.Empty<Document>());
+        }
+
+        public Task<int> CountAsync(
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(0);
+        }
+    }
+
+    private sealed class FakeDocumentReadyPublisher
+        : IDocumentReadyPublisher
+    {
+        public Guid? PublishedDocumentId
+        {
+            get;
+            private set;
+        }
+
+        public Task PublishAsync(
+            Guid documentId,
+            CancellationToken cancellationToken)
+        {
+            PublishedDocumentId =
+                documentId;
 
             return Task.CompletedTask;
         }

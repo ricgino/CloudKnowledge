@@ -1,43 +1,40 @@
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
-using CloudKnowledge.Application.Documents;
-using CloudKnowledge.Application.Documents.FailDocument;
-using CloudKnowledge.Application.Documents.ProcessDocument;
-using CloudKnowledge.Application.Documents.ProcessDocument.Exceptions;
 using CloudKnowledge.Application.Notifications.DocumentReady;
 
-namespace CloudKnowledge.Worker;
+namespace CloudKnowledge.Api.Notifications;
 
-public sealed class Worker : BackgroundService
+public sealed class DocumentReadyNotificationsWorker
+    : BackgroundService
 {
-    private readonly ILogger<Worker> _logger;
+    private readonly ILogger<DocumentReadyNotificationsWorker> _logger;
     private readonly ServiceBusClient _serviceBusClient;
     private readonly IConfiguration _configuration;
-    private ServiceBusProcessor? _processor;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IDocumentReadyPublisher _documentReadyPublisher;
+    private readonly NotificationStreamBroker _streamBroker;
+    private ServiceBusProcessor? _processor;
 
-    public Worker(
-        ILogger<Worker> logger,
+    public DocumentReadyNotificationsWorker(
+        ILogger<DocumentReadyNotificationsWorker> logger,
         ServiceBusClient serviceBusClient,
         IConfiguration configuration,
         IServiceScopeFactory scopeFactory,
-        IDocumentReadyPublisher documentReadyPublisher)
+        NotificationStreamBroker streamBroker)
     {
         _logger = logger;
         _serviceBusClient = serviceBusClient;
         _configuration = configuration;
         _scopeFactory = scopeFactory;
-        _documentReadyPublisher = documentReadyPublisher;
+        _streamBroker = streamBroker;
     }
 
     protected override async Task ExecuteAsync(
         CancellationToken stoppingToken)
     {
         var queueName =
-            _configuration["Messaging:QueueName"]
+            _configuration["Messaging:NotificationsQueueName"]
             ?? throw new InvalidOperationException(
-                "Service Bus queue name was not found.");
+                "Notifications queue name was not found.");
 
         _processor =
             await StartProcessorWithRetryAsync(
@@ -45,7 +42,7 @@ public sealed class Worker : BackgroundService
                 stoppingToken);
 
         _logger.LogInformation(
-            "Document worker started. Listening on queue {QueueName}.",
+            "Notification worker started. Listening on queue {QueueName}.",
             queueName);
 
         try
@@ -121,7 +118,7 @@ public sealed class Worker : BackgroundService
 
                 _logger.LogWarning(
                     exception,
-                    "Service Bus is not ready. Retrying worker startup in {RetrySeconds} seconds.",
+                    "Notification queue is not ready. Retrying in {RetrySeconds} seconds.",
                     retrySeconds);
 
                 await Task.Delay(
@@ -135,19 +132,19 @@ public sealed class Worker : BackgroundService
     private async Task ProcessMessageAsync(
         ProcessMessageEventArgs args)
     {
-        DocumentProcessingMessage? message;
+        DocumentReadyMessage? message;
 
         try
         {
             message =
-                JsonSerializer.Deserialize<DocumentProcessingMessage>(
+                JsonSerializer.Deserialize<DocumentReadyMessage>(
                     args.Message.Body.ToString());
         }
         catch (JsonException exception)
         {
             _logger.LogWarning(
                 exception,
-                "Invalid Service Bus message {MessageId}. Moving it to DLQ.",
+                "Invalid document-ready message {MessageId}.",
                 args.Message.MessageId);
 
             await args.DeadLetterMessageAsync(
@@ -171,34 +168,35 @@ public sealed class Worker : BackgroundService
             return;
         }
 
-        _logger.LogInformation(
-            "Received document {DocumentId}. Delivery count: {DeliveryCount}.",
-            message.DocumentId,
-            args.Message.DeliveryCount);
-
         try
         {
             await using var scope =
                 _scopeFactory.CreateAsyncScope();
 
             var useCase =
-                scope.ServiceProvider
-                    .GetRequiredService<ProcessDocumentUseCase>();
+                scope.ServiceProvider.GetRequiredService<
+                    CreateDocumentReadyNotificationsUseCase>();
 
-            await useCase.ExecuteAsync(
-                message.DocumentId,
-                args.CancellationToken);
+            var notifications =
+                await useCase.ExecuteAsync(
+                    message.DocumentId,
+                    args.CancellationToken);
 
-            await _documentReadyPublisher.PublishAsync(
-                message.DocumentId,
-                args.CancellationToken);
+            foreach (var notification in
+                     notifications)
+            {
+                _streamBroker.Publish(
+                    notification.UserId,
+                    notification);
+            }
 
             await args.CompleteMessageAsync(
                 args.Message,
                 args.CancellationToken);
 
             _logger.LogInformation(
-                "Document {DocumentId} processed successfully and emitted a ready event.",
+                "Created {NotificationCount} notifications for ready document {DocumentId}.",
+                notifications.Count,
                 message.DocumentId);
         }
         catch (OperationCanceledException)
@@ -206,116 +204,18 @@ public sealed class Worker : BackgroundService
         {
             throw;
         }
-        catch (PermanentDocumentProcessingException exception)
-        {
-            _logger.LogError(
-                exception,
-                "Permanent processing failure for document {DocumentId}.",
-                message.DocumentId);
-
-            await MarkDocumentAsFailedAsync(
-                message.DocumentId,
-                args.CancellationToken);
-
-            await args.DeadLetterMessageAsync(
-                args.Message,
-                "PermanentProcessingFailure",
-                exception.Message,
-                args.CancellationToken);
-        }
-        catch (TransientDocumentProcessingException exception)
-        {
-            var handled =
-                await HandleRetryableFailureAsync(
-                    message.DocumentId,
-                    args,
-                    exception);
-
-            if (handled)
-            {
-                return;
-            }
-
-            throw;
-        }
         catch (Exception exception)
         {
-            var handled =
-                await HandleRetryableFailureAsync(
-                    message.DocumentId,
-                    args,
-                    exception);
-
-            if (handled)
-            {
-                return;
-            }
-
-            throw;
-        }
-    }
-
-    private async Task<bool> HandleRetryableFailureAsync(
-        Guid documentId,
-        ProcessMessageEventArgs args,
-        Exception exception)
-    {
-        var maxDeliveryCount =
-            _configuration.GetValue<int>(
-                "Messaging:MaxDeliveryCount");
-
-        if (maxDeliveryCount <= 0)
-        {
-            throw new InvalidOperationException(
-                "Messaging:MaxDeliveryCount must be greater than zero.");
-        }
-
-        if (args.Message.DeliveryCount >= maxDeliveryCount)
-        {
             _logger.LogError(
                 exception,
-                "Document {DocumentId} failed after {DeliveryCount} deliveries. " +
-                "Moving message to DLQ.",
-                documentId,
-                args.Message.DeliveryCount);
+                "Failed to create notifications for ready document {DocumentId}.",
+                message.DocumentId);
 
-            await MarkDocumentAsFailedAsync(
-                documentId,
-                args.CancellationToken);
-
-            await args.DeadLetterMessageAsync(
+            await args.AbandonMessageAsync(
                 args.Message,
-                "ProcessingRetriesExhausted",
-                exception.Message,
-                args.CancellationToken);
-
-            return true;
+                cancellationToken:
+                    args.CancellationToken);
         }
-
-        _logger.LogWarning(
-            exception,
-            "Transient processing failure for document {DocumentId}. " +
-            "Delivery {DeliveryCount}. Message will be retried.",
-            documentId,
-            args.Message.DeliveryCount);
-
-        return false;
-    }
-
-    private async Task MarkDocumentAsFailedAsync(
-        Guid documentId,
-        CancellationToken cancellationToken)
-    {
-        await using var scope =
-            _scopeFactory.CreateAsyncScope();
-
-        var failDocumentUseCase =
-            scope.ServiceProvider
-                .GetRequiredService<FailDocumentUseCase>();
-
-        await failDocumentUseCase.ExecuteAsync(
-            documentId,
-            cancellationToken);
     }
 
     private Task ProcessErrorAsync(
@@ -323,8 +223,9 @@ public sealed class Worker : BackgroundService
     {
         _logger.LogError(
             args.Exception,
-            "Service Bus error. Entity: {EntityPath}.",
-            args.EntityPath);
+            "Notification Service Bus error. Entity: {EntityPath}; Source: {ErrorSource}.",
+            args.EntityPath,
+            args.ErrorSource);
 
         return Task.CompletedTask;
     }

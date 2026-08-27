@@ -69,6 +69,9 @@ services:
       Storage__ContainerName: documents
       Messaging__ConnectionString: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
       Messaging__QueueName: document-processing
+      Messaging__NotificationsQueueName: document-ready-events
+      Messaging__NotificationsEnabled: "true"
+      Messaging__StartupRetrySeconds: 5
       Ai__BaseUrl: http://host.docker.internal:11434
       Ai__EmbeddingModel: nomic-embed-text-v2-moe
       Ai__AnswerModel: qwen3:4b
@@ -102,6 +105,7 @@ services:
       Storage__ContainerName: documents
       Messaging__ConnectionString: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
       Messaging__QueueName: document-processing
+      Messaging__NotificationsQueueName: document-ready-events
       Messaging__MaxDeliveryCount: 3
       Messaging__StartupRetrySeconds: 5
       Ai__BaseUrl: http://host.docker.internal:11434
