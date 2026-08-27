@@ -152,8 +152,16 @@ export class App
 
   toggleNotifications(): void
   {
-    this.notificationsOpen =
+    const opening =
       !this.notificationsOpen;
+
+    this.notificationsOpen =
+      opening;
+
+    if (opening)
+    {
+      this.markVisibleNotificationsRead();
+    }
   }
 
   openNotification(
@@ -299,6 +307,60 @@ export class App
 
         this.cdr.detectChanges();
       });
+  }
+
+  private markVisibleNotificationsRead(): void
+  {
+    const unreadIds =
+      this.notifications
+        .filter(notification =>
+          !notification.isRead)
+        .map(notification =>
+          notification.id);
+
+    if (unreadIds.length === 0)
+    {
+      return;
+    }
+
+    const unreadIdSet =
+      new Set(unreadIds);
+
+    this.notifications =
+      this.notifications.map(notification =>
+        unreadIdSet.has(notification.id)
+          ? {
+              ...notification,
+              isRead: true
+            }
+          : notification);
+
+    this.cdr.detectChanges();
+
+    for (const notificationId of unreadIds)
+    {
+      this.notificationsService
+        .markRead(notificationId)
+        .subscribe({
+          error: error =>
+          {
+            this.notifications =
+              this.notifications.map(notification =>
+                notification.id === notificationId
+                  ? {
+                      ...notification,
+                      isRead: false
+                    }
+                  : notification);
+
+            console.warn(
+              'Unable to mark notification as read.',
+              error);
+
+            this.cdr.detectChanges();
+          }
+        });
+    }
   }
 
   private shutdownNotifications(): void
