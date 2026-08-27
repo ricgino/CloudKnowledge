@@ -43,20 +43,9 @@ public sealed class EfTeamDeletionRepository
         Guid teamId,
         CancellationToken cancellationToken)
     {
-        var team =
-            await _dbContext.Teams
-                .SingleOrDefaultAsync(
-                    item => item.Id == teamId,
-                    cancellationToken);
-
-        if (team is null)
-        {
-            return;
-        }
-
-        _dbContext.Teams.Remove(team);
-
-        await _dbContext.SaveChangesAsync(
-            cancellationToken);
+        await _dbContext.Teams
+            .Where(team => team.Id == teamId)
+            .ExecuteDeleteAsync(
+                cancellationToken);
     }
 }
