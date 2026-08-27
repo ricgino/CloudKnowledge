@@ -1,5 +1,6 @@
 import {
-  buildDocumentsQueryString
+  buildDocumentsQueryString,
+  isSupportedDocumentFileName
 } from './documents';
 
 describe('document library filters', () => {
@@ -30,5 +31,19 @@ describe('document library filters', () => {
     expect(query)
       .toBe(
         'page=1&pageSize=20&scope=owned');
+  });
+});
+
+describe('document upload formats', () => {
+  it('accepts pdf, docx and txt case-insensitively', () => {
+    expect(isSupportedDocumentFileName('manual.pdf')).toBeTrue();
+    expect(isSupportedDocumentFileName('handbook.DOCX')).toBeTrue();
+    expect(isSupportedDocumentFileName('notes.Txt')).toBeTrue();
+  });
+
+  it('rejects unsupported extensions', () => {
+    expect(isSupportedDocumentFileName('archive.zip')).toBeFalse();
+    expect(isSupportedDocumentFileName('legacy.doc')).toBeFalse();
+    expect(isSupportedDocumentFileName('payload.exe')).toBeFalse();
   });
 });
