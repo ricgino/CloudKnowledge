@@ -54,6 +54,75 @@ public sealed class DocumentTextExtractorTests
             text);
     }
 
+    [Fact]
+    public void PdfExtractor_ShouldPreferNativeTextWithoutRunningOcr()
+    {
+        var nativeExtractor =
+            new StubNativePdfTextExtractor(
+                "native PDF text");
+
+        var ocrExtractor =
+            new StubOcrPdfTextExtractor(
+                "OCR text");
+
+        var extractor =
+            new PdfDocumentTextExtractor(
+                nativeExtractor,
+                ocrExtractor);
+
+        using var stream =
+            new MemoryStream(
+                [1, 2, 3, 4]);
+
+        var text =
+            extractor.Extract(
+                stream,
+                CancellationToken.None);
+
+        Assert.Equal(
+            "native PDF text",
+            text);
+        Assert.Equal(
+            0,
+            ocrExtractor.CallCount);
+    }
+
+    [Fact]
+    public void PdfExtractor_ShouldFallbackToOcrWhenNativeTextIsEmpty()
+    {
+        var nativeExtractor =
+            new StubNativePdfTextExtractor(
+                "   \r\n  ");
+
+        var ocrExtractor =
+            new StubOcrPdfTextExtractor(
+                "text recovered from scan");
+
+        var extractor =
+            new PdfDocumentTextExtractor(
+                nativeExtractor,
+                ocrExtractor);
+
+        using var stream =
+            new MemoryStream(
+                [1, 2, 3, 4]);
+
+        var text =
+            extractor.Extract(
+                stream,
+                CancellationToken.None);
+
+        Assert.Equal(
+            "text recovered from scan",
+            text);
+        Assert.Equal(
+            1,
+            ocrExtractor.CallCount);
+        Assert.Equal(
+            0,
+            ocrExtractor.StreamPositionAtCall);
+    }
+
     private static MemoryStream CreateDocx(
         params string[] paragraphs)
     {
@@ -125,5 +194,51 @@ public sealed class DocumentTextExtractorTests
                 new UTF8Encoding(false));
 
         writer.Write(content.Trim());
+    }
+
+    private sealed class StubNativePdfTextExtractor
+        : IPdfNativeTextExtractor
+    {
+        private readonly string _text;
+
+        public StubNativePdfTextExtractor(
+            string text)
+        {
+            _text = text;
+        }
+
+        public string Extract(
+            Stream content,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            content.Position = content.Length;
+            return _text;
+        }
+    }
+
+    private sealed class StubOcrPdfTextExtractor
+        : IPdfOcrTextExtractor
+    {
+        private readonly string _text;
+
+        public StubOcrPdfTextExtractor(
+            string text)
+        {
+            _text = text;
+        }
+
+        public int CallCount { get; private set; }
+        public long StreamPositionAtCall { get; private set; } = -1;
+
+        public string Extract(
+            Stream content,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CallCount++;
+            StreamPositionAtCall = content.Position;
+            return _text;
+        }
     }
 }
