@@ -1,7 +1,8 @@
+using CloudKnowledge.Api.Contracts.Documents;
 using CloudKnowledge.Api.Contracts.Search;
 using CloudKnowledge.Application.Documents.SearchDocuments;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Identity.Web.Resource;
 
 namespace CloudKnowledge.Api.Controllers;
@@ -30,10 +31,25 @@ public sealed class SearchController
             [FromBody] SearchDocumentsRequest request,
             CancellationToken cancellationToken)
     {
+        if (!RetrievalScopeRequestParser.TryParse(
+                request.Scope,
+                request.TeamId,
+                request.IncludeDescendants,
+                out var scope,
+                out var errorMessage))
+        {
+            return BadRequest(
+                new
+                {
+                    message = errorMessage
+                });
+        }
+
         var results =
             await _searchDocumentsUseCase.ExecuteAsync(
                 request.Query,
                 request.Take,
+                scope,
                 cancellationToken);
 
         var response =
