@@ -1,0 +1,44 @@
+name: Scaffold Team Document Ownership Migration
+
+on:
+  push:
+    branches:
+      - feat/team-hierarchy-document-library
+
+permissions:
+  contents: write
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/team-hierarchy-document-library
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Generate migration
+        run: >-
+          dotnet ef migrations add AddTeamDocumentOwnership
+          --project src/CloudKnowledge.Infrastructure
+          --startup-project src/CloudKnowledge.Api
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/scaffold-team-document-ownership-migration.yml
+
+      - name: Commit generated migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/CloudKnowledge.Infrastructure/Persistence/Migrations .github/workflows/scaffold-team-document-ownership-migration.yml
+          git commit -m "feat: add team document ownership migration"
+          git push origin HEAD:feat/team-hierarchy-document-library
