@@ -37,6 +37,14 @@ export interface TeamMemberItem
   role: string;
 }
 
+export function canDeleteTeam(
+  team: TeamItem):
+  boolean
+{
+  return team.isMember &&
+    team.role === 'Owner';
+}
+
 export function buildTeamTreeRows(
   teams: readonly TeamItem[]):
   TeamTreeRow[]
@@ -150,6 +158,14 @@ export class Teams
         parentTeamId:
           parentTeamId || null
       });
+  }
+
+  deleteTeam(
+    teamId: string):
+    Observable<void>
+  {
+    return this.http.delete<void>(
+      `${apiBaseUrl}/api/teams/${teamId}`);
   }
 
   addMember(
