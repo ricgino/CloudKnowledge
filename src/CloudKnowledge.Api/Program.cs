@@ -17,6 +17,7 @@ using CloudKnowledge.Application.Notifications.DocumentReady;
 using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Application.Teams.AddTeamMember;
 using CloudKnowledge.Application.Teams.CreateTeam;
+using CloudKnowledge.Application.Teams.DeleteTeam;
 using CloudKnowledge.Application.Teams.GetTeams;
 using CloudKnowledge.Application.Users;
 using CloudKnowledge.Infrastructure.Documents;
@@ -293,6 +294,13 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     AddTeamMemberUseCase>();
+
+builder.Services.AddScoped<
+    ITeamDeletionRepository,
+    EfTeamDeletionRepository>();
+
+builder.Services.AddScoped<
+    DeleteTeamUseCase>();
 
 builder.Services.AddScoped<
     IDocumentSharingRepository,
