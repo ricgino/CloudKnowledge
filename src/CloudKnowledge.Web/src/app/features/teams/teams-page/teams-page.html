@@ -1,10 +1,10 @@
 <section class="teams-page">
-  <div class="teams-header">
+  <header class="page-header">
     <div>
       <p class="eyebrow">Collaboration</p>
-      <h2>Teams</h2>
-      <p class="subtitle">
-        Create teams and add existing CloudKnowledge users as members.
+      <h1>Teams</h1>
+      <p class="page-description">
+        See the teams that grant you access to shared knowledge. Membership changes are handled from Administration.
       </p>
     </div>
 
@@ -13,83 +13,48 @@
       class="secondary-button"
       (click)="loadTeams()"
       [disabled]="loading">
-      {{ loading ? 'Refreshing...' : 'Refresh teams' }}
+      {{ loading ? 'Refreshing...' : 'Refresh' }}
     </button>
-  </div>
+  </header>
 
-  <div class="team-actions">
-    <article class="team-card">
-      <h3>Create a team</h3>
-
-      <div class="controls">
-        <input
-          type="text"
-          placeholder="e.g. Engineering"
-          [value]="newTeamName"
-          (input)="onTeamNameChanged($event)"
-          (keyup.enter)="createTeam()"
-        />
-
-        <button
-          type="button"
-          class="primary-button"
-          (click)="createTeam()"
-          [disabled]="!newTeamName.trim() || creating">
-          {{ creating ? 'Creating...' : 'Create' }}
-        </button>
-      </div>
-    </article>
-
-    <article class="team-card">
-      <h3>Add a member</h3>
-
-      <div class="controls member-controls">
-        <select
-          [value]="selectedTeamId"
-          (change)="onSelectedTeamChanged($event)">
-          <option value="">Select a team</option>
-          @for (team of teams; track team.id) {
-            <option [value]="team.id">
-              {{ team.name }} · {{ team.role }}
-            </option>
-          }
-        </select>
-
-        <input
-          type="email"
-          placeholder="member@example.com"
-          [value]="memberEmail"
-          (input)="onMemberEmailChanged($event)"
-          (keyup.enter)="addMember()"
-        />
-
-        <button
-          type="button"
-          class="primary-button"
-          (click)="addMember()"
-          [disabled]="!selectedTeamId || !memberEmail.trim() || addingMember">
-          {{ addingMember ? 'Adding...' : 'Add member' }}
-        </button>
-      </div>
-    </article>
-  </div>
-
-  @if (teams.length > 0) {
-    <div class="team-list">
-      @for (team of teams; track team.id) {
-        <div class="team-row">
-          <strong>{{ team.name }}</strong>
-          <span>{{ team.role }}</span>
-        </div>
-      }
+  @if (errorMessage) {
+    <div class="message error-message">
+      {{ errorMessage }}
     </div>
   }
 
-  @if (successMessage) {
-    <p class="success-message">{{ successMessage }}</p>
-  }
+  @if (loading && teams.length === 0) {
+    <div class="empty-state">Loading teams...</div>
+  } @else if (teams.length === 0) {
+    <div class="empty-state">
+      You are not a member of any team yet.
+    </div>
+  } @else {
+    <div class="teams-grid">
+      @for (team of teams; track team.id) {
+        <article class="team-card">
+          <div class="team-heading">
+            <div class="team-icon">
+              {{ team.name.substring(0, 2).toUpperCase() }}
+            </div>
 
-  @if (errorMessage) {
-    <p class="error-message">{{ errorMessage }}</p>
+            <span
+              class="role-badge"
+              [class.owner]="team.role === 'Owner'"
+              [class.admin]="team.role === 'Admin'">
+              {{ team.role }}
+            </span>
+          </div>
+
+          <h2>{{ team.name }}</h2>
+          <p>{{ roleDescription(team.role) }}</p>
+
+          <div class="team-id">
+            <span>Team ID</span>
+            <code>{{ team.id }}</code>
+          </div>
+        </article>
+      }
+    </div>
   }
 </section>
