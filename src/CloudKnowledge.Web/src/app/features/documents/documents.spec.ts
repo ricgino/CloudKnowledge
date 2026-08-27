@@ -1,5 +1,6 @@
 import {
   buildDocumentsQueryString,
+  buildUploadSuccessMessage,
   isSupportedDocumentFileName
 } from './documents';
 
@@ -45,5 +46,20 @@ describe('document upload formats', () => {
     expect(isSupportedDocumentFileName('archive.zip')).toBe(false);
     expect(isSupportedDocumentFileName('legacy.doc')).toBe(false);
     expect(isSupportedDocumentFileName('payload.exe')).toBe(false);
+  });
+
+  it('describes personal and team ownership accurately after upload', () => {
+    expect(
+      buildUploadSuccessMessage(
+        'guide.pdf'))
+      .toBe(
+        'guide.pdf uploaded as a personal document. Processing continues in the background.');
+
+    expect(
+      buildUploadSuccessMessage(
+        'guide.pdf',
+        'Engineering'))
+      .toBe(
+        'guide.pdf uploaded as a team-owned document in Engineering. Processing continues in the background.');
   });
 });
