@@ -4,6 +4,7 @@ using CloudKnowledge.Domain.Users;
 using CloudKnowledge.Infrastructure.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Infrastructure.Persistence.Models;
+using CloudKnowledge.Infrastructure.Teams;
 using Microsoft.EntityFrameworkCore;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
@@ -177,8 +178,6 @@ public sealed class SemanticSearchAccessTests
 
         await dbContext.SaveChangesAsync();
 
-        // Query vector is deliberately almost identical
-        // to Alice's PRIVATE document.
         var queryEmbedding =
             CreateVector(
                 firstComponent: 1.0f);
@@ -217,7 +216,9 @@ public sealed class SemanticSearchAccessTests
 
         var repository =
             new EfDocumentSemanticSearchRepository(
-                dbContext);
+                dbContext,
+                new EfTeamScopeResolver(
+                    dbContext));
 
         var results =
             await repository.SearchAccessibleAsync(
