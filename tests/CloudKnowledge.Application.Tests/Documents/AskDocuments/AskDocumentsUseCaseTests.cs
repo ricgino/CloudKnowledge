@@ -10,7 +10,6 @@ public sealed class AskDocumentsUseCaseTests
     [Fact]
     public async Task ExecuteAsync_WhenSearchReturnsResults_ShouldGenerateAnswerAndSources()
     {
-        // Arrange
         var documentId = Guid.NewGuid();
         var firstChunkId = Guid.NewGuid();
         var secondChunkId = Guid.NewGuid();
@@ -32,16 +31,13 @@ public sealed class AskDocumentsUseCaseTests
                 0.35)
         };
 
-        var embeddingGenerator =
-            new FakeEmbeddingGenerator();
-
         var semanticSearchRepository =
             new FakeSemanticSearchRepository(
                 searchResults);
 
         var searchDocumentsUseCase =
             new SearchDocumentsUseCase(
-                embeddingGenerator,
+                new FakeEmbeddingGenerator(),
                 semanticSearchRepository,
                 new FakeCurrentUser());
 
@@ -54,14 +50,12 @@ public sealed class AskDocumentsUseCaseTests
                 searchDocumentsUseCase,
                 answerGenerator);
 
-        // Act
         var result =
             await sut.ExecuteAsync(
                 "What does the document say?",
                 5,
                 CancellationToken.None);
 
-        // Assert
         Assert.Equal(
             "Generated answer [S1]",
             result.Answer);
@@ -112,28 +106,66 @@ public sealed class AskDocumentsUseCaseTests
             answerGenerator.ReceivedSources!.Count);
 
         Assert.Equal(
-            "S1",
-            answerGenerator.ReceivedSources[0].Label);
+            DocumentRetrievalScope.All,
+            semanticSearchRepository.ReceivedScope);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TeamScope_ShouldForwardTheSameScopeToSearch()
+    {
+        var teamId =
+            Guid.NewGuid();
+
+        var scope =
+            DocumentRetrievalScope.ForTeam(
+                teamId,
+                includeDescendants: true);
+
+        var semanticSearchRepository =
+            new FakeSemanticSearchRepository(
+                new[]
+                {
+                    new SemanticSearchResult(
+                        Guid.NewGuid(),
+                        Guid.NewGuid(),
+                        0,
+                        "Scoped source.",
+                        0.1)
+                });
+
+        var searchDocumentsUseCase =
+            new SearchDocumentsUseCase(
+                new FakeEmbeddingGenerator(),
+                semanticSearchRepository,
+                new FakeCurrentUser());
+
+        var sut =
+            new AskDocumentsUseCase(
+                searchDocumentsUseCase,
+                new FakeAnswerGenerator(
+                    "Scoped answer [S1]"));
+
+        await sut.ExecuteAsync(
+            "Scoped question",
+            5,
+            scope,
+            CancellationToken.None);
 
         Assert.Equal(
-            "S2",
-            answerGenerator.ReceivedSources[1].Label);
+            scope,
+            semanticSearchRepository.ReceivedScope);
     }
 
     [Fact]
     public async Task ExecuteAsync_WhenNoSearchResults_ShouldReturnFallbackWithoutCallingGenerator()
     {
-        // Arrange
-        var embeddingGenerator =
-            new FakeEmbeddingGenerator();
-
         var semanticSearchRepository =
             new FakeSemanticSearchRepository(
                 Array.Empty<SemanticSearchResult>());
 
         var searchDocumentsUseCase =
             new SearchDocumentsUseCase(
-                embeddingGenerator,
+                new FakeEmbeddingGenerator(),
                 semanticSearchRepository,
                 new FakeCurrentUser());
 
@@ -146,14 +178,18 @@ public sealed class AskDocumentsUseCaseTests
                 searchDocumentsUseCase,
                 answerGenerator);
 
-        // Act
+        var scope =
+            DocumentRetrievalScope.ForTeam(
+                Guid.NewGuid(),
+                includeDescendants: false);
+
         var result =
             await sut.ExecuteAsync(
                 "Question with no results",
                 5,
+                scope,
                 CancellationToken.None);
 
-        // Assert
         Assert.Equal(
             "Non sono state trovate informazioni pertinenti nei documenti.",
             result.Answer);
@@ -163,6 +199,10 @@ public sealed class AskDocumentsUseCaseTests
 
         Assert.False(
             answerGenerator.WasCalled);
+
+        Assert.Equal(
+            scope,
+            semanticSearchRepository.ReceivedScope);
     }
 
     [Theory]
@@ -172,11 +212,9 @@ public sealed class AskDocumentsUseCaseTests
     public async Task ExecuteAsync_WhenQuestionIsEmpty_ShouldThrowArgumentException(
         string question)
     {
-        // Arrange
         var sut =
             CreateUseCase();
 
-        // Act
         var action =
             async () =>
                 await sut.ExecuteAsync(
@@ -184,7 +222,6 @@ public sealed class AskDocumentsUseCaseTests
                     5,
                     CancellationToken.None);
 
-        // Assert
         await Assert.ThrowsAsync<ArgumentException>(
             action);
     }
@@ -197,11 +234,9 @@ public sealed class AskDocumentsUseCaseTests
     public async Task ExecuteAsync_WhenTakeIsOutsideAllowedRange_ShouldThrow(
         int take)
     {
-        // Arrange
         var sut =
             CreateUseCase();
 
-        // Act
         var action =
             async () =>
                 await sut.ExecuteAsync(
@@ -209,7 +244,6 @@ public sealed class AskDocumentsUseCaseTests
                     take,
                     CancellationToken.None);
 
-        // Assert
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             action);
     }
@@ -269,27 +303,25 @@ public sealed class AskDocumentsUseCaseTests
                 results;
         }
 
-        public Task<IReadOnlyList<SemanticSearchResult>> SearchAsync(
-            float[] queryEmbedding,
-            int take,
-            CancellationToken cancellationToken)
+        public DocumentRetrievalScope? ReceivedScope
         {
-            return Task.FromResult(
-                _results);
+            get;
+            private set;
         }
 
         public Task<IReadOnlyList<SemanticSearchResult>> SearchAccessibleAsync(
             Guid userId,
             float[] queryEmbedding,
             int take,
+            DocumentRetrievalScope scope,
             CancellationToken cancellationToken)
         {
-            return SearchAsync(
-                queryEmbedding,
-                take,
-                cancellationToken);
-        }
+            ReceivedScope =
+                scope;
 
+            return Task.FromResult(
+                _results);
+        }
     }
 
     private sealed class FakeCurrentUser
@@ -302,7 +334,7 @@ public sealed class AskDocumentsUseCaseTests
                 Guid.Parse(
                     "11111111-1111-1111-1111-111111111111"));
         }
-    }    
+    }
 
     private sealed class FakeAnswerGenerator
         : IAnswerGenerator
