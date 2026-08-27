@@ -5,6 +5,8 @@ using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.Access;
 using CloudKnowledge.Application.Documents.AskDocuments;
 using CloudKnowledge.Application.Documents.CreateDocument;
+using CloudKnowledge.Application.Documents.DeleteDocument;
+using CloudKnowledge.Application.Documents.DownloadDocument;
 using CloudKnowledge.Application.Documents.GetDocument;
 using CloudKnowledge.Application.Documents.GetDocuments;
 using CloudKnowledge.Application.Documents.SearchDocuments;
@@ -93,9 +95,15 @@ builder.Services.AddScoped<
     IDocumentRepository,
     EfDocumentRepository>();
 
+builder.Services.AddScoped<
+    IDocumentDeletionRepository,
+    EfDocumentDeletionRepository>();
+
 builder.Services.AddScoped<CreateDocumentUseCase>();
 builder.Services.AddScoped<GetDocumentUseCase>();
 builder.Services.AddScoped<GetDocumentsUseCase>();
+builder.Services.AddScoped<DeleteDocumentUseCase>();
+builder.Services.AddScoped<DownloadDocumentUseCase>();
 
 builder.Services.AddSingleton(
     serviceProvider =>
@@ -125,6 +133,10 @@ builder.Services.AddSingleton(
 
 builder.Services.AddScoped<
     IDocumentStorage,
+    AzureBlobDocumentStorage>();
+
+builder.Services.AddScoped<
+    IDocumentDeletionStorage,
     AzureBlobDocumentStorage>();
 
 builder.Services.AddSingleton(

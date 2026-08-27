@@ -1,10 +1,13 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Documents.DeleteDocument;
 
 namespace CloudKnowledge.Infrastructure.Documents;
 
-public sealed class AzureBlobDocumentStorage : IDocumentStorage
+public sealed class AzureBlobDocumentStorage
+    : IDocumentStorage,
+      IDocumentDeletionStorage
 {
     private readonly BlobContainerClient _containerClient;
 
@@ -42,19 +45,32 @@ public sealed class AzureBlobDocumentStorage : IDocumentStorage
     }
 
     public async Task<Stream> OpenReadAsync(
-    Guid documentId,
-    CancellationToken cancellationToken)
-{
-    var blobClient =
-        _containerClient.GetBlobClient(
-            documentId.ToString());
+        Guid documentId,
+        CancellationToken cancellationToken)
+    {
+        var blobClient =
+            _containerClient.GetBlobClient(
+                documentId.ToString());
 
-    var options =
-        new BlobOpenReadOptions(
-            allowModifications: false);
+        var options =
+            new BlobOpenReadOptions(
+                allowModifications: false);
 
-    return await blobClient.OpenReadAsync(
-        options,
-        cancellationToken);
-}
+        return await blobClient.OpenReadAsync(
+            options,
+            cancellationToken);
+    }
+
+    public async Task DeleteAsync(
+        Guid documentId,
+        CancellationToken cancellationToken)
+    {
+        var blobClient =
+            _containerClient.GetBlobClient(
+                documentId.ToString());
+
+        await blobClient.DeleteIfExistsAsync(
+            DeleteSnapshotsOption.IncludeSnapshots,
+            cancellationToken: cancellationToken);
+    }
 }

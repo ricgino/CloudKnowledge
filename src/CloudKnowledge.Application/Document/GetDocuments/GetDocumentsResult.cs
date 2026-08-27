@@ -13,4 +13,5 @@ public sealed record GetDocumentsItem(
     Guid Id,
     string FileName,
     string ContentType,
-    DocumentStatus Status);
+    DocumentStatus Status,
+    bool IsOwner);

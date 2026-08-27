@@ -65,9 +65,19 @@
                       <span class="source-label">{{ source.label }}</span>
                       <strong>{{ documentName(source.documentId) }}</strong>
                     </div>
-                    <span class="match-value">
-                      {{ (source.similarity * 100).toFixed(1) }}%
-                    </span>
+
+                    <div class="source-actions">
+                      <span class="match-value">
+                        {{ (source.similarity * 100).toFixed(1) }}%
+                      </span>
+                      <button
+                        type="button"
+                        class="document-link-button"
+                        (click)="downloadDocument(source.documentId)"
+                        [disabled]="downloadingDocumentId === source.documentId">
+                        {{ downloadingDocumentId === source.documentId ? 'Downloading...' : 'Download PDF' }}
+                      </button>
+                    </div>
                   </div>
                   <p>{{ source.content }}</p>
                 </article>
@@ -124,17 +134,27 @@
                   <span>Chunk {{ result.position + 1 }}</span>
                 </div>
 
-                <div class="match-group">
-                  <span
-                    class="relevance-badge"
-                    [class.high]="result.similarity >= 0.6"
-                    [class.medium]="result.similarity >= 0.3 && result.similarity < 0.6"
-                    [class.low]="result.similarity < 0.3">
-                    {{ relevanceLabel(result.similarity) }}
-                  </span>
-                  <span class="match-value">
-                    {{ (result.similarity * 100).toFixed(1) }}%
-                  </span>
+                <div class="result-actions">
+                  <div class="match-group">
+                    <span
+                      class="relevance-badge"
+                      [class.high]="result.similarity >= 0.6"
+                      [class.medium]="result.similarity >= 0.3 && result.similarity < 0.6"
+                      [class.low]="result.similarity < 0.3">
+                      {{ relevanceLabel(result.similarity) }}
+                    </span>
+                    <span class="match-value">
+                      {{ (result.similarity * 100).toFixed(1) }}%
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="document-link-button"
+                    (click)="downloadDocument(result.documentId)"
+                    [disabled]="downloadingDocumentId === result.documentId">
+                    {{ downloadingDocumentId === result.documentId ? 'Downloading...' : 'Download PDF' }}
+                  </button>
                 </div>
               </div>
 

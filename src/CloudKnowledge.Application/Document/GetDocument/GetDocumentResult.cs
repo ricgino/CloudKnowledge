@@ -6,4 +6,5 @@ public sealed record GetDocumentResult(
     Guid Id,
     string FileName,
     string ContentType,
-    DocumentStatus Status);
+    DocumentStatus Status,
+    bool IsOwner);

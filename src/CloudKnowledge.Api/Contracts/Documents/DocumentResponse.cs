@@ -4,4 +4,5 @@ public sealed record DocumentResponse(
     Guid Id,
     string FileName,
     string ContentType,
-    string Status);
+    string Status,
+    bool IsOwner = false);

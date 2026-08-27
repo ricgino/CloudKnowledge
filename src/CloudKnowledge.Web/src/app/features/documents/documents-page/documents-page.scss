@@ -117,8 +117,10 @@
 
 .upload-controls {
   display: flex;
-  align-items: center;
+  align-items: end;
   gap: 0.65rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .file-picker {
@@ -145,8 +147,33 @@
   display: none;
 }
 
+.visibility-picker {
+  min-width: 190px;
+}
+
+.visibility-picker span {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: #7a8496;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.visibility-picker select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #d9deea;
+  border-radius: 9px;
+  padding: 0 0.7rem;
+  background: #fff;
+  color: #344056;
+}
+
 .primary-button,
-.secondary-button {
+.secondary-button,
+.danger-button {
   min-height: 42px;
   border-radius: 9px;
   padding: 0 1rem;
@@ -163,6 +190,18 @@
   border: 1px solid #d9deea;
   background: #fff;
   color: #344056;
+}
+
+.danger-button {
+  border: 1px solid #e4c5c5;
+  background: #fff7f7;
+  color: #a03f3f;
+}
+
+.compact-button {
+  min-height: 34px;
+  padding: 0 0.75rem;
+  font-size: 0.78rem;
 }
 
 button:disabled {
@@ -208,7 +247,7 @@ button:disabled {
   min-width: 0;
   padding: 0.85rem 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 0.9rem;
   border-bottom: 1px solid #edf0f5;
@@ -271,6 +310,12 @@ button:disabled {
   color: #a34242;
 }
 
+.document-actions {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
 .empty-state {
   margin-top: 1rem;
   padding: 1rem;
@@ -278,6 +323,17 @@ button:disabled {
   background: #f7f8fb;
   color: #778196;
   font-size: 0.86rem;
+}
+
+@media (max-width: 920px) {
+  .document-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .document-actions {
+    grid-column: 2 / 4;
+    justify-self: end;
+  }
 }
 
 @media (max-width: 820px) {
@@ -294,8 +350,10 @@ button:disabled {
     flex-direction: column;
   }
 
-  .file-picker {
+  .file-picker,
+  .visibility-picker {
     max-width: none;
+    width: 100%;
   }
 }
 
@@ -308,8 +366,13 @@ button:disabled {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .status-badge {
+  .status-badge,
+  .document-actions {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .document-actions {
+    flex-wrap: wrap;
   }
 }

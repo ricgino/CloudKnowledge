@@ -31,6 +31,7 @@ export class KnowledgePage
   answer = '';
   answerSources: AskDocumentSource[] = [];
   asking = false;
+  downloadingDocumentId = '';
 
   errorMessage = '';
 
@@ -140,6 +141,46 @@ export class KnowledgePage
           this.errorMessage =
             `Unable to answer question (HTTP ${error.status}).`;
           this.asking = false;
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  downloadDocument(
+    documentId: string):
+    void
+  {
+    const fileName =
+      this.documentName(documentId);
+
+    this.downloadingDocumentId =
+      documentId;
+    this.errorMessage = '';
+
+    this.documentsService
+      .downloadDocument(documentId)
+      .subscribe({
+        next: blob =>
+        {
+          const url =
+            URL.createObjectURL(blob);
+
+          const anchor =
+            window.document.createElement('a');
+
+          anchor.href = url;
+          anchor.download = fileName;
+          anchor.click();
+
+          URL.revokeObjectURL(url);
+          this.downloadingDocumentId = '';
+          this.cdr.detectChanges();
+        },
+        error: error =>
+        {
+          this.errorMessage =
+            `Unable to download document (HTTP ${error.status}).`;
+          this.downloadingDocumentId = '';
           this.cdr.detectChanges();
         }
       });
