@@ -65,13 +65,12 @@ public sealed class ProcessDocumentUseCase
             return;
         }
 
-        if (!string.Equals(
-            document.ContentType,
-            "application/pdf",
-            StringComparison.OrdinalIgnoreCase))
+        if (!DocumentFormatDetector.TryDetect(
+                document.FileName,
+                out _))
         {
             throw new PermanentDocumentProcessingException(
-                $"Content type '{document.ContentType}' is not supported.");
+                $"Document format for '{document.FileName}' is not supported.");
         }
 
         if (document.Status == DocumentStatus.Pending)
@@ -109,6 +108,8 @@ public sealed class ProcessDocumentUseCase
         {
             extractedText =
                 _documentTextExtractor.Extract(
+                    document.FileName,
+                    document.ContentType,
                     bufferedContent,
                     cancellationToken);
         }
