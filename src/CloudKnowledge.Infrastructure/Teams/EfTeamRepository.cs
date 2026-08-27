@@ -19,6 +19,17 @@ public sealed class EfTeamRepository
             dbContext;
     }
 
+    public async Task<Team?> GetByIdAsync(
+        Guid teamId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Teams
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                team => team.Id == teamId,
+                cancellationToken);
+    }
+
     public async Task AddAsync(
         Team team,
         TeamMember ownerMembership,
@@ -39,16 +50,15 @@ public sealed class EfTeamRepository
         CancellationToken cancellationToken)
     {
         return await (
-            from membership in _dbContext.TeamMembers
-            join team in _dbContext.Teams
-                on membership.TeamId equals team.Id
+            from team in _dbContext.Teams.AsNoTracking()
+            join membership in _dbContext.TeamMembers.AsNoTracking()
+                on team.Id equals membership.TeamId
             where membership.UserId == userId
             orderby team.Name, team.Id
             select new GetTeamsResult(
                 team.Id,
                 team.Name,
                 membership.Role))
-            .AsNoTracking()
             .ToListAsync(
                 cancellationToken);
     }

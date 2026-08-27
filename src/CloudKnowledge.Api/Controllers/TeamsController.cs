@@ -67,14 +67,29 @@ public sealed class TeamsController
         var result =
             await _createTeamUseCase.ExecuteAsync(
                 request.Name,
+                request.ParentTeamId,
                 cancellationToken);
 
-        return Created(
-            $"/api/teams/{result.Id}",
-            new TeamResponse(
-                result.Id,
-                result.Name,
-                result.Role.ToString()));
+        switch (result.Status)
+        {
+            case CreateTeamStatus.Created:
+                return Created(
+                    $"/api/teams/{result.Id}",
+                    new TeamResponse(
+                        result.Id!.Value,
+                        result.Name!,
+                        result.Role!.Value.ToString()));
+
+            case CreateTeamStatus.ParentNotFoundOrNotMember:
+                return NotFound();
+
+            case CreateTeamStatus.Forbidden:
+                return Forbid();
+
+            default:
+                throw new InvalidOperationException(
+                    "Unexpected create team result.");
+        }
     }
 
     [HttpPost("{teamId:guid}/members")]
