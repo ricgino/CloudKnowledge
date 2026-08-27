@@ -1,4 +1,5 @@
 using CloudKnowledge.Api.Contracts.Documents;
+using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.CreateDocument;
 using CloudKnowledge.Application.Documents.DeleteDocument;
 using CloudKnowledge.Application.Documents.DownloadDocument;
@@ -60,6 +61,16 @@ public sealed class DocumentsController : ControllerBase
         if (request.File.Length == 0)
         {
             return BadRequest("The uploaded file is empty.");
+        }
+
+        if (!DocumentFormatDetector.TryDetect(
+                request.File.FileName,
+                out _))
+        {
+            return BadRequest(new
+            {
+                message = "Supported document formats are PDF, DOCX and TXT."
+            });
         }
 
         if (request.TeamId.HasValue)
