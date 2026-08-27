@@ -1,4 +1,5 @@
 using CloudKnowledge.Domain.Teams;
+using CloudKnowledge.Domain.Users;
 using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Infrastructure.Teams;
 using Microsoft.EntityFrameworkCore;
@@ -40,8 +41,16 @@ public sealed class TeamNavigationTests
                 "Budgeting",
                 finance.Id);
 
+        var user =
+            UserAccount.Create(
+                "reporting.member@example.com",
+                "Reporting Member");
+
         var userId =
-            Guid.NewGuid();
+            user.Id;
+
+        dbContext.UserAccounts.Add(
+            user);
 
         dbContext.Teams.AddRange(
             stellantis,
@@ -139,8 +148,16 @@ public sealed class TeamNavigationTests
             Team.Create(
                 "Rai");
 
+        var user =
+            UserAccount.Create(
+                $"{role.ToString().ToLowerInvariant()}@example.com",
+                $"{role} User");
+
         var userId =
-            Guid.NewGuid();
+            user.Id;
+
+        dbContext.UserAccounts.Add(
+            user);
 
         dbContext.Teams.Add(
             team);
