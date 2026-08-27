@@ -6,6 +6,8 @@ public sealed class Document
 
     public Guid? OwnerUserId { get; private set; }
 
+    public Guid? OwnerTeamId { get; private set; }
+
     public string FileName { get; private set; }
 
     public string ContentType { get; private set; }
@@ -17,6 +19,13 @@ public sealed class Document
     public void AssignOwner(
         Guid ownerUserId)
     {
+        AssignUserOwner(
+            ownerUserId);
+    }
+
+    public void AssignUserOwner(
+        Guid ownerUserId)
+    {
         if (ownerUserId == Guid.Empty)
         {
             throw new ArgumentException(
@@ -24,12 +33,14 @@ public sealed class Document
                 nameof(ownerUserId));
         }
 
-        if (OwnerUserId == ownerUserId)
+        if (OwnerUserId == ownerUserId &&
+            OwnerTeamId is null)
         {
             return;
         }
 
-        if (OwnerUserId is not null)
+        if (OwnerUserId is not null ||
+            OwnerTeamId is not null)
         {
             throw new InvalidOperationException(
                 "Document already has an owner.");
@@ -37,6 +48,33 @@ public sealed class Document
 
         OwnerUserId =
             ownerUserId;
+    }
+
+    public void AssignTeamOwner(
+        Guid ownerTeamId)
+    {
+        if (ownerTeamId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Owner team id cannot be empty.",
+                nameof(ownerTeamId));
+        }
+
+        if (OwnerTeamId == ownerTeamId &&
+            OwnerUserId is null)
+        {
+            return;
+        }
+
+        if (OwnerUserId is not null ||
+            OwnerTeamId is not null)
+        {
+            throw new InvalidOperationException(
+                "Document already has an owner.");
+        }
+
+        OwnerTeamId =
+            ownerTeamId;
     }
 
     public void MarkAsProcessing()
