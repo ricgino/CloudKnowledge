@@ -1,15 +1,34 @@
-import { TestBed } from '@angular/core/testing';
-import { Documents } from './documents';
+import {
+  buildDocumentsQueryString
+} from './documents';
 
-describe('Documents', () => {
-  let service: Documents;
+describe('document library filters', () => {
+  it('serializes team branch and filename search server-side', () => {
+    const query =
+      buildDocumentsQueryString({
+        page: 2,
+        pageSize: 10,
+        scope: 'team',
+        teamId: 'team-123',
+        includeDescendants: true,
+        query: '  handbook  '
+      });
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(Documents);
+    expect(query)
+      .toBe(
+        'page=2&pageSize=10&scope=team&teamId=team-123&includeDescendants=true&query=handbook');
   });
 
-  it('should be created', () => {
-    expect(service).toBeTruthy();
+  it('omits team-only parameters for owned documents', () => {
+    const query =
+      buildDocumentsQueryString({
+        page: 1,
+        pageSize: 20,
+        scope: 'owned'
+      });
+
+    expect(query)
+      .toBe(
+        'page=1&pageSize=20&scope=owned');
   });
 });
