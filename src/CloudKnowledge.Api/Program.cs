@@ -264,6 +264,10 @@ builder.Services.AddSingleton<IAnswerGenerator>(
 builder.Services.AddScoped<AskDocumentsUseCase>();
 
 builder.Services.AddScoped<
+    ITeamScopeResolver,
+    EfTeamScopeResolver>();
+
+builder.Services.AddScoped<
     IDocumentSemanticSearchRepository,
     EfDocumentSemanticSearchRepository>();
 
