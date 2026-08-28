@@ -270,6 +270,36 @@ public sealed class EfDocumentAccessRepository
         return result;
     }
 
+    public async Task<IReadOnlyCollection<Guid>> GetTeamOwnedDeletableDocumentIdsAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid> documentIds,
+        CancellationToken cancellationToken)
+    {
+        var distinctDocumentIds =
+            documentIds
+                .Where(documentId => documentId != Guid.Empty)
+                .Distinct()
+                .ToArray();
+
+        if (distinctDocumentIds.Length == 0)
+        {
+            return Array.Empty<Guid>();
+        }
+
+        return await (
+                from document in _dbContext.Documents.AsNoTracking()
+                join membership in _dbContext.TeamMembers.AsNoTracking()
+                    on document.OwnerTeamId equals membership.TeamId
+                where distinctDocumentIds.Contains(document.Id)
+                      && document.OwnerTeamId.HasValue
+                      && membership.UserId == userId
+                      && membership.Role == TeamRole.Owner
+                select document.Id)
+            .Distinct()
+            .ToArrayAsync(
+                cancellationToken);
+    }
+
     private async Task<IQueryable<Document>> BuildFilteredQueryAsync(
         Guid userId,
         GetDocumentsQuery query,
