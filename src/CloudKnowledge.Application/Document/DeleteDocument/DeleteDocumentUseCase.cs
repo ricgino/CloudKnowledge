@@ -4,8 +4,8 @@ namespace CloudKnowledge.Application.Documents.DeleteDocument;
 
 public interface IDocumentDeletionRepository
 {
-    Task<bool> DeleteOwnedAsync(
-        Guid ownerUserId,
+    Task<bool> DeleteAuthorizedAsync(
+        Guid userId,
         Guid documentId,
         CancellationToken cancellationToken);
 }
@@ -42,7 +42,7 @@ public sealed class DeleteDocumentUseCase
                 cancellationToken);
 
         var deleted =
-            await _documentRepository.DeleteOwnedAsync(
+            await _documentRepository.DeleteAuthorizedAsync(
                 userId,
                 documentId,
                 cancellationToken);
