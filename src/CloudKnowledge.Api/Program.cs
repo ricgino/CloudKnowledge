@@ -202,73 +202,70 @@ builder.Services.AddSingleton<IDocumentReadyPublisher>(
 
 builder.Services.AddOpenApi();
 
+var aiConfiguration =
+    AiProviderConfiguration.From(
+        builder.Configuration,
+        requireAnswerGenerator: true);
+
 builder.Services.AddSingleton(
-    serviceProvider =>
-    {
-        var configuration =
-            serviceProvider.GetRequiredService<IConfiguration>();
+    aiConfiguration);
 
-        var baseUrl =
-            configuration["Ai:BaseUrl"]
-            ?? throw new InvalidOperationException(
-                "AI base URL was not found.");
-
-        return new HttpClient
+builder.Services.AddSingleton(
+    _ =>
+        new HttpClient
         {
             BaseAddress =
-                new Uri(baseUrl)
-        };
-    });
+                aiConfiguration.BaseUrl
+        });
 
 builder.Services.AddSingleton<IEmbeddingGenerator>(
     serviceProvider =>
     {
-        var configuration =
-            serviceProvider.GetRequiredService<IConfiguration>();
+        var httpClient =
+            serviceProvider
+                .GetRequiredService<HttpClient>();
 
-        var model =
-            configuration["Ai:EmbeddingModel"]
-            ?? throw new InvalidOperationException(
-                "AI embedding model was not found.");
-
-        var dimensions =
-            configuration.GetValue<int>(
-                "Ai:EmbeddingDimensions");
+        if (aiConfiguration.IsAzureOpenAi)
+        {
+            return new AzureOpenAiEmbeddingGenerator(
+                httpClient,
+                aiConfiguration.EmbeddingModel,
+                aiConfiguration.ApiKey!,
+                aiConfiguration.ApiVersion!,
+                aiConfiguration.EmbeddingDimensions);
+        }
 
         return new OllamaEmbeddingGenerator(
-            serviceProvider
-                .GetRequiredService<HttpClient>(),
-            model,
+            httpClient,
+            aiConfiguration.EmbeddingModel,
             inputPrefix:
                 "search_query: ",
-            dimensions);
+            aiConfiguration.EmbeddingDimensions);
     });
 
 builder.Services.AddSingleton<IAnswerGenerator>(
     serviceProvider =>
     {
-        var configuration =
-            serviceProvider.GetRequiredService<IConfiguration>();
+        var httpClient =
+            serviceProvider
+                .GetRequiredService<HttpClient>();
 
-        var model =
-            configuration["Ai:AnswerModel"]
-            ?? throw new InvalidOperationException(
-                "AI answer model was not found.");
-
-        var temperature =
-            configuration.GetValue<double>(
-                "Ai:AnswerTemperature");
-
-        var maxTokens =
-            configuration.GetValue<int>(
-                "Ai:AnswerMaxTokens");
+        if (aiConfiguration.IsAzureOpenAi)
+        {
+            return new AzureOpenAiAnswerGenerator(
+                httpClient,
+                aiConfiguration.AnswerModel!,
+                aiConfiguration.ApiKey!,
+                aiConfiguration.ApiVersion!,
+                aiConfiguration.AnswerTemperature,
+                aiConfiguration.AnswerMaxTokens);
+        }
 
         return new OllamaAnswerGenerator(
-            serviceProvider
-                .GetRequiredService<HttpClient>(),
-            model,
-            temperature,
-            maxTokens,
+            httpClient,
+            aiConfiguration.AnswerModel!,
+            aiConfiguration.AnswerTemperature,
+            aiConfiguration.AnswerMaxTokens,
             serviceProvider
                 .GetRequiredService<ILogger<OllamaAnswerGenerator>>());
     });
