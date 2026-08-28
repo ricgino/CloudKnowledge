@@ -76,8 +76,8 @@ services:
       Ai__EmbeddingModel: nomic-embed-text-v2-moe
       Ai__AnswerModel: qwen3:4b
       Ai__EmbeddingDimensions: 768
-      Ai__AnswerTemperature: 0.1
-      Ai__AnswerMaxTokens: 256
+      Ai__AnswerTemperature: 0
+      Ai__AnswerMaxTokens: 384
       Cors__AllowedOrigins__0: http://localhost:4200
       Database__ApplyMigrationsOnStartup: "true"
     ports:
