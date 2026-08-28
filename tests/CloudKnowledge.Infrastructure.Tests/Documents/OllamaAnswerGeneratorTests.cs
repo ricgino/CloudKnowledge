@@ -109,6 +109,85 @@ public sealed class OllamaAnswerGeneratorTests
                     StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task GenerateAsync_ShouldRetryOnce_WhenFirstAnswerEchoesQuestion()
+    {
+        var handler =
+            new SequenceOllamaHandler(
+                CreateResponse(
+                    "faceless void changes"),
+                CreateResponse(
+                    "Faceless Void's damage gain per level increased from 3.0 to 3.1. [S1]"));
+
+        var httpClient =
+            new HttpClient(handler)
+            {
+                BaseAddress =
+                    new Uri("http://localhost:11434")
+            };
+
+        var sut =
+            new OllamaAnswerGenerator(
+                httpClient,
+                "qwen3:4b");
+
+        var sources =
+            new[]
+            {
+                new AnswerContextSource(
+                    "S1",
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    0,
+                    "FACELESS VOID: Damage gain per level increased from 3.0 to 3.1.")
+            };
+
+        var result =
+            await sut.GenerateAsync(
+                "faceless void changes",
+                sources,
+                CancellationToken.None);
+
+        Assert.Equal(
+            "Faceless Void's damage gain per level increased from 3.0 to 3.1. [S1]",
+            result);
+
+        Assert.Equal(
+            2,
+            handler.RequestBodies.Count);
+
+        Assert.Contains(
+            "non ripetere la domanda",
+            handler.RequestBodies[1],
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CreateResponse(
+        string answer)
+    {
+        var escapedAnswer =
+            answer
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("\"", "\\\"", StringComparison.Ordinal);
+
+        return
+            $$"""
+            {
+              "message": {
+                "role": "assistant",
+                "content": "{\"answer\":\"{{escapedAnswer}}\"}"
+              },
+              "total_duration": 1000000000,
+              "load_duration": 100000000,
+              "prompt_eval_count": 300,
+              "prompt_eval_duration": 400000000,
+              "eval_count": 40,
+              "eval_duration": 500000000,
+              "done_reason": "stop"
+            }
+            """;
+    }
+
     private sealed class FakeOllamaHandler
         : HttpMessageHandler
     {
@@ -140,6 +219,45 @@ public sealed class OllamaAnswerGeneratorTests
                   "done_reason": "stop"
                 }
                 """;
+
+            return new HttpResponseMessage(
+                HttpStatusCode.OK)
+            {
+                Content =
+                    new StringContent(
+                        responseJson,
+                        Encoding.UTF8,
+                        "application/json")
+            };
+        }
+    }
+
+    private sealed class SequenceOllamaHandler
+        : HttpMessageHandler
+    {
+        private readonly Queue<string> _responses;
+
+        public SequenceOllamaHandler(
+            params string[] responses)
+        {
+            _responses =
+                new Queue<string>(responses);
+        }
+
+        public List<string> RequestBodies { get; } =
+            new();
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestBodies.Add(
+                await request.Content!
+                    .ReadAsStringAsync(
+                        cancellationToken));
+
+            var responseJson =
+                _responses.Dequeue();
 
             return new HttpResponseMessage(
                 HttpStatusCode.OK)
