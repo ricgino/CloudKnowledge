@@ -546,7 +546,7 @@ export class DocumentsPage
     document: DocumentItem):
     void
   {
-    if (!document.isOwner)
+    if (!document.canDelete)
     {
       return;
     }
@@ -587,7 +587,7 @@ export class DocumentsPage
         {
           this.errorMessage =
             error.status === 404
-              ? 'Only the document owner can delete this document.'
+              ? 'You are not allowed to delete this document.'
               : `Unable to delete document (HTTP ${error.status}).`;
           this.deletingDocumentId = '';
           this.cdr.detectChanges();
