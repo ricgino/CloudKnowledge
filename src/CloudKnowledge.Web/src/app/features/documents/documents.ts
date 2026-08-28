@@ -53,6 +53,7 @@ export interface DocumentItem
   contentType: string;
   status: string;
   isOwner: boolean;
+  canDelete: boolean;
   sharedTeams?: DocumentAccessTeam[] | null;
 }
 
