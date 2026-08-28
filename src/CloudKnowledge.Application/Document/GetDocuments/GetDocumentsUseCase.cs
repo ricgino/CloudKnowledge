@@ -82,14 +82,27 @@ public sealed class GetDocumentsUseCase
                     normalizedQuery,
                     cancellationToken);
 
+        var documentIds =
+            documents
+                .Select(document => document.Id)
+                .ToArray();
+
         var visibleTeamAccess =
             await _documentAccessRepository
                 .GetVisibleTeamAccessAsync(
                     userId,
-                    documents
-                        .Select(document => document.Id)
-                        .ToArray(),
+                    documentIds,
                     cancellationToken);
+
+        var teamOwnedDeletableDocumentIds =
+            await _documentAccessRepository
+                .GetTeamOwnedDeletableDocumentIdsAsync(
+                    userId,
+                    documentIds,
+                    cancellationToken);
+
+        var teamOwnedDeletableDocumentIdSet =
+            teamOwnedDeletableDocumentIds.ToHashSet();
 
         var items =
             documents
@@ -100,12 +113,18 @@ public sealed class GetDocumentsUseCase
                             document.Id,
                             out var sharedTeams);
 
+                        var isOwner =
+                            document.OwnerUserId == userId;
+
                         return new GetDocumentsItem(
                             document.Id,
                             document.FileName,
                             document.ContentType,
                             document.Status,
-                            document.OwnerUserId == userId,
+                            isOwner,
+                            isOwner ||
+                            teamOwnedDeletableDocumentIdSet.Contains(
+                                document.Id),
                             sharedTeams ??
                                 Array.Empty<DocumentAccessTeamResult>());
                     })
