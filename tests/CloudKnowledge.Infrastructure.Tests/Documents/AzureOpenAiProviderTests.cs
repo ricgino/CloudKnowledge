@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using CloudKnowledge.Application.Documents.AskDocuments;
 using CloudKnowledge.Infrastructure.Documents;
 using Microsoft.Extensions.Configuration;
@@ -120,9 +121,19 @@ public sealed class AzureOpenAiProviderTests
             "/openai/deployments/answer-small/chat/completions?api-version=2025-04-01-preview",
             handler.RequestUri?.PathAndQuery);
         Assert.Equal("test-key", handler.ApiKey);
-        Assert.Contains("Qual è l'azienda?", handler.RequestBody);
-        Assert.Contains("[S1]", handler.RequestBody);
-        Assert.Contains("\"max_tokens\":256", handler.RequestBody);
+
+        using var requestJson =
+            JsonDocument.Parse(
+                Assert.IsType<string>(handler.RequestBody));
+
+        var root = requestJson.RootElement;
+        var messages = root.GetProperty("messages");
+        var userMessage = messages[1].GetProperty("content").GetString();
+
+        Assert.NotNull(userMessage);
+        Assert.Contains("Qual è l'azienda?", userMessage);
+        Assert.Contains("[S1]", userMessage);
+        Assert.Equal(256, root.GetProperty("max_tokens").GetInt32());
     }
 
     private sealed class RecordingHandler(string responseJson)
