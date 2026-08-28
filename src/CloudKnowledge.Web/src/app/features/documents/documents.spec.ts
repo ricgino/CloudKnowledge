@@ -1,5 +1,7 @@
 import {
-  of
+  of,
+  Subject,
+  throwError
 } from 'rxjs';
 
 import {
@@ -157,5 +159,110 @@ describe('document upload formats', () => {
         'Engineering'))
       .toBe(
         'guide.pdf uploaded as a team-owned document in Engineering. Processing continues in the background.');
+  });
+
+  it('uploads a selected batch sequentially with the same team access', () => {
+    const firstResponse = new Subject<unknown>();
+    const secondResponse = new Subject<unknown>();
+    const requestBodies: FormData[] = [];
+
+    const http = {
+      post: (_url: string, body: FormData) =>
+      {
+        requestBodies.push(body);
+
+        return requestBodies.length === 1
+          ? firstResponse
+          : secondResponse;
+      }
+    };
+
+    const documents =
+      new Documents(http as never);
+
+    const firstFile =
+      new File(
+        ['first'],
+        'first.pdf',
+        { type: 'application/pdf' });
+
+    const secondFile =
+      new File(
+        ['second'],
+        'second.txt',
+        { type: 'text/plain' });
+
+    documents
+      .uploadDocuments(
+        [firstFile, secondFile],
+        'team-dota')
+      .subscribe();
+
+    expect(requestBodies.length).toBe(1);
+    expect(requestBodies[0].get('File')).toBe(firstFile);
+    expect(requestBodies[0].get('TeamId')).toBe('team-dota');
+
+    firstResponse.next({ id: 'first' });
+    firstResponse.complete();
+
+    expect(requestBodies.length).toBe(2);
+    expect(requestBodies[1].get('File')).toBe(secondFile);
+    expect(requestBodies[1].get('TeamId')).toBe('team-dota');
+  });
+
+  it('continues the batch after an upload failure and reports each outcome', () => {
+    const attemptedFiles: string[] = [];
+
+    const http = {
+      post: (_url: string, body: FormData) =>
+      {
+        const file = body.get('File') as File;
+        attemptedFiles.push(file.name);
+
+        return file.name === 'broken.pdf'
+          ? throwError(() => ({ status: 500 }))
+          : of({
+              id: 'ok',
+              fileName: file.name,
+              contentType: file.type,
+              status: 'Pending',
+              isOwner: true
+            });
+      }
+    };
+
+    const documents =
+      new Documents(http as never);
+
+    const results: unknown[] = [];
+
+    documents
+      .uploadDocuments(
+        [
+          new File(['bad'], 'broken.pdf'),
+          new File(['good'], 'good.docx')
+        ],
+        'team-dota')
+      .subscribe(result => results.push(result));
+
+    expect(attemptedFiles)
+      .toEqual([
+        'broken.pdf',
+        'good.docx'
+      ]);
+
+    expect(results)
+      .toEqual([
+        [
+          expect.objectContaining({
+            fileName: 'broken.pdf',
+            succeeded: false
+          }),
+          expect.objectContaining({
+            fileName: 'good.docx',
+            succeeded: true
+          })
+        ]
+      ]);
   });
 });
