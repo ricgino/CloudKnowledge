@@ -263,7 +263,7 @@
           Page {{ totalPages === 0 ? 0 : page }} of {{ totalPages }} · {{ totalCount }} result{{ totalCount === 1 ? '' : 's' }}
         </span>
 
-        <div>
+        <div class="page-controls">
           <button
             type="button"
             class="secondary-button compact-button"
@@ -271,6 +271,24 @@
             [disabled]="page <= 1 || loading">
             Previous
           </button>
+
+          <div class="page-number-list" aria-label="Document pages">
+            @for (pageItem of paginationItems; track $index) {
+              @if (pageItem === null) {
+                <span class="pagination-ellipsis" aria-hidden="true">…</span>
+              } @else {
+                <button
+                  type="button"
+                  class="secondary-button compact-button page-number-button"
+                  [class.active]="pageItem === page"
+                  [attr.aria-current]="pageItem === page ? 'page' : null"
+                  (click)="goToPage(pageItem)"
+                  [disabled]="loading">
+                  {{ pageItem }}
+                </button>
+              }
+            }
+          </div>
 
           <button
             type="button"
