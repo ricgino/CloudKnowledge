@@ -115,46 +115,45 @@ builder.Services.AddScoped<
 
 builder.Services.AddSingleton<TextChunker>();
 
+var aiConfiguration =
+    AiProviderConfiguration.From(
+        builder.Configuration,
+        requireAnswerGenerator: false);
+
 builder.Services.AddSingleton(
-    serviceProvider =>
-    {
-        var configuration =
-            serviceProvider.GetRequiredService<IConfiguration>();
+    aiConfiguration);
 
-        var baseUrl =
-            configuration["Ai:BaseUrl"]
-            ?? throw new InvalidOperationException(
-                "AI base URL was not found.");
-
-        return new HttpClient
+builder.Services.AddSingleton(
+    _ =>
+        new HttpClient
         {
             BaseAddress =
-                new Uri(baseUrl)
-        };
-    });
+                aiConfiguration.BaseUrl
+        });
 
 builder.Services.AddSingleton<IEmbeddingGenerator>(
     serviceProvider =>
     {
-        var configuration =
-            serviceProvider.GetRequiredService<IConfiguration>();
+        var httpClient =
+            serviceProvider
+                .GetRequiredService<HttpClient>();
 
-        var model =
-            configuration["Ai:EmbeddingModel"]
-            ?? throw new InvalidOperationException(
-                "AI embedding model was not found.");
-
-        var dimensions =
-            configuration.GetValue<int>(
-                "Ai:EmbeddingDimensions");
+        if (aiConfiguration.IsAzureOpenAi)
+        {
+            return new AzureOpenAiEmbeddingGenerator(
+                httpClient,
+                aiConfiguration.EmbeddingModel,
+                aiConfiguration.ApiKey!,
+                aiConfiguration.ApiVersion!,
+                aiConfiguration.EmbeddingDimensions);
+        }
 
         return new OllamaEmbeddingGenerator(
-            serviceProvider
-                .GetRequiredService<HttpClient>(),
-            model,
+            httpClient,
+            aiConfiguration.EmbeddingModel,
             inputPrefix:
                 "search_document: ",
-            dimensions);
+            aiConfiguration.EmbeddingDimensions);
     });
 
 builder.Services.AddScoped<
