@@ -54,10 +54,6 @@ public sealed class OllamaAnswerGeneratorTests
             result);
 
         Assert.DoesNotContain(
-            "<think>",
-            result);
-
-        Assert.DoesNotContain(
             "internal reasoning",
             result);
 
@@ -74,6 +70,14 @@ public sealed class OllamaAnswerGeneratorTests
         Assert.Contains(
             "/no_think",
             requestBody);
+
+        Assert.Contains(
+            "\"format\"",
+            requestBody.ToLowerInvariant());
+
+        Assert.Contains(
+            "\"answer\"",
+            requestBody.ToLowerInvariant());
 
         Assert.Contains(
             "\"temperature\":0.1",
@@ -124,7 +128,8 @@ public sealed class OllamaAnswerGeneratorTests
                 {
                   "message": {
                     "role": "assistant",
-                    "content": "<think>internal reasoning</think>\nAlperia Smart Services Srl. [S1]"
+                    "thinking": "internal reasoning",
+                    "content": "{\"answer\":\"Alperia Smart Services Srl. [S1]\"}"
                   },
                   "total_duration": 4500000000,
                   "load_duration": 200000000,
