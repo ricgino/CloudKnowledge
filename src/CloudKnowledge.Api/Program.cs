@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using Azure.Storage.Blobs;
 using CloudKnowledge.Api.Authentication;
+using CloudKnowledge.Api.Configuration;
 using CloudKnowledge.Api.Database;
 using CloudKnowledge.Api.Notifications;
 using CloudKnowledge.Application.Documents;
@@ -55,19 +56,16 @@ builder.Services.AddCors(
             policy =>
             {
                 var allowedOrigins =
-                    builder.Configuration
-                        .GetSection("Cors:AllowedOrigins")
-                        .Get<string[]>()
-                    ?? [];
+                    CorsAllowedOrigins.Get(
+                        builder.Configuration);
 
-                if (allowedOrigins.Length == 0)
+                if (allowedOrigins.Length > 0)
                 {
-                    throw new InvalidOperationException(
-                        "At least one CORS allowed origin must be configured.");
+                    policy.WithOrigins(
+                        allowedOrigins);
                 }
 
                 policy
-                    .WithOrigins(allowedOrigins)
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             });
