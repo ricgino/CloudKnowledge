@@ -29,7 +29,17 @@ describe('AdministrationPage form containment', () => {
           {
             provide: Teams,
             useValue: {
-              getTeams: () => of([])
+              getTeams: () =>
+                of([
+                  {
+                    id: 'team-dota',
+                    name: 'Dota',
+                    parentTeamId: null,
+                    isMember: true,
+                    role: 'Owner',
+                    canManage: true
+                  }
+                ])
             }
           },
           {
