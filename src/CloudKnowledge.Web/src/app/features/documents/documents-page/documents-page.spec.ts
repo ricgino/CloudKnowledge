@@ -175,6 +175,60 @@ describe('DocumentsPage pagination', () => {
   });
 });
 
+describe('DocumentsPage deletion capability', () => {
+  it('deletes a team-owned document when the backend grants canDelete', () => {
+    const deletedIds: string[] = [];
+
+    const documentsService = {
+      deleteDocument: (documentId: string) =>
+      {
+        deletedIds.push(documentId);
+        return of(undefined);
+      },
+      getDocuments: () =>
+        of({
+          items: [],
+          page: 1,
+          pageSize: 20,
+          totalCount: 0,
+          totalPages: 0
+        })
+    };
+
+    const page =
+      createPage(documentsService);
+
+    const originalConfirm =
+      window.confirm;
+
+    window.confirm =
+      () => true;
+
+    try
+    {
+      page.deleteDocument({
+        id: 'team-document',
+        fileName: 'team-owned.pdf',
+        contentType: 'application/pdf',
+        status: 'Ready',
+        isOwner: false,
+        canDelete: true,
+        sharedTeams: []
+      } as never);
+    }
+    finally
+    {
+      window.confirm =
+        originalConfirm;
+    }
+
+    expect(deletedIds)
+      .toEqual([
+        'team-document'
+      ]);
+  });
+});
+
 function createPage(
   documentsService: unknown =
     {
