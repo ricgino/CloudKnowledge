@@ -67,4 +67,13 @@ public interface IDocumentAccessRepository
         return Task.FromResult(
             result);
     }
+
+    Task<IReadOnlyCollection<Guid>> GetTeamOwnedDeletableDocumentIdsAsync(
+        Guid userId,
+        IReadOnlyCollection<Guid> documentIds,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyCollection<Guid>>(
+            Array.Empty<Guid>());
+    }
 }
