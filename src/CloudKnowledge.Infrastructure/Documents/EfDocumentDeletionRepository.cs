@@ -1,4 +1,5 @@
 using CloudKnowledge.Application.Documents.DeleteDocument;
+using CloudKnowledge.Domain.Teams;
 using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,8 +16,8 @@ public sealed class EfDocumentDeletionRepository
         _dbContext = dbContext;
     }
 
-    public async Task<bool> DeleteOwnedAsync(
-        Guid ownerUserId,
+    public async Task<bool> DeleteAuthorizedAsync(
+        Guid userId,
         Guid documentId,
         CancellationToken cancellationToken)
     {
@@ -25,7 +26,17 @@ public sealed class EfDocumentDeletionRepository
                 .SingleOrDefaultAsync(
                     item =>
                         item.Id == documentId &&
-                        item.OwnerUserId == ownerUserId,
+                        (
+                            item.OwnerUserId == userId ||
+                            (
+                                item.OwnerTeamId.HasValue &&
+                                _dbContext.TeamMembers.Any(
+                                    membership =>
+                                        membership.TeamId == item.OwnerTeamId.Value &&
+                                        membership.UserId == userId &&
+                                        membership.Role == TeamRole.Owner)
+                            )
+                        ),
                     cancellationToken);
 
         if (document is null)

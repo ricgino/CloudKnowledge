@@ -48,6 +48,10 @@ namespace CloudKnowledge.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("file_name");
 
+                    b.Property<Guid?>("OwnerTeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_team_id");
+
                     b.Property<Guid?>("OwnerUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("owner_user_id");
@@ -57,6 +61,9 @@ namespace CloudKnowledge.Infrastructure.Persistence.Migrations
                         .HasColumnName("status");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OwnerTeamId")
+                        .HasDatabaseName("IX_documents_owner_team_id");
 
                     b.HasIndex("OwnerUserId")
                         .HasDatabaseName("IX_documents_owner_user_id");
@@ -192,7 +199,14 @@ namespace CloudKnowledge.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<Guid?>("ParentTeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_team_id");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ParentTeamId")
+                        .HasDatabaseName("ix_teams_parent_team_id");
 
                     b.ToTable("teams", (string)null);
                 });
@@ -293,6 +307,11 @@ namespace CloudKnowledge.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("CloudKnowledge.Domain.Documents.Document", b =>
                 {
+                    b.HasOne("CloudKnowledge.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerTeamId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("CloudKnowledge.Domain.Users.UserAccount", null)
                         .WithMany()
                         .HasForeignKey("OwnerUserId")
@@ -330,6 +349,14 @@ namespace CloudKnowledge.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("CloudKnowledge.Domain.Teams.Team", b =>
+                {
+                    b.HasOne("CloudKnowledge.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("ParentTeamId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("CloudKnowledge.Domain.Teams.TeamMember", b =>

@@ -10,7 +10,10 @@ import {
 } from '../../documents/documents';
 
 import {
+  buildTeamTreeRows,
+  canDeleteTeam as canDeleteTeamItem,
   TeamItem,
+  TeamTreeRow,
   Teams
 } from '../../teams/teams';
 
@@ -38,7 +41,9 @@ export class AdministrationPage
   addingMember = false;
 
   newTeamName = '';
+  newTeamParentId = '';
   creatingTeam = false;
+  deletingTeamId = '';
 
   selectedDocumentId = '';
   selectedShareTeamId = '';
@@ -60,13 +65,22 @@ export class AdministrationPage
     this.refresh();
   }
 
+  get teamRows(): TeamTreeRow[]
+  {
+    return buildTeamTreeRows(
+      this.teams);
+  }
+
   get manageableTeams(): TeamItem[]
   {
     return this.teams
-      .filter(
-        team =>
-          team.role === 'Owner' ||
-          team.role === 'Admin');
+      .filter(team => team.canManage)
+      .sort(
+        (left, right) =>
+          left.name.localeCompare(
+            right.name,
+            undefined,
+            { sensitivity: 'base' }));
   }
 
   get readyDocuments(): DocumentItem[]
@@ -199,6 +213,14 @@ export class AdministrationPage
       (event.target as HTMLInputElement).value;
   }
 
+  onTeamParentChanged(
+    event: Event):
+    void
+  {
+    this.newTeamParentId =
+      (event.target as HTMLSelectElement).value;
+  }
+
   createTeam(): void
   {
     const name =
@@ -209,18 +231,25 @@ export class AdministrationPage
       return;
     }
 
+    const parent =
+      this.teams.find(
+        team => team.id === this.newTeamParentId);
+
     this.creatingTeam = true;
     this.clearMessages();
 
     this.teamsService
-      .createTeam(name)
+      .createTeam(
+        name,
+        this.newTeamParentId || undefined)
       .subscribe({
         next: team =>
         {
           this.newTeamName = '';
           this.creatingTeam = false;
-          this.successMessage =
-            `${team.name} created. You are the owner.`;
+          this.successMessage = parent
+            ? `${team.name} created under ${parent.name}. You are the owner of the new team.`
+            : `${team.name} created as a root team. You are the owner.`;
           this.refresh();
         },
         error: error =>
@@ -229,6 +258,75 @@ export class AdministrationPage
           this.errorMessage =
             error.error?.message ??
             `Unable to create team (HTTP ${error.status}).`;
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  canDeleteTeam(
+    team: TeamItem):
+    boolean
+  {
+    return canDeleteTeamItem(team);
+  }
+
+  deleteTeam(
+    team: TeamItem):
+    void
+  {
+    if (!this.canDeleteTeam(team))
+    {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Delete ${team.name}? Team-owned documents and their search data will be permanently removed. Personal documents only shared with this team will be preserved.`);
+
+    if (!confirmed)
+    {
+      return;
+    }
+
+    this.deletingTeamId = team.id;
+    this.clearMessages();
+
+    this.teamsService
+      .deleteTeam(team.id)
+      .subscribe({
+        next: () =>
+        {
+          this.deletingTeamId = '';
+          this.successMessage =
+            `${team.name} deleted together with its team-owned documents.`;
+          this.refresh();
+        },
+        error: error =>
+        {
+          this.deletingTeamId = '';
+
+          if (error.status === 409)
+          {
+            this.errorMessage =
+              error.error?.message ??
+              'Delete child teams before deleting this team.';
+          }
+          else if (error.status === 403)
+          {
+            this.errorMessage =
+              'Only a direct team owner can delete this team.';
+          }
+          else if (error.status === 404)
+          {
+            this.errorMessage =
+              'Team not found or no longer visible to your account.';
+          }
+          else
+          {
+            this.errorMessage =
+              `Unable to delete team (HTTP ${error.status}).`;
+          }
+
           this.cdr.detectChanges();
         }
       });
@@ -317,6 +415,14 @@ export class AdministrationPage
     {
       this.selectedMemberTeamId =
         this.manageableTeams[0]?.id ?? '';
+    }
+
+    if (
+      this.newTeamParentId &&
+      !manageableTeamIds.has(
+        this.newTeamParentId))
+    {
+      this.newTeamParentId = '';
     }
 
     if (

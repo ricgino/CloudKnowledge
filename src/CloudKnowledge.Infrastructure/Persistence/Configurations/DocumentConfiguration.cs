@@ -1,7 +1,8 @@
 using CloudKnowledge.Domain.Documents;
+using CloudKnowledge.Domain.Teams;
+using CloudKnowledge.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using CloudKnowledge.Domain.Users;
 
 namespace CloudKnowledge.Infrastructure.Persistence.Configurations;
 
@@ -30,6 +31,18 @@ public sealed class DocumentConfiguration
         builder.HasIndex(document => document.OwnerUserId)
             .HasDatabaseName("IX_documents_owner_user_id");
 
+        builder.Property(document => document.OwnerTeamId)
+            .HasColumnName("owner_team_id")
+            .IsRequired(false);
+
+        builder.HasOne<Team>()
+            .WithMany()
+            .HasForeignKey(document => document.OwnerTeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(document => document.OwnerTeamId)
+            .HasDatabaseName("IX_documents_owner_team_id");
+
         builder.Property(document => document.FileName)
             .HasColumnName("file_name")
             .HasMaxLength(255)
@@ -44,13 +57,13 @@ public sealed class DocumentConfiguration
             .HasColumnName("status")
             .HasConversion<int>()
             .IsRequired();
-            
+
         builder.Property(document => document.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
             .HasDefaultValueSql("CURRENT_TIMESTAMP")
             .IsRequired();
-        
+
         builder.HasIndex(document => new
             {
                 document.CreatedAtUtc,

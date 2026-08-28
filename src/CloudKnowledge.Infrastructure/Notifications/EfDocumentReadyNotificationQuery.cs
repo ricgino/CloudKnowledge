@@ -20,16 +20,14 @@ public sealed class EfDocumentReadyNotificationQuery
         CancellationToken cancellationToken)
     {
         var document =
-            await (
-                from item in _dbContext.Documents.AsNoTracking()
-                join owner in _dbContext.UserAccounts.AsNoTracking()
-                    on item.OwnerUserId equals owner.Id
-                where item.Id == documentId
-                select new
+            await _dbContext.Documents
+                .AsNoTracking()
+                .Where(item => item.Id == documentId)
+                .Select(item => new
                 {
                     item.FileName,
-                    OwnerUserId = owner.Id,
-                    owner.DisplayName
+                    item.OwnerUserId,
+                    item.OwnerTeamId
                 })
                 .SingleOrDefaultAsync(
                     cancellationToken);
@@ -39,22 +37,88 @@ public sealed class EfDocumentReadyNotificationQuery
             return null;
         }
 
-        var recipients =
-            await (
+        if (document.OwnerUserId.HasValue)
+        {
+            var ownerUserId =
+                document.OwnerUserId.Value;
+
+            var ownerDisplayName =
+                await _dbContext.UserAccounts
+                    .AsNoTracking()
+                    .Where(owner => owner.Id == ownerUserId)
+                    .Select(owner => owner.DisplayName)
+                    .SingleOrDefaultAsync(
+                        cancellationToken);
+
+            if (ownerDisplayName is null)
+            {
+                return null;
+            }
+
+            var recipients =
+                await (
+                    from access in _dbContext.DocumentTeamAccess.AsNoTracking()
+                    join member in _dbContext.TeamMembers.AsNoTracking()
+                        on access.TeamId equals member.TeamId
+                    where access.DocumentId == documentId &&
+                          member.UserId != ownerUserId
+                    select member.UserId)
+                    .Distinct()
+                    .ToListAsync(
+                        cancellationToken);
+
+            return new DocumentReadyNotificationAudience(
+                document.FileName,
+                ownerUserId,
+                ownerDisplayName,
+                recipients);
+        }
+
+        if (document.OwnerTeamId.HasValue)
+        {
+            var ownerTeamId =
+                document.OwnerTeamId.Value;
+
+            var ownerTeamName =
+                await _dbContext.Teams
+                    .AsNoTracking()
+                    .Where(team => team.Id == ownerTeamId)
+                    .Select(team => team.Name)
+                    .SingleOrDefaultAsync(
+                        cancellationToken);
+
+            if (ownerTeamName is null)
+            {
+                return null;
+            }
+
+            var ownerTeamRecipients =
+                _dbContext.TeamMembers
+                    .AsNoTracking()
+                    .Where(member => member.TeamId == ownerTeamId)
+                    .Select(member => member.UserId);
+
+            var explicitlySharedRecipients =
                 from access in _dbContext.DocumentTeamAccess.AsNoTracking()
                 join member in _dbContext.TeamMembers.AsNoTracking()
                     on access.TeamId equals member.TeamId
-                where access.DocumentId == documentId &&
-                      member.UserId != document.OwnerUserId
-                select member.UserId)
-                .Distinct()
-                .ToListAsync(
-                    cancellationToken);
+                where access.DocumentId == documentId
+                select member.UserId;
 
-        return new DocumentReadyNotificationAudience(
-            document.FileName,
-            document.OwnerUserId,
-            document.DisplayName,
-            recipients);
+            var recipients =
+                await ownerTeamRecipients
+                    .Concat(explicitlySharedRecipients)
+                    .Distinct()
+                    .ToListAsync(
+                        cancellationToken);
+
+            return new DocumentReadyNotificationAudience(
+                document.FileName,
+                Guid.Empty,
+                ownerTeamName,
+                recipients);
+        }
+
+        return null;
     }
 }

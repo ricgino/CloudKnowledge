@@ -9,4 +9,12 @@ public sealed class GetDocumentsRequest
 
     [Range(1, 100)]
     public int PageSize { get; init; } = 20;
+
+    public string Scope { get; init; } = "all";
+
+    public Guid? TeamId { get; init; }
+
+    public bool IncludeDescendants { get; init; }
+
+    public string? Query { get; init; }
 }

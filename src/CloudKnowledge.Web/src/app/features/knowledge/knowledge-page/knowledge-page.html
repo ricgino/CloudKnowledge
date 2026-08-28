@@ -15,6 +15,43 @@
     </div>
   }
 
+  <section class="scope-panel" aria-label="Knowledge scope">
+    <div class="scope-copy">
+      <p class="eyebrow">Retrieval scope</p>
+      <h2>Choose where Search and Ask can retrieve from.</h2>
+      <p>
+        Team scope is exact by default. Including subteams still searches only descendant teams your account is directly authorized to access.
+      </p>
+    </div>
+
+    <div class="scope-controls">
+      <label class="scope-field">
+        <span>Knowledge source</span>
+        <select
+          [value]="knowledgeScopeState.teamId ?? ''"
+          [disabled]="scopeControlsDisabled"
+          (change)="onKnowledgeScopeChanged($event)">
+          <option value="">All accessible knowledge</option>
+          @for (team of teamOptions; track team.id) {
+            <option [value]="team.id">{{ team.label }}</option>
+          }
+        </select>
+      </label>
+
+      @if (knowledgeScopeState.teamId) {
+        <label class="descendants-toggle">
+          <input
+            type="checkbox"
+            [checked]="knowledgeScopeState.includeDescendants"
+            [disabled]="scopeControlsDisabled"
+            (change)="onIncludeDescendantsChanged($event)"
+          />
+          <span>Include subteams</span>
+        </label>
+      }
+    </div>
+  </section>
+
   <div class="knowledge-grid">
     <section class="panel ask-panel">
       <div class="panel-heading">
@@ -26,7 +63,7 @@
       </div>
 
       <p class="panel-description">
-        Answers are generated only from documents your account is allowed to retrieve.
+        Answers are generated only from documents your account is allowed to retrieve within the selected scope.
       </p>
 
       <textarea
@@ -75,7 +112,7 @@
                         class="document-link-button"
                         (click)="downloadDocument(source.documentId)"
                         [disabled]="downloadingDocumentId === source.documentId">
-                        {{ downloadingDocumentId === source.documentId ? 'Downloading...' : 'Download PDF' }}
+                        {{ downloadingDocumentId === source.documentId ? 'Downloading...' : 'Download document' }}
                       </button>
                     </div>
                   </div>
@@ -153,7 +190,7 @@
                     class="document-link-button"
                     (click)="downloadDocument(result.documentId)"
                     [disabled]="downloadingDocumentId === result.documentId">
-                    {{ downloadingDocumentId === result.documentId ? 'Downloading...' : 'Download PDF' }}
+                    {{ downloadingDocumentId === result.documentId ? 'Downloading...' : 'Download document' }}
                   </button>
                 </div>
               </div>

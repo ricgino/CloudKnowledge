@@ -1,4 +1,6 @@
 using CloudKnowledge.Application.Documents.SearchDocuments;
+using CloudKnowledge.Application.Teams;
+using CloudKnowledge.Domain.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Pgvector;
@@ -12,11 +14,33 @@ public sealed class EfDocumentSemanticSearchRepository
     private readonly CloudKnowledgeDbContext
         _dbContext;
 
+    private readonly ITeamScopeResolver
+        _teamScopeResolver;
+
     public EfDocumentSemanticSearchRepository(
-        CloudKnowledgeDbContext dbContext)
+        CloudKnowledgeDbContext dbContext,
+        ITeamScopeResolver teamScopeResolver)
     {
         _dbContext =
             dbContext;
+
+        _teamScopeResolver =
+            teamScopeResolver;
+    }
+
+    public Task<IReadOnlyList<SemanticSearchResult>>
+        SearchAccessibleAsync(
+            Guid userId,
+            float[] queryEmbedding,
+            int take,
+            CancellationToken cancellationToken)
+    {
+        return SearchAccessibleAsync(
+            userId,
+            queryEmbedding,
+            take,
+            DocumentRetrievalScope.All,
+            cancellationToken);
     }
 
     public async Task<IReadOnlyList<SemanticSearchResult>>
@@ -24,6 +48,7 @@ public sealed class EfDocumentSemanticSearchRepository
             Guid userId,
             float[] queryEmbedding,
             int take,
+            DocumentRetrievalScope scope,
             CancellationToken cancellationToken)
     {
         if (userId == Guid.Empty)
@@ -33,16 +58,63 @@ public sealed class EfDocumentSemanticSearchRepository
                 nameof(userId));
         }
 
+        ArgumentNullException.ThrowIfNull(
+            scope);
+
         var queryVector =
             new Vector(
                 queryEmbedding);
 
-        var accessibleDocuments =
+        IQueryable<Document> accessibleDocuments =
             _dbContext.Documents
                 .AsNoTracking()
                 .WhereAccessibleTo(
                     _dbContext,
                     userId);
+
+        switch (scope.Kind)
+        {
+            case DocumentRetrievalScopeKind.All:
+                break;
+
+            case DocumentRetrievalScopeKind.Team:
+                var allowedTeamIds =
+                    await _teamScopeResolver.ResolveAllowedTeamIdsAsync(
+                        userId,
+                        scope.TeamId!.Value,
+                        scope.IncludeDescendants,
+                        cancellationToken);
+
+                if (allowedTeamIds.Length == 0)
+                {
+                    accessibleDocuments =
+                        accessibleDocuments.Where(
+                            _ => false);
+                    break;
+                }
+
+                accessibleDocuments =
+                    accessibleDocuments.Where(
+                        document =>
+                            (document.OwnerTeamId.HasValue
+                             && allowedTeamIds.Contains(
+                                 document.OwnerTeamId.Value))
+
+                            ||
+
+                            _dbContext.DocumentTeamAccess.Any(
+                                access =>
+                                    access.DocumentId == document.Id
+                                    && allowedTeamIds.Contains(
+                                        access.TeamId)));
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(scope),
+                    scope.Kind,
+                    "Unknown document retrieval scope.");
+        }
 
         var rows =
             await (

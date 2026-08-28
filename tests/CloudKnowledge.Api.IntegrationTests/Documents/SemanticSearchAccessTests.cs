@@ -4,6 +4,7 @@ using CloudKnowledge.Domain.Users;
 using CloudKnowledge.Infrastructure.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
 using CloudKnowledge.Infrastructure.Persistence.Models;
+using CloudKnowledge.Infrastructure.Teams;
 using Microsoft.EntityFrameworkCore;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
@@ -54,21 +55,31 @@ public sealed class SemanticSearchAccessTests
                 "bob@example.com",
                 "Bob");
 
-        var team =
+        var engineering =
             Team.Create(
                 "Engineering");
 
-        var aliceMembership =
+        var secrets =
+            Team.Create(
+                "Secrets");
+
+        var aliceEngineeringMembership =
             TeamMember.Create(
-                team.Id,
+                engineering.Id,
                 alice.Id,
                 TeamRole.Owner);
 
-        var bobMembership =
+        var bobEngineeringMembership =
             TeamMember.Create(
-                team.Id,
+                engineering.Id,
                 bob.Id,
                 TeamRole.Member);
+
+        var aliceSecretsMembership =
+            TeamMember.Create(
+                secrets.Id,
+                alice.Id,
+                TeamRole.Owner);
 
         var alicePrivateDocument =
             Document.Create(
@@ -94,6 +105,22 @@ public sealed class SemanticSearchAccessTests
         bobPrivateDocument.AssignOwner(
             bob.Id);
 
+        var engineeringOwnedDocument =
+            Document.Create(
+                "engineering-owned.pdf",
+                "application/pdf");
+
+        engineeringOwnedDocument.AssignTeamOwner(
+            engineering.Id);
+
+        var secretsOwnedDocument =
+            Document.Create(
+                "secrets-owned.pdf",
+                "application/pdf");
+
+        secretsOwnedDocument.AssignTeamOwner(
+            secrets.Id);
+
         var alicePrivateChunk =
             DocumentChunk.Create(
                 alicePrivateDocument.Id,
@@ -112,29 +139,45 @@ public sealed class SemanticSearchAccessTests
                 0,
                 "BOB PRIVATE INFORMATION");
 
+        var engineeringOwnedChunk =
+            DocumentChunk.Create(
+                engineeringOwnedDocument.Id,
+                0,
+                "ENGINEERING OWNED INFORMATION");
+
+        var secretsOwnedChunk =
+            DocumentChunk.Create(
+                secretsOwnedDocument.Id,
+                0,
+                "SECRETS TEAM INFORMATION");
+
         var sharedAccess =
             DocumentTeamAccess.Create(
                 aliceSharedDocument.Id,
-                team.Id);
+                engineering.Id);
 
         dbContext.AddRange(
             alice,
             bob,
-            team,
-            aliceMembership,
-            bobMembership,
+            engineering,
+            secrets,
+            aliceEngineeringMembership,
+            bobEngineeringMembership,
+            aliceSecretsMembership,
             alicePrivateDocument,
             aliceSharedDocument,
             bobPrivateDocument,
+            engineeringOwnedDocument,
+            secretsOwnedDocument,
             alicePrivateChunk,
             aliceSharedChunk,
             bobPrivateChunk,
+            engineeringOwnedChunk,
+            secretsOwnedChunk,
             sharedAccess);
 
         await dbContext.SaveChangesAsync();
 
-        // Query vector is deliberately almost identical
-        // to Alice's PRIVATE document.
         var queryEmbedding =
             CreateVector(
                 firstComponent: 1.0f);
@@ -155,13 +198,27 @@ public sealed class SemanticSearchAccessTests
                 bobPrivateChunk,
                 CreateVector(
                     firstComponent: 0.7f,
-                    secondComponent: 0.3f)));
+                    secondComponent: 0.3f)),
+
+            CreateEmbedding(
+                engineeringOwnedChunk,
+                CreateVector(
+                    firstComponent: 0.6f,
+                    secondComponent: 0.4f)),
+
+            CreateEmbedding(
+                secretsOwnedChunk,
+                CreateVector(
+                    firstComponent: 0.95f,
+                    secondComponent: 0.05f)));
 
         await dbContext.SaveChangesAsync();
 
         var repository =
             new EfDocumentSemanticSearchRepository(
-                dbContext);
+                dbContext,
+                new EfTeamScopeResolver(
+                    dbContext));
 
         var results =
             await repository.SearchAccessibleAsync(
@@ -188,12 +245,25 @@ public sealed class SemanticSearchAccessTests
                 result.DocumentId ==
                 bobPrivateDocument.Id);
 
+        Assert.Contains(
+            results,
+            result =>
+                result.DocumentId ==
+                engineeringOwnedDocument.Id);
+
+        Assert.DoesNotContain(
+            results,
+            result =>
+                result.DocumentId ==
+                secretsOwnedDocument.Id);
+
         Assert.All(
             results,
             result =>
-                Assert.NotEqual(
-                    "TOP SECRET ALICE",
-                    result.Content));
+                Assert.DoesNotContain(
+                    "SECRET",
+                    result.Content,
+                    StringComparison.OrdinalIgnoreCase));
     }
 
     private static float[] CreateVector(

@@ -127,8 +127,7 @@ public sealed class ProcessDocumentUseCaseTests
                 new FakeDocumentChunkRepository(),
                 new TextChunker(),
                 new FakeEmbeddingGenerator(),
-            new FakeDocumentChunkEmbeddingRepository()
-            );
+                new FakeDocumentChunkEmbeddingRepository());
 
         await Assert.ThrowsAsync<PermanentDocumentProcessingException>(
             () => useCase.ExecuteAsync(
@@ -199,8 +198,7 @@ public sealed class ProcessDocumentUseCaseTests
             new FakeDocumentChunkRepository(),
             new TextChunker(),
             new FakeEmbeddingGenerator(),
-            new FakeDocumentChunkEmbeddingRepository()
-            );
+            new FakeDocumentChunkEmbeddingRepository());
     }
 
     private sealed class FakeDocumentStorage
@@ -239,12 +237,15 @@ public sealed class ProcessDocumentUseCaseTests
         }
 
         public string Extract(
+            string fileName,
+            string contentType,
             Stream content,
             CancellationToken cancellationToken)
         {
             return _text;
         }
     }
+
     private sealed class FakeDocumentRepository
         : IDocumentRepository
     {
@@ -301,77 +302,76 @@ public sealed class ProcessDocumentUseCaseTests
         {
             return Task.FromResult(0);
         }
-
     }
 
     private sealed class FakeDocumentChunkRepository
-            : IDocumentChunkRepository
+        : IDocumentChunkRepository
+    {
+        public IReadOnlyCollection<DocumentChunk>? SavedChunks
         {
-            public IReadOnlyCollection<DocumentChunk>? SavedChunks
-            {
-                get;
-                private set;
-            }
-
-            public Task ReplaceForDocumentAsync(
-                Guid documentId,
-                IReadOnlyCollection<DocumentChunk> chunks,
-                CancellationToken cancellationToken)
-            {
-                SavedChunks = chunks;
-
-                return Task.CompletedTask;
-            }
+            get;
+            private set;
         }
 
-        private sealed class FakeEmbeddingGenerator
-            : IEmbeddingGenerator
+        public Task ReplaceForDocumentAsync(
+            Guid documentId,
+            IReadOnlyCollection<DocumentChunk> chunks,
+            CancellationToken cancellationToken)
         {
-            public int Dimensions => 1536;
+            SavedChunks = chunks;
 
-            public Task<IReadOnlyList<float[]>> GenerateAsync(
-                IReadOnlyList<string> inputs,
-                CancellationToken cancellationToken)
-            {
-                var result =
-                    inputs
-                        .Select(
-                            _ =>
-                            {
-                                var vector =
-                                    new float[Dimensions];
+            return Task.CompletedTask;
+        }
+    }
 
-                                vector[0] = 1;
+    private sealed class FakeEmbeddingGenerator
+        : IEmbeddingGenerator
+    {
+        public int Dimensions => 1536;
 
-                                return vector;
-                            })
-                        .ToArray();
+        public Task<IReadOnlyList<float[]>> GenerateAsync(
+            IReadOnlyList<string> inputs,
+            CancellationToken cancellationToken)
+        {
+            var result =
+                inputs
+                    .Select(
+                        _ =>
+                        {
+                            var vector =
+                                new float[Dimensions];
 
-                return Task.FromResult<
-                    IReadOnlyList<float[]>>(
-                        result);
-            }
+                            vector[0] = 1;
+
+                            return vector;
+                        })
+                    .ToArray();
+
+            return Task.FromResult<
+                IReadOnlyList<float[]>>(
+                    result);
+        }
+    }
+
+    private sealed class FakeDocumentChunkEmbeddingRepository
+        : IDocumentChunkEmbeddingRepository
+    {
+        public IReadOnlyCollection<DocumentChunkEmbedding>?
+            SavedEmbeddings
+        {
+            get;
+            private set;
         }
 
-        private sealed class FakeDocumentChunkEmbeddingRepository
-            : IDocumentChunkEmbeddingRepository
+        public Task ReplaceForDocumentAsync(
+            Guid documentId,
+            IReadOnlyCollection<DocumentChunkEmbedding> embeddings,
+            CancellationToken cancellationToken)
         {
-            public IReadOnlyCollection<DocumentChunkEmbedding>?
-                SavedEmbeddings
-            {
-                get;
-                private set;
-            }
+            SavedEmbeddings =
+                embeddings;
 
-            public Task ReplaceForDocumentAsync(
-                Guid documentId,
-                IReadOnlyCollection<DocumentChunkEmbedding> embeddings,
-                CancellationToken cancellationToken)
-            {
-                SavedEmbeddings =
-                    embeddings;
-
-                return Task.CompletedTask;
-            }
+            return Task.CompletedTask;
         }
+    }
 }

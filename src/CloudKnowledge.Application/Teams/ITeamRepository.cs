@@ -5,6 +5,10 @@ namespace CloudKnowledge.Application.Teams;
 
 public interface ITeamRepository
 {
+    Task<Team?> GetByIdAsync(
+        Guid teamId,
+        CancellationToken cancellationToken);
+
     Task AddAsync(
         Team team,
         TeamMember ownerMembership,

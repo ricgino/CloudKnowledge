@@ -5,4 +5,6 @@ public sealed record DocumentResponse(
     string FileName,
     string ContentType,
     string Status,
-    bool IsOwner = false);
+    bool IsOwner = false,
+    bool CanDelete = false,
+    IReadOnlyList<DocumentAccessTeamResponse>? SharedTeams = null);

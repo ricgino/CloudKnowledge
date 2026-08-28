@@ -18,7 +18,22 @@ export interface TeamItem
 {
   id: string;
   name: string;
-  role: string;
+  parentTeamId: string | null;
+  isMember: boolean;
+  role: string | null;
+  canManage: boolean;
+}
+
+export interface TeamTreeRow extends TeamItem
+{
+  depth: number;
+  hasChildren: boolean;
+}
+
+export interface KnowledgeTeamOption
+{
+  id: string;
+  label: string;
 }
 
 export interface TeamMemberItem
@@ -26,6 +41,143 @@ export interface TeamMemberItem
   userId: string;
   email: string;
   role: string;
+}
+
+export function canDeleteTeam(
+  team: TeamItem):
+  boolean
+{
+  return team.isMember &&
+    team.role === 'Owner';
+}
+
+export function buildTeamTreeRows(
+  teams: readonly TeamItem[]):
+  TeamTreeRow[]
+{
+  const byParent =
+    new Map<string | null, TeamItem[]>();
+
+  const knownIds =
+    new Set(
+      teams.map(team => team.id));
+
+  for (const team of teams)
+  {
+    const parentKey =
+      team.parentTeamId &&
+      knownIds.has(team.parentTeamId)
+        ? team.parentTeamId
+        : null;
+
+    const siblings =
+      byParent.get(parentKey) ?? [];
+
+    siblings.push(team);
+    byParent.set(parentKey, siblings);
+  }
+
+  for (const siblings of byParent.values())
+  {
+    siblings.sort(
+      (left, right) =>
+        left.name.localeCompare(
+          right.name,
+          undefined,
+          { sensitivity: 'base' }));
+  }
+
+  const rows: TeamTreeRow[] = [];
+  const visited = new Set<string>();
+
+  const appendChildren =
+    (parentId: string | null, depth: number): void =>
+    {
+      for (const team of byParent.get(parentId) ?? [])
+      {
+        if (visited.has(team.id))
+        {
+          continue;
+        }
+
+        visited.add(team.id);
+
+        rows.push({
+          ...team,
+          depth,
+          hasChildren:
+            (byParent.get(team.id)?.length ?? 0) > 0
+        });
+
+        appendChildren(
+          team.id,
+          depth + 1);
+      }
+    };
+
+  appendChildren(null, 0);
+
+  // Defensive fallback for malformed/cyclic API data: keep every node visible
+  // without recursing forever.
+  for (const team of teams)
+  {
+    if (!visited.has(team.id))
+    {
+      rows.push({
+        ...team,
+        depth: 0,
+        hasChildren:
+          (byParent.get(team.id)?.length ?? 0) > 0
+      });
+    }
+  }
+
+  return rows;
+}
+
+export function buildKnowledgeTeamOptions(
+  teams: readonly TeamItem[]):
+  KnowledgeTeamOption[]
+{
+  const teamsById =
+    new Map(
+      teams.map(team => [
+        team.id,
+        team
+      ]));
+
+  const buildPath =
+    (team: TeamItem): string =>
+    {
+      const names: string[] = [];
+      const visited = new Set<string>();
+
+      let current: TeamItem | undefined =
+        team;
+
+      while (
+        current &&
+        !visited.has(current.id))
+      {
+        visited.add(current.id);
+        names.push(current.name);
+
+        current =
+          current.parentTeamId
+            ? teamsById.get(current.parentTeamId)
+            : undefined;
+      }
+
+      names.reverse();
+
+      return names.join(' / ');
+    };
+
+  return buildTeamTreeRows(teams)
+    .map(team => ({
+      id: team.id,
+      label: buildPath(team)
+    }));
 }
 
 @Injectable({
@@ -46,14 +198,25 @@ export class Teams
   }
 
   createTeam(
-    name: string):
+    name: string,
+    parentTeamId?: string):
     Observable<TeamItem>
   {
     return this.http.post<TeamItem>(
       `${apiBaseUrl}/api/teams`,
       {
-        name
+        name,
+        parentTeamId:
+          parentTeamId || null
       });
+  }
+
+  deleteTeam(
+    teamId: string):
+    Observable<void>
+  {
+    return this.http.delete<void>(
+      `${apiBaseUrl}/api/teams/${teamId}`);
   }
 
   addMember(

@@ -1,24 +1,84 @@
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using CloudKnowledge.Application.Documents.AskDocuments;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CloudKnowledge.Infrastructure.Documents;
 
 public sealed class OllamaAnswerGenerator
     : IAnswerGenerator
 {
+    private const int MaximumAttempts = 3;
+
     private readonly HttpClient _httpClient;
     private readonly string _model;
+    private readonly double _temperature;
+    private readonly int _maxTokens;
+    private readonly ILogger<OllamaAnswerGenerator> _logger;
 
     public OllamaAnswerGenerator(
         HttpClient httpClient,
         string model)
+        : this(
+            httpClient,
+            model,
+            temperature: 0,
+            maxTokens: 384,
+            NullLogger<OllamaAnswerGenerator>.Instance)
     {
+    }
+
+    public OllamaAnswerGenerator(
+        HttpClient httpClient,
+        string model,
+        double temperature,
+        int maxTokens,
+        ILogger<OllamaAnswerGenerator> logger)
+    {
+        ArgumentNullException.ThrowIfNull(
+            httpClient);
+
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            throw new ArgumentException(
+                "Model cannot be empty.",
+                nameof(model));
+        }
+
+        if (temperature < 0 ||
+            temperature > 2)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(temperature),
+                "Temperature must be between 0 and 2.");
+        }
+
+        if (maxTokens < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxTokens),
+                "Maximum token count must be greater than zero.");
+        }
+
         _httpClient =
             httpClient;
 
         _model =
-            model;
+            model.Trim();
+
+        _temperature =
+            temperature;
+
+        _maxTokens =
+            maxTokens;
+
+        _logger =
+            logger ??
+            throw new ArgumentNullException(
+                nameof(logger));
     }
 
     public async Task<string> GenerateAsync(
@@ -48,12 +108,16 @@ public sealed class OllamaAnswerGenerator
             - Quando affermi qualcosa ricavato dal contesto,
             cita la fonte usando il formato [S1], [S2], ecc.
             - Usa solo identificatori di fonti realmente presenti.
-            - Fornisci esclusivamente la risposta finale.
+            - Fornisci esclusivamente la risposta finale nel campo "answer".
+            - Il campo "answer" deve contenere una risposta, mai una copia
+            o una parafrasi della domanda.
             - Non mostrare ragionamenti, analisi o passaggi intermedi.
-            - Sii conciso ma completo.
+            - Non descrivere come analizzi le fonti.
+            - Non ripetere la domanda e non dire cosa sta chiedendo l'utente.
+            - Sii conciso ma completo e resta entro circa 160 parole.
             """;
 
-        var userPrompt =
+        var baseUserPrompt =
             $"""
             DOMANDA:
             {question}
@@ -65,6 +129,68 @@ public sealed class OllamaAnswerGenerator
             le fonti sopra riportate.
             """;
 
+        Exception? lastRecoverableException =
+            null;
+
+        for (var attempt = 1;
+             attempt <= MaximumAttempts;
+             attempt++)
+        {
+            var userPrompt =
+                attempt == 1
+                    ? baseUserPrompt
+                    : BuildCorrectivePrompt(
+                        baseUserPrompt);
+
+            string answer;
+
+            try
+            {
+                answer =
+                    await GenerateAttemptAsync(
+                        systemPrompt,
+                        userPrompt,
+                        cancellationToken);
+            }
+            catch (RetryableAnswerGenerationException exception)
+            {
+                lastRecoverableException =
+                    exception;
+
+                _logger.LogWarning(
+                    exception,
+                    "Ollama produced an unusable structured response on attempt {Attempt} of {MaximumAttempts}; retrying={Retrying}.",
+                    attempt,
+                    MaximumAttempts,
+                    attempt < MaximumAttempts);
+
+                continue;
+            }
+
+            if (IsAcceptableGroundedAnswer(
+                    question,
+                    answer))
+            {
+                return answer;
+            }
+
+            _logger.LogWarning(
+                "Ollama produced a degenerate grounded answer on attempt {Attempt} of {MaximumAttempts}; retrying={Retrying}.",
+                attempt,
+                MaximumAttempts,
+                attempt < MaximumAttempts);
+        }
+
+        throw new InvalidOperationException(
+            "Ollama did not produce a valid grounded answer after retrying.",
+            lastRecoverableException);
+    }
+
+    private async Task<string> GenerateAttemptAsync(
+        string systemPrompt,
+        string userPrompt,
+        CancellationToken cancellationToken)
+    {
         var request =
             new OllamaChatRequest(
                 _model,
@@ -79,7 +205,11 @@ public sealed class OllamaAnswerGenerator
                         userPrompt)
                 },
                 Stream: false,
-                Think: false);
+                Think: false,
+                CreateAnswerFormat(),
+                new OllamaChatOptions(
+                    _temperature,
+                    _maxTokens));
 
         using var response =
             await _httpClient.PostAsJsonAsync(
@@ -94,16 +224,139 @@ public sealed class OllamaAnswerGenerator
                 .ReadFromJsonAsync<OllamaChatResponse>(
                     cancellationToken);
 
-        var answer =
+        var content =
             result?.Message?.Content;
 
-        if (string.IsNullOrWhiteSpace(answer))
+        if (string.IsNullOrWhiteSpace(content))
         {
-            throw new InvalidOperationException(
+            throw new RetryableAnswerGenerationException(
                 "Ollama returned an empty answer.");
         }
 
+        LogTimings(
+            result!);
+
+        OllamaStructuredAnswer? structuredAnswer;
+
+        try
+        {
+            structuredAnswer =
+                JsonSerializer.Deserialize<OllamaStructuredAnswer>(
+                    content);
+        }
+        catch (JsonException exception)
+        {
+            throw new RetryableAnswerGenerationException(
+                "Ollama returned an invalid structured answer.",
+                exception);
+        }
+
+        var answer =
+            structuredAnswer?.Answer;
+
+        if (string.IsNullOrWhiteSpace(answer))
+        {
+            throw new RetryableAnswerGenerationException(
+                "Ollama returned a structured response without an answer.");
+        }
+
         return RemoveThinkingContent(answer);
+    }
+
+    private static string BuildCorrectivePrompt(
+        string baseUserPrompt)
+    {
+        return
+            $"""
+            {baseUserPrompt}
+
+            ATTENZIONE: il tentativo precedente non era una risposta valida.
+            Non ripetere la domanda.
+            Estrai dalle fonti fatti concreti che rispondono alla domanda.
+            Se le fonti contengono informazioni pertinenti, riportale esplicitamente.
+            Quando possibile includi citazioni come [S1], [S2], ecc.
+            Mantieni la risposta concisa.
+            """;
+    }
+
+    private static bool IsAcceptableGroundedAnswer(
+        string question,
+        string answer)
+    {
+        return NormalizeComparableText(answer) !=
+            NormalizeComparableText(question);
+    }
+
+    private static string NormalizeComparableText(
+        string value)
+    {
+        var builder =
+            new StringBuilder();
+
+        var previousWasSeparator =
+            false;
+
+        foreach (var character in value.Trim())
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                builder.Append(
+                    char.ToLowerInvariant(character));
+
+                previousWasSeparator =
+                    false;
+
+                continue;
+            }
+
+            if (!previousWasSeparator &&
+                builder.Length > 0)
+            {
+                builder.Append(' ');
+                previousWasSeparator = true;
+            }
+        }
+
+        return builder
+            .ToString()
+            .Trim();
+    }
+
+    private static OllamaResponseFormat CreateAnswerFormat()
+    {
+        return new OllamaResponseFormat(
+            "object",
+            new Dictionary<string, OllamaSchemaProperty>
+            {
+                ["answer"] =
+                    new OllamaSchemaProperty(
+                        "string")
+            },
+            ["answer"],
+            AdditionalProperties: false);
+    }
+
+    private void LogTimings(
+        OllamaChatResponse result)
+    {
+        _logger.LogInformation(
+            "Ollama answer timing model={Model} totalMs={TotalMs} loadMs={LoadMs} promptTokens={PromptTokens} promptMs={PromptMs} outputTokens={OutputTokens} evalMs={EvalMs} doneReason={DoneReason}",
+            _model,
+            ToMilliseconds(result.TotalDuration),
+            ToMilliseconds(result.LoadDuration),
+            result.PromptEvalCount,
+            ToMilliseconds(result.PromptEvalDuration),
+            result.EvalCount,
+            ToMilliseconds(result.EvalDuration),
+            result.DoneReason);
+    }
+
+    private static double? ToMilliseconds(
+        long? nanoseconds)
+    {
+        return nanoseconds.HasValue
+            ? nanoseconds.Value / 1_000_000d
+            : null;
     }
 
     private static string RemoveThinkingContent(
@@ -150,16 +403,70 @@ public sealed class OllamaAnswerGenerator
         return builder.ToString();
     }
 
+    private sealed class RetryableAnswerGenerationException
+        : Exception
+    {
+        public RetryableAnswerGenerationException(
+            string message)
+            : base(message)
+        {
+        }
+
+        public RetryableAnswerGenerationException(
+            string message,
+            Exception innerException)
+            : base(
+                message,
+                innerException)
+        {
+        }
+    }
+
     private sealed record OllamaChatRequest(
         string Model,
         OllamaChatMessage[] Messages,
         bool Stream,
-        bool Think);
+        bool Think,
+        OllamaResponseFormat Format,
+        OllamaChatOptions Options);
+
+    private sealed record OllamaResponseFormat(
+        string Type,
+        Dictionary<string, OllamaSchemaProperty> Properties,
+        string[] Required,
+        [property: JsonPropertyName("additionalProperties")]
+        bool AdditionalProperties);
+
+    private sealed record OllamaSchemaProperty(
+        string Type);
+
+    private sealed record OllamaChatOptions(
+        double Temperature,
+        [property: JsonPropertyName("num_predict")]
+        int NumPredict);
 
     private sealed record OllamaChatMessage(
         string Role,
         string Content);
 
+    private sealed record OllamaStructuredAnswer(
+        [property: JsonPropertyName("answer")]
+        string? Answer);
+
     private sealed record OllamaChatResponse(
-        OllamaChatMessage? Message);
+        OllamaChatMessage? Message,
+        [property: JsonPropertyName("total_duration")]
+        long? TotalDuration,
+        [property: JsonPropertyName("load_duration")]
+        long? LoadDuration,
+        [property: JsonPropertyName("prompt_eval_count")]
+        int? PromptEvalCount,
+        [property: JsonPropertyName("prompt_eval_duration")]
+        long? PromptEvalDuration,
+        [property: JsonPropertyName("eval_count")]
+        int? EvalCount,
+        [property: JsonPropertyName("eval_duration")]
+        long? EvalDuration,
+        [property: JsonPropertyName("done_reason")]
+        string? DoneReason);
 }

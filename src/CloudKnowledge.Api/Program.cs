@@ -17,6 +17,7 @@ using CloudKnowledge.Application.Notifications.DocumentReady;
 using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Application.Teams.AddTeamMember;
 using CloudKnowledge.Application.Teams.CreateTeam;
+using CloudKnowledge.Application.Teams.DeleteTeam;
 using CloudKnowledge.Application.Teams.GetTeams;
 using CloudKnowledge.Application.Users;
 using CloudKnowledge.Infrastructure.Documents;
@@ -254,13 +255,29 @@ builder.Services.AddSingleton<IAnswerGenerator>(
             ?? throw new InvalidOperationException(
                 "AI answer model was not found.");
 
+        var temperature =
+            configuration.GetValue<double>(
+                "Ai:AnswerTemperature");
+
+        var maxTokens =
+            configuration.GetValue<int>(
+                "Ai:AnswerMaxTokens");
+
         return new OllamaAnswerGenerator(
             serviceProvider
                 .GetRequiredService<HttpClient>(),
-            model);
+            model,
+            temperature,
+            maxTokens,
+            serviceProvider
+                .GetRequiredService<ILogger<OllamaAnswerGenerator>>());
     });
 
 builder.Services.AddScoped<AskDocumentsUseCase>();
+
+builder.Services.AddScoped<
+    ITeamScopeResolver,
+    EfTeamScopeResolver>();
 
 builder.Services.AddScoped<
     IDocumentSemanticSearchRepository,
@@ -293,6 +310,13 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     AddTeamMemberUseCase>();
+
+builder.Services.AddScoped<
+    ITeamDeletionRepository,
+    EfTeamDeletionRepository>();
+
+builder.Services.AddScoped<
+    DeleteTeamUseCase>();
 
 builder.Services.AddScoped<
     IDocumentSharingRepository,

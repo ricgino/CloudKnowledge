@@ -1,12 +1,13 @@
+using CloudKnowledge.Api.IntegrationTests.Authentication;
 using CloudKnowledge.Application.Documents;
+using CloudKnowledge.Application.Documents.AskDocuments;
 using CloudKnowledge.Application.Notifications.DocumentReady;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using CloudKnowledge.Api.IntegrationTests.Authentication;
-using Microsoft.AspNetCore.Authentication;
 
 namespace CloudKnowledge.Api.IntegrationTests;
 
@@ -57,6 +58,8 @@ public sealed class CloudKnowledgeApiFactory
             {
                 services.RemoveAll<IDocumentProcessingQueue>();
                 services.RemoveAll<IDocumentReadyPublisher>();
+                services.RemoveAll<IEmbeddingGenerator>();
+                services.RemoveAll<IAnswerGenerator>();
 
                 services
                     .AddAuthentication(
@@ -81,6 +84,12 @@ public sealed class CloudKnowledgeApiFactory
 
                 services.AddSingleton<IDocumentReadyPublisher>(
                     new FakeDocumentReadyPublisher());
+
+                services.AddSingleton<IEmbeddingGenerator>(
+                    new FakeEmbeddingGenerator());
+
+                services.AddSingleton<IAnswerGenerator>(
+                    new FakeAnswerGenerator());
             });
     }
 
@@ -107,6 +116,55 @@ public sealed class CloudKnowledgeApiFactory
             CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeEmbeddingGenerator
+        : IEmbeddingGenerator
+    {
+        public int Dimensions =>
+            768;
+
+        public Task<IReadOnlyList<float[]>> GenerateAsync(
+            IReadOnlyList<string> inputs,
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyList<float[]> embeddings =
+                inputs
+                    .Select(
+                        _ =>
+                        {
+                            var vector =
+                                new float[768];
+
+                            vector[0] =
+                                1.0f;
+
+                            return vector;
+                        })
+                    .ToArray();
+
+            return Task.FromResult(
+                embeddings);
+        }
+    }
+
+    private sealed class FakeAnswerGenerator
+        : IAnswerGenerator
+    {
+        public Task<string> GenerateAsync(
+            string question,
+            IReadOnlyList<AnswerContextSource> sources,
+            CancellationToken cancellationToken)
+        {
+            var labels =
+                string.Join(
+                    ", ",
+                    sources.Select(
+                        source => $"[{source.Label}]"));
+
+            return Task.FromResult(
+                $"Deterministic integration answer {labels}".Trim());
         }
     }
 }

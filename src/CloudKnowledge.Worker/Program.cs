@@ -62,8 +62,45 @@ builder.Services.AddScoped<
     AzureBlobDocumentStorage>();
 
 builder.Services.AddScoped<
-    IDocumentTextExtractor,
+    IPdfNativeTextExtractor,
     PdfPigDocumentTextExtractor>();
+
+builder.Services.AddSingleton<
+    IExternalCommandRunner,
+    SystemExternalCommandRunner>();
+
+builder.Services.AddScoped<IPdfOcrTextExtractor>(
+    serviceProvider =>
+    {
+        var configuration =
+            serviceProvider.GetRequiredService<IConfiguration>();
+
+        var languages =
+            configuration["Ocr:Languages"]
+            ?? "eng+ita";
+
+        var dpi =
+            configuration.GetValue<int>(
+                "Ocr:Dpi");
+
+        if (dpi <= 0)
+        {
+            dpi = 300;
+        }
+
+        return new TesseractPdfOcrTextExtractor(
+            serviceProvider
+                .GetRequiredService<IExternalCommandRunner>(),
+            languages,
+            dpi);
+    });
+
+builder.Services.AddScoped<PdfDocumentTextExtractor>();
+builder.Services.AddScoped<OpenXmlDocumentTextExtractor>();
+builder.Services.AddScoped<PlainTextDocumentTextExtractor>();
+builder.Services.AddScoped<
+    IDocumentTextExtractor,
+    DocumentTextExtractorDispatcher>();
 
 builder.Services.AddScoped<
     IDocumentRepository,

@@ -1,12 +1,11 @@
 using CloudKnowledge.Api.Contracts.Documents;
+using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.CreateDocument;
 using CloudKnowledge.Application.Documents.DeleteDocument;
 using CloudKnowledge.Application.Documents.DownloadDocument;
 using CloudKnowledge.Application.Documents.GetDocument;
 using CloudKnowledge.Application.Documents.GetDocuments;
 using CloudKnowledge.Application.Documents.Sharing;
-using CloudKnowledge.Application.Teams;
-using CloudKnowledge.Application.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Identity.Web.Resource;
@@ -26,8 +25,6 @@ public sealed class DocumentsController : ControllerBase
     private readonly UnshareDocumentFromTeamUseCase _unshareDocumentFromTeamUseCase;
     private readonly DeleteDocumentUseCase _deleteDocumentUseCase;
     private readonly DownloadDocumentUseCase _downloadDocumentUseCase;
-    private readonly ITeamMembershipRepository _teamMembershipRepository;
-    private readonly ICurrentUser _currentUser;
 
     public DocumentsController(
         CreateDocumentUseCase createDocumentUseCase,
@@ -36,9 +33,7 @@ public sealed class DocumentsController : ControllerBase
         ShareDocumentWithTeamUseCase shareDocumentWithTeamUseCase,
         UnshareDocumentFromTeamUseCase unshareDocumentFromTeamUseCase,
         DeleteDocumentUseCase deleteDocumentUseCase,
-        DownloadDocumentUseCase downloadDocumentUseCase,
-        ITeamMembershipRepository teamMembershipRepository,
-        ICurrentUser currentUser)
+        DownloadDocumentUseCase downloadDocumentUseCase)
     {
         _createDocumentUseCase = createDocumentUseCase;
         _getDocumentUseCase = getDocumentUseCase;
@@ -47,8 +42,6 @@ public sealed class DocumentsController : ControllerBase
         _unshareDocumentFromTeamUseCase = unshareDocumentFromTeamUseCase;
         _deleteDocumentUseCase = deleteDocumentUseCase;
         _downloadDocumentUseCase = downloadDocumentUseCase;
-        _teamMembershipRepository = teamMembershipRepository;
-        _currentUser = currentUser;
     }
 
     [HttpPost]
@@ -62,60 +55,48 @@ public sealed class DocumentsController : ControllerBase
             return BadRequest("The uploaded file is empty.");
         }
 
-        if (request.TeamId.HasValue)
+        if (!DocumentFormatDetector.TryDetect(
+                request.File.FileName,
+                out _))
         {
-            var userId =
-                await _currentUser.GetUserIdAsync(
-                    cancellationToken);
-
-            var isTeamMember =
-                await _teamMembershipRepository.IsMemberAsync(
-                    request.TeamId.Value,
-                    userId,
-                    cancellationToken);
-
-            if (!isTeamMember)
+            return BadRequest(new
             {
-                return BadRequest(new
-                {
-                    message = "The selected team is not available to the current user."
-                });
-            }
+                message = "Supported document formats are PDF, DOCX and TXT."
+            });
         }
 
         await using var stream =
             request.File.OpenReadStream();
 
-        var result = await _createDocumentUseCase.ExecuteAsync(
-            request.File.FileName,
-            request.File.ContentType,
-            stream,
-            cancellationToken);
+        CreateDocumentResult result;
 
-        if (request.TeamId.HasValue)
+        try
         {
-            var shareStatus =
-                await _shareDocumentWithTeamUseCase.ExecuteAsync(
-                    result.Id,
-                    request.TeamId.Value,
-                    cancellationToken);
-
-            if (shareStatus is not ShareDocumentStatus.Shared &&
-                shareStatus is not ShareDocumentStatus.AlreadyShared)
-            {
-                return Conflict(new
-                {
-                    message = "The document was uploaded but could not be shared with the selected team."
-                });
-            }
+            result = await _createDocumentUseCase.ExecuteAsync(
+                request.File.FileName,
+                request.File.ContentType,
+                stream,
+                request.TeamId,
+                cancellationToken);
         }
+        catch (UnauthorizedAccessException exception)
+        {
+            return BadRequest(new
+            {
+                message = exception.Message
+            });
+        }
+
+        var isOwner =
+            !request.TeamId.HasValue;
 
         var response = new DocumentResponse(
             result.Id,
             result.FileName,
             result.ContentType,
             result.Status.ToString(),
-            true);
+            isOwner,
+            isOwner);
 
         return CreatedAtAction(
             nameof(GetById),
@@ -142,6 +123,7 @@ public sealed class DocumentsController : ControllerBase
             result.FileName,
             result.ContentType,
             result.Status.ToString(),
+            result.IsOwner,
             result.IsOwner);
 
         return Ok(response);
@@ -152,10 +134,65 @@ public sealed class DocumentsController : ControllerBase
         [FromQuery] GetDocumentsRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _getDocumentsUseCase.ExecuteAsync(
-            request.Page,
-            request.PageSize,
-            cancellationToken);
+        if (!TryParseScope(
+                request.Scope,
+                out var scope))
+        {
+            return BadRequest(new
+            {
+                message = "Scope must be one of: all, owned, team."
+            });
+        }
+
+        if (scope == DocumentListScope.Team &&
+            !request.TeamId.HasValue)
+        {
+            return BadRequest(new
+            {
+                message = "teamId is required when scope=team."
+            });
+        }
+
+        if (scope != DocumentListScope.Team &&
+            request.TeamId.HasValue)
+        {
+            return BadRequest(new
+            {
+                message = "teamId is valid only when scope=team."
+            });
+        }
+
+        if (scope != DocumentListScope.Team &&
+            request.IncludeDescendants)
+        {
+            return BadRequest(new
+            {
+                message = "includeDescendants is valid only when scope=team."
+            });
+        }
+
+        GetDocumentsResult result;
+
+        try
+        {
+            result =
+                await _getDocumentsUseCase.ExecuteAsync(
+                    new GetDocumentsQuery(
+                        request.Page,
+                        request.PageSize,
+                        scope,
+                        request.TeamId,
+                        request.IncludeDescendants,
+                        request.Query),
+                    cancellationToken);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new
+            {
+                message = exception.Message
+            });
+        }
 
         var items = result.Items
             .Select(document => new DocumentResponse(
@@ -163,7 +200,15 @@ public sealed class DocumentsController : ControllerBase
                 document.FileName,
                 document.ContentType,
                 document.Status.ToString(),
-                document.IsOwner))
+                document.IsOwner,
+                document.CanDelete,
+                document.SharedTeams
+                    .Select(team =>
+                        new DocumentAccessTeamResponse(
+                            team.Id,
+                            team.Name,
+                            team.Path))
+                    .ToArray()))
             .ToList();
 
         var response = new GetDocumentsResponse(
@@ -257,5 +302,29 @@ public sealed class DocumentsController : ControllerBase
             _ => throw new InvalidOperationException(
                 "Unexpected unshare document result.")
         };
+    }
+
+    private static bool TryParseScope(
+        string? rawScope,
+        out DocumentListScope scope)
+    {
+        switch (rawScope?.Trim().ToLowerInvariant())
+        {
+            case "all":
+                scope = DocumentListScope.All;
+                return true;
+
+            case "owned":
+                scope = DocumentListScope.Owned;
+                return true;
+
+            case "team":
+                scope = DocumentListScope.Team;
+                return true;
+
+            default:
+                scope = default;
+                return false;
+        }
     }
 }

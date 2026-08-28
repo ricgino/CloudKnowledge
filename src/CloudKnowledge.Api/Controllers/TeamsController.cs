@@ -1,6 +1,7 @@
 using CloudKnowledge.Api.Contracts.Teams;
 using CloudKnowledge.Application.Teams.AddTeamMember;
 using CloudKnowledge.Application.Teams.CreateTeam;
+using CloudKnowledge.Application.Teams.DeleteTeam;
 using CloudKnowledge.Application.Teams.GetTeams;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,10 +25,14 @@ public sealed class TeamsController
     private readonly GetTeamsUseCase
         _getTeamsUseCase;
 
+    private readonly DeleteTeamUseCase
+        _deleteTeamUseCase;
+
     public TeamsController(
         CreateTeamUseCase createTeamUseCase,
         AddTeamMemberUseCase addTeamMemberUseCase,
-        GetTeamsUseCase getTeamsUseCase)
+        GetTeamsUseCase getTeamsUseCase,
+        DeleteTeamUseCase deleteTeamUseCase)
     {
         _createTeamUseCase =
             createTeamUseCase;
@@ -37,6 +42,9 @@ public sealed class TeamsController
 
         _getTeamsUseCase =
             getTeamsUseCase;
+
+        _deleteTeamUseCase =
+            deleteTeamUseCase;
     }
 
     [HttpGet]
@@ -53,7 +61,10 @@ public sealed class TeamsController
                     new TeamResponse(
                         result.Id,
                         result.Name,
-                        result.Role.ToString()))
+                        result.ParentTeamId,
+                        result.IsMember,
+                        result.Role?.ToString(),
+                        result.CanManage))
                 .ToArray();
 
         return Ok(response);
@@ -67,14 +78,58 @@ public sealed class TeamsController
         var result =
             await _createTeamUseCase.ExecuteAsync(
                 request.Name,
+                request.ParentTeamId,
                 cancellationToken);
 
-        return Created(
-            $"/api/teams/{result.Id}",
-            new TeamResponse(
-                result.Id,
-                result.Name,
-                result.Role.ToString()));
+        switch (result.Status)
+        {
+            case CreateTeamStatus.Created:
+                return Created(
+                    $"/api/teams/{result.Id}",
+                    new TeamResponse(
+                        result.Id!.Value,
+                        result.Name!,
+                        result.ParentTeamId,
+                        true,
+                        result.Role!.Value.ToString(),
+                        true));
+
+            case CreateTeamStatus.ParentNotFoundOrNotMember:
+                return NotFound();
+
+            case CreateTeamStatus.Forbidden:
+                return Forbid();
+
+            default:
+                throw new InvalidOperationException(
+                    "Unexpected create team result.");
+        }
+    }
+
+    [HttpDelete("{teamId:guid}")]
+    public async Task<IActionResult> Delete(
+        Guid teamId,
+        CancellationToken cancellationToken)
+    {
+        var status =
+            await _deleteTeamUseCase.ExecuteAsync(
+                teamId,
+                cancellationToken);
+
+        return status switch
+        {
+            DeleteTeamStatus.Deleted => NoContent(),
+            DeleteTeamStatus.NotFound => NotFound(),
+            DeleteTeamStatus.Forbidden => Forbid(),
+            DeleteTeamStatus.HasChildren => Conflict(
+                new
+                {
+                    message =
+                        "A team with child teams cannot be deleted."
+                }),
+            _ => throw new InvalidOperationException(
+                "Unexpected delete team result.")
+        };
     }
 
     [HttpPost("{teamId:guid}/members")]

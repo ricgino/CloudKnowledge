@@ -29,11 +29,27 @@ public sealed class SearchDocumentsUseCase
             currentUser;
     }
 
-    public async Task<IReadOnlyList<SemanticSearchResult>> ExecuteAsync(
+    public Task<IReadOnlyList<SemanticSearchResult>> ExecuteAsync(
         string query,
         int take,
         CancellationToken cancellationToken)
     {
+        return ExecuteAsync(
+            query,
+            take,
+            DocumentRetrievalScope.All,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SemanticSearchResult>> ExecuteAsync(
+        string query,
+        int take,
+        DocumentRetrievalScope scope,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(
+            scope);
+
         if (string.IsNullOrWhiteSpace(query))
         {
             throw new ArgumentException(
@@ -83,6 +99,7 @@ public sealed class SearchDocumentsUseCase
                 userId,
                 queryEmbedding,
                 take,
+                scope,
                 cancellationToken);
     }
 }

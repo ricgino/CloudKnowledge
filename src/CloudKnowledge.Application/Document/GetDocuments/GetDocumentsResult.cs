@@ -14,4 +14,11 @@ public sealed record GetDocumentsItem(
     string FileName,
     string ContentType,
     DocumentStatus Status,
-    bool IsOwner);
+    bool IsOwner,
+    bool CanDelete,
+    IReadOnlyList<DocumentAccessTeamResult> SharedTeams);
+
+public sealed record DocumentAccessTeamResult(
+    Guid Id,
+    string Name,
+    string Path);

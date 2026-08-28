@@ -3,6 +3,7 @@ using CloudKnowledge.Domain.Teams;
 using CloudKnowledge.Domain.Users;
 using CloudKnowledge.Infrastructure.Documents;
 using CloudKnowledge.Infrastructure.Persistence;
+using CloudKnowledge.Infrastructure.Teams;
 using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -118,9 +119,10 @@ public sealed class DocumentAccessTests
 
         var repository =
             new EfDocumentAccessRepository(
-                dbContext);
+                dbContext,
+                new EfTeamScopeResolver(
+                    dbContext));
 
-        // Alice owns both of her documents.
         Assert.True(
             await repository.CanAccessAsync(
                 alice.Id,
@@ -133,29 +135,24 @@ public sealed class DocumentAccessTests
                 aliceSharedDocument.Id,
                 CancellationToken.None));
 
-        // Bob cannot access Alice's private document.
         Assert.False(
             await repository.CanAccessAsync(
                 bob.Id,
                 alicePrivateDocument.Id,
                 CancellationToken.None));
 
-        // Bob is in Engineering,
-        // therefore he can access the shared document.
         Assert.True(
             await repository.CanAccessAsync(
                 bob.Id,
                 aliceSharedDocument.Id,
                 CancellationToken.None));
 
-        // Bob can access his own private document.
         Assert.True(
             await repository.CanAccessAsync(
                 bob.Id,
                 bobPrivateDocument.Id,
                 CancellationToken.None));
 
-        // Charlie belongs to no team.
         Assert.False(
             await repository.CanAccessAsync(
                 charlie.Id,

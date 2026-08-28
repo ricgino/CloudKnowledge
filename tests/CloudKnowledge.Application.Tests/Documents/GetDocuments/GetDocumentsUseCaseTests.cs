@@ -71,6 +71,64 @@ public sealed class GetDocumentsUseCaseTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ShouldKeepPersonalOwnershipSeparateFromDeleteCapability()
+    {
+        var userId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+
+        var personalDocument =
+            Document.Create(
+                "personal.pdf",
+                "application/pdf");
+        personalDocument.AssignUserOwner(userId);
+
+        var teamDocument =
+            Document.Create(
+                "team.pdf",
+                "application/pdf");
+        teamDocument.AssignTeamOwner(teamId);
+
+        var repository =
+            new FakeDocumentAccessRepository(
+                new[]
+                {
+                    personalDocument,
+                    teamDocument
+                },
+                new[]
+                {
+                    teamDocument.Id
+                });
+
+        var useCase =
+            new GetDocumentsUseCase(
+                repository,
+                new FakeCurrentUser(userId));
+
+        var result =
+            await useCase.ExecuteAsync(
+                page: 1,
+                pageSize: 20,
+                CancellationToken.None);
+
+        var personalItem =
+            Assert.Single(
+                result.Items,
+                item => item.Id == personalDocument.Id);
+
+        Assert.True(personalItem.IsOwner);
+        Assert.True(personalItem.CanDelete);
+
+        var teamItem =
+            Assert.Single(
+                result.Items,
+                item => item.Id == teamDocument.Id);
+
+        Assert.False(teamItem.IsOwner);
+        Assert.True(teamItem.CanDelete);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WhenPageIsZero_ShouldThrow()
     {
         var useCase =
@@ -134,11 +192,19 @@ public sealed class GetDocumentsUseCaseTests
         private readonly IReadOnlyList<Document>
             _documents;
 
+        private readonly IReadOnlyCollection<Guid>
+            _teamOwnedDeletableDocumentIds;
+
         public FakeDocumentAccessRepository(
-            IReadOnlyList<Document> documents)
+            IReadOnlyList<Document> documents,
+            IReadOnlyCollection<Guid>? teamOwnedDeletableDocumentIds = null)
         {
             _documents =
                 documents;
+
+            _teamOwnedDeletableDocumentIds =
+                teamOwnedDeletableDocumentIds ??
+                Array.Empty<Guid>();
         }
 
         public Guid ReceivedUserId
@@ -203,6 +269,19 @@ public sealed class GetDocumentsUseCaseTests
                 _documents.Any(
                     document =>
                         document.Id == documentId));
+        }
+
+        public Task<IReadOnlyCollection<Guid>> GetTeamOwnedDeletableDocumentIdsAsync(
+            Guid userId,
+            IReadOnlyCollection<Guid> documentIds,
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyCollection<Guid> result =
+                _teamOwnedDeletableDocumentIds
+                    .Where(documentIds.Contains)
+                    .ToArray();
+
+            return Task.FromResult(result);
         }
     }
 }

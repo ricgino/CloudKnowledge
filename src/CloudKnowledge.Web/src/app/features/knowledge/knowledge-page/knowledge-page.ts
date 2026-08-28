@@ -11,6 +11,22 @@ import {
   SearchDocumentResult
 } from '../../documents/documents';
 
+import {
+  buildKnowledgeTeamOptions,
+  KnowledgeTeamOption,
+  Teams
+} from '../../teams/teams';
+
+import {
+  initialKnowledgeScopeState,
+  KnowledgeRetrievalScope,
+  KnowledgeScopeState,
+  selectAllKnowledge,
+  selectKnowledgeTeam,
+  setKnowledgeDescendants,
+  toKnowledgeRetrievalScope
+} from '../knowledge-scope';
+
 @Component({
   selector: 'app-knowledge-page',
   standalone: false,
@@ -21,6 +37,9 @@ export class KnowledgePage
   implements OnInit
 {
   documents: DocumentItem[] = [];
+  teamOptions: KnowledgeTeamOption[] = [];
+  knowledgeScopeState: KnowledgeScopeState =
+    initialKnowledgeScopeState();
 
   searchQuery = '';
   searchResults: SearchDocumentResult[] = [];
@@ -37,8 +56,23 @@ export class KnowledgePage
 
   constructor(
     private readonly documentsService: Documents,
+    private readonly teamsService: Teams,
     private readonly cdr: ChangeDetectorRef)
   {
+  }
+
+  get currentScope():
+    KnowledgeRetrievalScope
+  {
+    return toKnowledgeRetrievalScope(
+      this.knowledgeScopeState);
+  }
+
+  get scopeControlsDisabled():
+    boolean
+  {
+    return this.searching ||
+      this.asking;
   }
 
   ngOnInit(): void
@@ -57,6 +91,52 @@ export class KnowledgePage
           this.cdr.detectChanges();
         }
       });
+
+    this.teamsService
+      .getTeams()
+      .subscribe({
+        next: teams =>
+        {
+          this.teamOptions =
+            buildKnowledgeTeamOptions(teams);
+          this.cdr.detectChanges();
+        },
+        error: () =>
+        {
+          this.teamOptions = [];
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  onKnowledgeScopeChanged(
+    event: Event):
+    void
+  {
+    const teamId =
+      (event.target as HTMLSelectElement).value;
+
+    this.knowledgeScopeState =
+      teamId
+        ? selectKnowledgeTeam(
+            this.knowledgeScopeState,
+            teamId)
+        : selectAllKnowledge(
+            this.knowledgeScopeState);
+
+    this.clearScopedResults();
+  }
+
+  onIncludeDescendantsChanged(
+    event: Event):
+    void
+  {
+    this.knowledgeScopeState =
+      setKnowledgeDescendants(
+        this.knowledgeScopeState,
+        (event.target as HTMLInputElement).checked);
+
+    this.clearScopedResults();
   }
 
   onSearchQueryChanged(
@@ -85,7 +165,10 @@ export class KnowledgePage
     this.errorMessage = '';
 
     this.documentsService
-      .search(query)
+      .search(
+        query,
+        5,
+        this.currentScope)
       .subscribe({
         next: results =>
         {
@@ -127,7 +210,10 @@ export class KnowledgePage
     this.errorMessage = '';
 
     this.documentsService
-      .ask(question)
+      .ask(
+        question,
+        5,
+        this.currentScope)
       .subscribe({
         next: response =>
         {
@@ -210,5 +296,15 @@ export class KnowledgePage
     }
 
     return 'Low';
+  }
+
+  private clearScopedResults():
+    void
+  {
+    this.searchResults = [];
+    this.searchSubmitted = false;
+    this.answer = '';
+    this.answerSources = [];
+    this.errorMessage = '';
   }
 }

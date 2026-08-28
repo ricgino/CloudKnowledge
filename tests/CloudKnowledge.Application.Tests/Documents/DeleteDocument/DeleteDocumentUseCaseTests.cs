@@ -6,11 +6,13 @@ namespace CloudKnowledge.Application.Tests.Documents.DeleteDocument;
 public sealed class DeleteDocumentUseCaseTests
 {
     [Fact]
-    public async Task ExecuteAsync_WhenOwnedDocumentExists_ShouldDeleteDatabaseAndStorage()
+    public async Task ExecuteAsync_WhenDeletionIsAuthorized_ShouldDeleteDatabaseAndStorage()
     {
         var userId = Guid.NewGuid();
         var documentId = Guid.NewGuid();
-        var repository = new FakeDeletionRepository(true);
+        var repository = new FakeDeletionRepository(
+            authorizedDeleted: true,
+            legacyOwnedDeleted: false);
         var storage = new FakeDeletionStorage();
         var useCase = new DeleteDocumentUseCase(
             repository,
@@ -22,15 +24,18 @@ public sealed class DeleteDocumentUseCaseTests
             CancellationToken.None);
 
         Assert.True(deleted);
-        Assert.Equal(userId, repository.ReceivedOwnerUserId);
+        Assert.True(repository.AuthorizedDeleteCalled);
+        Assert.Equal(userId, repository.ReceivedUserId);
         Assert.Equal(documentId, repository.ReceivedDocumentId);
         Assert.Equal(documentId, storage.DeletedDocumentId);
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenDocumentIsNotOwned_ShouldNotDeleteStorage()
+    public async Task ExecuteAsync_WhenDeletionIsNotAuthorized_ShouldNotDeleteStorage()
     {
-        var repository = new FakeDeletionRepository(false);
+        var repository = new FakeDeletionRepository(
+            authorizedDeleted: false,
+            legacyOwnedDeleted: false);
         var storage = new FakeDeletionStorage();
         var useCase = new DeleteDocumentUseCase(
             repository,
@@ -61,14 +66,19 @@ public sealed class DeleteDocumentUseCaseTests
 
     private sealed class FakeDeletionRepository : IDocumentDeletionRepository
     {
-        private readonly bool _deleted;
+        private readonly bool _authorizedDeleted;
+        private readonly bool _legacyOwnedDeleted;
 
-        public FakeDeletionRepository(bool deleted)
+        public FakeDeletionRepository(
+            bool authorizedDeleted,
+            bool legacyOwnedDeleted)
         {
-            _deleted = deleted;
+            _authorizedDeleted = authorizedDeleted;
+            _legacyOwnedDeleted = legacyOwnedDeleted;
         }
 
-        public Guid ReceivedOwnerUserId { get; private set; }
+        public bool AuthorizedDeleteCalled { get; private set; }
+        public Guid ReceivedUserId { get; private set; }
         public Guid ReceivedDocumentId { get; private set; }
 
         public Task<bool> DeleteOwnedAsync(
@@ -76,9 +86,20 @@ public sealed class DeleteDocumentUseCaseTests
             Guid documentId,
             CancellationToken cancellationToken)
         {
-            ReceivedOwnerUserId = ownerUserId;
+            ReceivedUserId = ownerUserId;
             ReceivedDocumentId = documentId;
-            return Task.FromResult(_deleted);
+            return Task.FromResult(_legacyOwnedDeleted);
+        }
+
+        public Task<bool> DeleteAuthorizedAsync(
+            Guid userId,
+            Guid documentId,
+            CancellationToken cancellationToken)
+        {
+            AuthorizedDeleteCalled = true;
+            ReceivedUserId = userId;
+            ReceivedDocumentId = documentId;
+            return Task.FromResult(_authorizedDeleted);
         }
     }
 

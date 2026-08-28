@@ -4,7 +4,7 @@
       <p class="eyebrow">Workspace management</p>
       <h1>Administration</h1>
       <p class="page-description">
-        Manage the teams, users and document access that your current permissions allow. Backend ownership rules remain authoritative.
+        Manage team hierarchy, users and document access within the permissions granted to your account.
       </p>
     </div>
 
@@ -19,7 +19,7 @@
 
   <div class="overview-grid">
     <article>
-      <span>Teams</span>
+      <span>Visible teams</span>
       <strong>{{ teams.length }}</strong>
       <small>{{ manageableTeams.length }} manageable</small>
     </article>
@@ -32,8 +32,8 @@
 
     <article>
       <span>Access model</span>
-      <strong>Scoped</strong>
-      <small>Ownership and team roles enforced by API</small>
+      <strong>Explicit</strong>
+      <small>Team hierarchy never inherits membership</small>
     </article>
   </div>
 
@@ -83,7 +83,7 @@
         </div>
 
         <p class="panel-description">
-          Users are provisioned when they first sign in to CloudKnowledge. Owners and team admins can then grant team membership by email.
+          Membership is always explicit. Adding a user to a parent team does not add that user to any child team.
         </p>
 
         @if (manageableTeams.length === 0) {
@@ -127,13 +127,6 @@
             </button>
           </div>
         }
-
-        <aside class="info-callout">
-          <strong>Current limitation</strong>
-          <p>
-            This first administration view manages existing CloudKnowledge accounts through team membership. A platform-wide user directory, invitations and account disabling need dedicated administration APIs and roles; they are the next backend extension if we want full tenant administration.
-          </p>
-        </aside>
       </section>
     }
 
@@ -142,25 +135,48 @@
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Collaboration structure</p>
-            <h2>Create and review teams</h2>
+            <h2>Create root teams and sub-teams</h2>
           </div>
         </div>
 
-        <div class="create-row">
-          <input
-            type="text"
-            placeholder="New team name"
-            [value]="newTeamName"
-            (input)="onTeamNameChanged($event)"
-            (keyup.enter)="createTeam()"
-          />
+        <p class="panel-description">
+          Choose “Root team” for a top-level workspace such as Rai or Stellantis. Choose a team you manage to create a child such as an application, department or another nested level.
+        </p>
 
+        <div class="form-grid">
+          <label>
+            Team name
+            <input
+              type="text"
+              placeholder="e.g. DeskSharing"
+              [value]="newTeamName"
+              (input)="onTeamNameChanged($event)"
+              (keyup.enter)="createTeam()"
+            />
+          </label>
+
+          <label>
+            Parent
+            <select
+              [value]="newTeamParentId"
+              (change)="onTeamParentChanged($event)">
+              <option value="">Root team</option>
+              @for (team of manageableTeams; track team.id) {
+                <option [value]="team.id">
+                  {{ team.name }} · {{ team.role }}
+                </option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <div class="actions">
           <button
             type="button"
             class="primary-button"
             (click)="createTeam()"
             [disabled]="!newTeamName.trim() || creatingTeam">
-            {{ creatingTeam ? 'Creating...' : 'Create team' }}
+            {{ creatingTeam ? 'Creating...' : (newTeamParentId ? 'Create sub-team' : 'Create root team') }}
           </button>
         </div>
 
@@ -168,23 +184,46 @@
           <div class="empty-state">No teams are visible to your account.</div>
         } @else {
           <div class="resource-list">
-            @for (team of teams; track team.id) {
-              <article class="resource-row">
+            @for (team of teamRows; track team.id) {
+              <article
+                class="resource-row"
+                [style.margin-left.rem]="team.depth * 1.25">
                 <div>
-                  <strong>{{ team.name }}</strong>
-                  <span>{{ team.id }}</span>
+                  <strong>{{ team.depth > 0 ? '↳ ' : '' }}{{ team.name }}</strong>
+                  <span>
+                    {{ team.isMember ? 'Direct membership' : 'Structural ancestor' }} · {{ team.id }}
+                  </span>
                 </div>
 
-                <span
-                  class="role-badge"
-                  [class.owner]="team.role === 'Owner'"
-                  [class.admin]="team.role === 'Admin'">
-                  {{ team.role }}
-                </span>
+                <aside class="row-actions">
+                  <span
+                    class="role-badge"
+                    [class.owner]="team.role === 'Owner'"
+                    [class.admin]="team.role === 'Admin'">
+                    {{ team.isMember ? (team.role ?? 'Member') : 'Folder' }}
+                  </span>
+
+                  @if (canDeleteTeam(team)) {
+                    <button
+                      type="button"
+                      class="danger-button compact-button"
+                      (click)="deleteTeam(team)"
+                      [disabled]="deletingTeamId === team.id">
+                      {{ deletingTeamId === team.id ? 'Deleting...' : 'Delete team' }}
+                    </button>
+                  }
+                </aside>
               </article>
             }
           </div>
         }
+
+        <aside class="info-callout">
+          <strong>No inherited permissions</strong>
+          <p>
+            The hierarchy is organizational only. A Rai member does not automatically become a DeskSharing member, and structural ancestors cannot be used to bypass document authorization.
+          </p>
+        </aside>
       </section>
     }
 
@@ -198,7 +237,7 @@
         </div>
 
         <p class="panel-description">
-          Select a document and a team you manage. The API only applies changes when your account owns the document and is eligible to manage the target team.
+          Select a document and a team you manage. The API only applies changes when your account owns the document and is eligible for the target team.
         </p>
 
         @if (documents.length === 0 || manageableTeams.length === 0) {

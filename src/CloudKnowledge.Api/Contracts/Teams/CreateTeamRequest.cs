@@ -1,4 +1,5 @@
 namespace CloudKnowledge.Api.Contracts.Teams;
 
 public sealed record CreateTeamRequest(
-    string Name);
+    string Name,
+    Guid? ParentTeamId = null);
