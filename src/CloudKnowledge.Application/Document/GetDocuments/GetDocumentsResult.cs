@@ -15,6 +15,7 @@ public sealed record GetDocumentsItem(
     string ContentType,
     DocumentStatus Status,
     bool IsOwner,
+    bool CanDelete,
     IReadOnlyList<DocumentAccessTeamResult> SharedTeams);
 
 public sealed record DocumentAccessTeamResult(
