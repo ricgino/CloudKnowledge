@@ -87,12 +87,16 @@ public sealed class DocumentsController : ControllerBase
             });
         }
 
+        var isOwner =
+            !request.TeamId.HasValue;
+
         var response = new DocumentResponse(
             result.Id,
             result.FileName,
             result.ContentType,
             result.Status.ToString(),
-            !request.TeamId.HasValue);
+            isOwner,
+            isOwner);
 
         return CreatedAtAction(
             nameof(GetById),
@@ -119,6 +123,7 @@ public sealed class DocumentsController : ControllerBase
             result.FileName,
             result.ContentType,
             result.Status.ToString(),
+            result.IsOwner,
             result.IsOwner);
 
         return Ok(response);
@@ -196,6 +201,7 @@ public sealed class DocumentsController : ControllerBase
                 document.ContentType,
                 document.Status.ToString(),
                 document.IsOwner,
+                document.CanDelete,
                 document.SharedTeams
                     .Select(team =>
                         new DocumentAccessTeamResponse(
