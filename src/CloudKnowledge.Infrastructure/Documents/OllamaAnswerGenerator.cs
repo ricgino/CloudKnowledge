@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using CloudKnowledge.Application.Documents.AskDocuments;
 using Microsoft.Extensions.Logging;
@@ -105,8 +106,10 @@ public sealed class OllamaAnswerGenerator
             - Quando affermi qualcosa ricavato dal contesto,
             cita la fonte usando il formato [S1], [S2], ecc.
             - Usa solo identificatori di fonti realmente presenti.
-            - Fornisci esclusivamente la risposta finale.
+            - Fornisci esclusivamente la risposta finale nel campo "answer".
             - Non mostrare ragionamenti, analisi o passaggi intermedi.
+            - Non descrivere come analizzi le fonti.
+            - Non ripetere la domanda e non dire cosa sta chiedendo l'utente.
             - Sii conciso ma completo.
             """;
 
@@ -137,6 +140,7 @@ public sealed class OllamaAnswerGenerator
                 },
                 Stream: false,
                 Think: false,
+                CreateAnswerFormat(),
                 new OllamaChatOptions(
                     _temperature,
                     _maxTokens));
@@ -154,10 +158,10 @@ public sealed class OllamaAnswerGenerator
                 .ReadFromJsonAsync<OllamaChatResponse>(
                     cancellationToken);
 
-        var answer =
+        var content =
             result?.Message?.Content;
 
-        if (string.IsNullOrWhiteSpace(answer))
+        if (string.IsNullOrWhiteSpace(content))
         {
             throw new InvalidOperationException(
                 "Ollama returned an empty answer.");
@@ -166,7 +170,45 @@ public sealed class OllamaAnswerGenerator
         LogTimings(
             result!);
 
+        OllamaStructuredAnswer? structuredAnswer;
+
+        try
+        {
+            structuredAnswer =
+                JsonSerializer.Deserialize<OllamaStructuredAnswer>(
+                    content);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException(
+                "Ollama returned an invalid structured answer.",
+                exception);
+        }
+
+        var answer =
+            structuredAnswer?.Answer;
+
+        if (string.IsNullOrWhiteSpace(answer))
+        {
+            throw new InvalidOperationException(
+                "Ollama returned a structured response without an answer.");
+        }
+
         return RemoveThinkingContent(answer);
+    }
+
+    private static OllamaResponseFormat CreateAnswerFormat()
+    {
+        return new OllamaResponseFormat(
+            "object",
+            new Dictionary<string, OllamaSchemaProperty>
+            {
+                ["answer"] =
+                    new OllamaSchemaProperty(
+                        "string")
+            },
+            ["answer"],
+            AdditionalProperties: false);
     }
 
     private void LogTimings(
@@ -241,7 +283,18 @@ public sealed class OllamaAnswerGenerator
         OllamaChatMessage[] Messages,
         bool Stream,
         bool Think,
+        OllamaResponseFormat Format,
         OllamaChatOptions Options);
+
+    private sealed record OllamaResponseFormat(
+        string Type,
+        Dictionary<string, OllamaSchemaProperty> Properties,
+        string[] Required,
+        [property: JsonPropertyName("additionalProperties")]
+        bool AdditionalProperties);
+
+    private sealed record OllamaSchemaProperty(
+        string Type);
 
     private sealed record OllamaChatOptions(
         double Temperature,
@@ -251,6 +304,10 @@ public sealed class OllamaAnswerGenerator
     private sealed record OllamaChatMessage(
         string Role,
         string Content);
+
+    private sealed record OllamaStructuredAnswer(
+        [property: JsonPropertyName("answer")]
+        string? Answer);
 
     private sealed record OllamaChatResponse(
         OllamaChatMessage? Message,
