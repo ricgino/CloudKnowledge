@@ -105,6 +105,76 @@ describe('DocumentsPage multi-file upload', () => {
   });
 });
 
+describe('DocumentsPage pagination', () => {
+  it('shows every page when the result set is small', () => {
+    const page =
+      createPage();
+
+    page.page = 3;
+    page.totalPages = 5;
+
+    expect(page.paginationItems)
+      .toEqual([
+        1,
+        2,
+        3,
+        4,
+        5
+      ]);
+  });
+
+  it('keeps first last and a bounded window around the current page', () => {
+    const page =
+      createPage();
+
+    page.page = 9;
+    page.totalPages = 18;
+
+    expect(page.paginationItems)
+      .toEqual([
+        1,
+        null,
+        7,
+        8,
+        9,
+        10,
+        11,
+        null,
+        18
+      ]);
+  });
+
+  it('loads a directly selected page once', () => {
+    let loadCalls = 0;
+
+    const documentsService = {
+      getDocuments: () =>
+      {
+        loadCalls++;
+
+        return of({
+          items: [],
+          page: 4,
+          pageSize: 20,
+          totalCount: 200,
+          totalPages: 10
+        });
+      }
+    };
+
+    const page =
+      createPage(documentsService);
+
+    page.page = 2;
+    page.totalPages = 10;
+
+    page.goToPage(4);
+
+    expect(loadCalls).toBe(1);
+    expect(page.page).toBe(4);
+  });
+});
+
 function createPage(
   documentsService: unknown =
     {
