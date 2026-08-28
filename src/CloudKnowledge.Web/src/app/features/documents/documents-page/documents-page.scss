@@ -492,9 +492,36 @@ button:disabled {
   font-size: 0.78rem;
 }
 
-.pagination-bar > div {
+.page-controls,
+.page-number-list {
   display: flex;
-  gap: 0.45rem;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.page-controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.page-number-list {
+  flex-wrap: wrap;
+}
+
+.page-number-button {
+  min-width: 34px;
+  padding: 0 0.55rem;
+}
+
+.page-number-button.active {
+  border-color: #3155d8;
+  background: #edf1ff;
+  color: #2748bc;
+}
+
+.pagination-ellipsis {
+  min-width: 1.4rem;
+  text-align: center;
 }
 
 @media (max-width: 980px) {
@@ -549,6 +576,10 @@ button:disabled {
   .pagination-bar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .page-controls {
+    justify-content: flex-start;
   }
 
   .document-row {
