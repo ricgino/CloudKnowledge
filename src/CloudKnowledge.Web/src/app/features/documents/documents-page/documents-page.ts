@@ -154,6 +154,65 @@ export class DocumentsPage
     return 'All documents';
   }
 
+  get paginationItems(): Array<number | null>
+  {
+    if (this.totalPages <= 0)
+    {
+      return [];
+    }
+
+    if (this.totalPages <= 7)
+    {
+      return Array.from(
+        { length: this.totalPages },
+        (_, index) => index + 1);
+    }
+
+    let start =
+      Math.max(
+        2,
+        this.page - 2);
+
+    let end =
+      Math.min(
+        this.totalPages - 1,
+        this.page + 2);
+
+    if (this.page <= 4)
+    {
+      start = 2;
+      end = 6;
+    }
+    else if (this.page >= this.totalPages - 3)
+    {
+      start = this.totalPages - 5;
+      end = this.totalPages - 1;
+    }
+
+    const items: Array<number | null> = [1];
+
+    if (start > 2)
+    {
+      items.push(null);
+    }
+
+    for (let pageNumber = start;
+      pageNumber <= end;
+      pageNumber++)
+    {
+      items.push(pageNumber);
+    }
+
+    if (end < this.totalPages - 1)
+    {
+      items.push(null);
+    }
+
+    items.push(this.totalPages);
+
+    return items;
+  }
+
   loadDocuments(): void
   {
     this.loading = true;
@@ -276,29 +335,33 @@ export class DocumentsPage
     this.loadDocuments();
   }
 
-  previousPage(): void
+  goToPage(
+    targetPage: number):
+    void
   {
-    if (this.page <= 1 || this.loading)
+    if (
+      this.loading ||
+      targetPage < 1 ||
+      targetPage > this.totalPages ||
+      targetPage === this.page)
     {
       return;
     }
 
-    this.page--;
+    this.page = targetPage;
     this.loadDocuments();
+  }
+
+  previousPage(): void
+  {
+    this.goToPage(
+      this.page - 1);
   }
 
   nextPage(): void
   {
-    if (
-      this.loading ||
-      this.totalPages === 0 ||
-      this.page >= this.totalPages)
-    {
-      return;
-    }
-
-    this.page++;
-    this.loadDocuments();
+    this.goToPage(
+      this.page + 1);
   }
 
   onFileSelected(
