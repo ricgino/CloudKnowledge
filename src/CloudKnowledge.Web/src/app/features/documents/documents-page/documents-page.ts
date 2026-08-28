@@ -45,13 +45,16 @@ export class DocumentsPage
 
   loading = false;
   uploading = false;
-  selectedFile: File | null = null;
+  selectedFiles: File[] = [];
   selectedTeamId = '';
   deletingDocumentId = '';
   downloadingDocumentId = '';
 
   errorMessage = '';
   successMessage = '';
+
+  private selectedFileInput:
+    HTMLInputElement | null = null;
 
   constructor(
     private readonly documentsService: Documents,
@@ -76,6 +79,38 @@ export class DocumentsPage
             right.name,
             undefined,
             { sensitivity: 'base' }));
+  }
+
+  get selectedFilesLabel(): string
+  {
+    if (this.selectedFiles.length === 0)
+    {
+      return 'Choose PDF, DOCX or TXT';
+    }
+
+    if (this.selectedFiles.length === 1)
+    {
+      return this.selectedFiles[0].name;
+    }
+
+    return `${this.selectedFiles.length} files selected`;
+  }
+
+  get uploadButtonLabel(): string
+  {
+    const count =
+      this.selectedFiles.length;
+
+    if (this.uploading)
+    {
+      return count === 1
+        ? 'Uploading document...'
+        : `Uploading ${count} documents...`;
+    }
+
+    return count <= 1
+      ? 'Upload document'
+      : `Upload ${count} documents`;
   }
 
   get readyCount(): number
@@ -273,23 +308,29 @@ export class DocumentsPage
     const input =
       event.target as HTMLInputElement;
 
-    const file =
-      input.files?.[0] ?? null;
+    const files =
+      Array.from(
+        input.files ?? []);
 
+    this.selectedFileInput = input;
     this.successMessage = '';
 
-    if (
-      file &&
-      !isSupportedDocumentFileName(file.name))
+    const unsupportedFiles =
+      files.filter(
+        file =>
+          !isSupportedDocumentFileName(
+            file.name));
+
+    if (unsupportedFiles.length > 0)
     {
-      this.selectedFile = null;
+      this.selectedFiles = [];
       this.errorMessage =
-        'Supported document formats are PDF, DOCX and TXT.';
+        `Unsupported document${unsupportedFiles.length === 1 ? '' : 's'}: ${unsupportedFiles.map(file => file.name).join(', ')}. Supported formats are PDF, DOCX and TXT.`;
       input.value = '';
       return;
     }
 
-    this.selectedFile = file;
+    this.selectedFiles = files;
     this.errorMessage = '';
   }
 
@@ -303,21 +344,26 @@ export class DocumentsPage
 
   upload(): void
   {
-    if (!this.selectedFile)
+    if (this.selectedFiles.length === 0)
     {
       return;
     }
 
-    if (!isSupportedDocumentFileName(
-        this.selectedFile.name))
+    const unsupportedFiles =
+      this.selectedFiles.filter(
+        file =>
+          !isSupportedDocumentFileName(
+            file.name));
+
+    if (unsupportedFiles.length > 0)
     {
       this.errorMessage =
         'Supported document formats are PDF, DOCX and TXT.';
       return;
     }
 
-    const fileName =
-      this.selectedFile.name;
+    const files =
+      [...this.selectedFiles];
 
     const teamName =
       this.teams.find(
@@ -329,29 +375,67 @@ export class DocumentsPage
     this.successMessage = '';
 
     this.documentsService
-      .uploadDocument(
-        this.selectedFile,
+      .uploadDocuments(
+        files,
         this.selectedTeamId || undefined)
       .subscribe({
-        next: () =>
+        next: outcomes =>
         {
+          const succeeded =
+            outcomes.filter(
+              outcome => outcome.succeeded);
+
+          const failed =
+            outcomes.filter(
+              outcome => !outcome.succeeded);
+
           this.uploading = false;
-          this.selectedFile = null;
-          this.successMessage =
-            buildUploadSuccessMessage(
-              fileName,
-              teamName);
-          this.page = 1;
-          this.loadDocuments();
+          this.selectedFiles = [];
+
+          if (this.selectedFileInput)
+          {
+            this.selectedFileInput.value = '';
+          }
+
+          if (succeeded.length === 1 && outcomes.length === 1)
+          {
+            this.successMessage =
+              buildUploadSuccessMessage(
+                succeeded[0].fileName,
+                teamName);
+          }
+          else if (succeeded.length > 0)
+          {
+            const ownership =
+              teamName
+                ? `as team-owned documents in ${teamName}`
+                : 'as personal documents';
+
+            this.successMessage =
+              `${succeeded.length}${failed.length > 0 ? ` of ${outcomes.length}` : ''} documents uploaded ${ownership}. Processing continues in the background.`;
+          }
+
+          if (failed.length > 0)
+          {
+            this.errorMessage =
+              `Unable to upload ${failed.length} document${failed.length === 1 ? '' : 's'}: ${failed.map(outcome => outcome.fileName).join(', ')}.`;
+          }
+
+          if (succeeded.length > 0)
+          {
+            this.page = 1;
+            this.loadDocuments();
+          }
+          else
+          {
+            this.cdr.detectChanges();
+          }
         },
         error: error =>
         {
-          const apiMessage =
-            error.error?.message;
-
           this.errorMessage =
-            apiMessage ??
-            `Unable to upload document (HTTP ${error.status}).`;
+            error.error?.message ??
+            `Unable to upload documents (HTTP ${error.status}).`;
           this.uploading = false;
           this.cdr.detectChanges();
         }
