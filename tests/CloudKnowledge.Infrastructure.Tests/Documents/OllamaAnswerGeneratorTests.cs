@@ -162,6 +162,98 @@ public sealed class OllamaAnswerGeneratorTests
             StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task GenerateAsync_ShouldAcceptSubstantiveAnswerWithoutInlineCitation()
+    {
+        var handler =
+            new SequenceOllamaHandler(
+                CreateResponse(
+                    "Faceless Void's Time Walk radius decreased from 400 to 325."));
+
+        var httpClient =
+            new HttpClient(handler)
+            {
+                BaseAddress =
+                    new Uri("http://localhost:11434")
+            };
+
+        var sut =
+            new OllamaAnswerGenerator(
+                httpClient,
+                "qwen3:4b");
+
+        var sources =
+            new[]
+            {
+                new AnswerContextSource(
+                    "S1",
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    0,
+                    "FACELESS VOID: Time Walk radius decreased from 400 to 325.")
+            };
+
+        var result =
+            await sut.GenerateAsync(
+                "faceless void changes",
+                sources,
+                CancellationToken.None);
+
+        Assert.Equal(
+            "Faceless Void's Time Walk radius decreased from 400 to 325.",
+            result);
+
+        Assert.Single(
+            handler.RequestBodies);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_ShouldRetry_WhenStructuredAnswerIsTruncated()
+    {
+        var handler =
+            new SequenceOllamaHandler(
+                CreateTruncatedResponse(),
+                CreateResponse(
+                    "Faceless Void's Time Walk radius decreased from 400 to 325. [S1]"));
+
+        var httpClient =
+            new HttpClient(handler)
+            {
+                BaseAddress =
+                    new Uri("http://localhost:11434")
+            };
+
+        var sut =
+            new OllamaAnswerGenerator(
+                httpClient,
+                "qwen3:4b");
+
+        var sources =
+            new[]
+            {
+                new AnswerContextSource(
+                    "S1",
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    0,
+                    "FACELESS VOID: Time Walk radius decreased from 400 to 325.")
+            };
+
+        var result =
+            await sut.GenerateAsync(
+                "faceless void changes",
+                sources,
+                CancellationToken.None);
+
+        Assert.Equal(
+            "Faceless Void's Time Walk radius decreased from 400 to 325. [S1]",
+            result);
+
+        Assert.Equal(
+            2,
+            handler.RequestBodies.Count);
+    }
+
     private static string CreateResponse(
         string answer)
     {
@@ -184,6 +276,26 @@ public sealed class OllamaAnswerGeneratorTests
               "eval_count": 40,
               "eval_duration": 500000000,
               "done_reason": "stop"
+            }
+            """;
+    }
+
+    private static string CreateTruncatedResponse()
+    {
+        return
+            """
+            {
+              "message": {
+                "role": "assistant",
+                "content": "{\"answer\":\"Faceless Void's Time Walk radius decreased from 400 to 325"
+              },
+              "total_duration": 1000000000,
+              "load_duration": 100000000,
+              "prompt_eval_count": 300,
+              "prompt_eval_duration": 400000000,
+              "eval_count": 256,
+              "eval_duration": 500000000,
+              "done_reason": "length"
             }
             """;
     }
