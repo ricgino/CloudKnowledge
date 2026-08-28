@@ -11,7 +11,7 @@ namespace CloudKnowledge.Infrastructure.Documents;
 public sealed class OllamaAnswerGenerator
     : IAnswerGenerator
 {
-    private const int MaximumAttempts = 2;
+    private const int MaximumAttempts = 3;
 
     private readonly HttpClient _httpClient;
     private readonly string _model;
@@ -25,8 +25,8 @@ public sealed class OllamaAnswerGenerator
         : this(
             httpClient,
             model,
-            temperature: 0.1,
-            maxTokens: 256,
+            temperature: 0,
+            maxTokens: 384,
             NullLogger<OllamaAnswerGenerator>.Instance)
     {
     }
@@ -109,10 +109,12 @@ public sealed class OllamaAnswerGenerator
             cita la fonte usando il formato [S1], [S2], ecc.
             - Usa solo identificatori di fonti realmente presenti.
             - Fornisci esclusivamente la risposta finale nel campo "answer".
+            - Il campo "answer" deve contenere una risposta, mai una copia
+            o una parafrasi della domanda.
             - Non mostrare ragionamenti, analisi o passaggi intermedi.
             - Non descrivere come analizzi le fonti.
             - Non ripetere la domanda e non dire cosa sta chiedendo l'utente.
-            - Sii conciso ma completo.
+            - Sii conciso ma completo e resta entro circa 160 parole.
             """;
 
         var baseUserPrompt =
@@ -127,6 +129,9 @@ public sealed class OllamaAnswerGenerator
             le fonti sopra riportate.
             """;
 
+        Exception? lastRecoverableException =
+            null;
+
         for (var attempt = 1;
              attempt <= MaximumAttempts;
              attempt++)
@@ -137,16 +142,34 @@ public sealed class OllamaAnswerGenerator
                     : BuildCorrectivePrompt(
                         baseUserPrompt);
 
-            var answer =
-                await GenerateAttemptAsync(
-                    systemPrompt,
-                    userPrompt,
-                    cancellationToken);
+            string answer;
+
+            try
+            {
+                answer =
+                    await GenerateAttemptAsync(
+                        systemPrompt,
+                        userPrompt,
+                        cancellationToken);
+            }
+            catch (RetryableAnswerGenerationException exception)
+            {
+                lastRecoverableException =
+                    exception;
+
+                _logger.LogWarning(
+                    exception,
+                    "Ollama produced an unusable structured response on attempt {Attempt} of {MaximumAttempts}; retrying={Retrying}.",
+                    attempt,
+                    MaximumAttempts,
+                    attempt < MaximumAttempts);
+
+                continue;
+            }
 
             if (IsAcceptableGroundedAnswer(
                     question,
-                    answer,
-                    sources))
+                    answer))
             {
                 return answer;
             }
@@ -159,7 +182,8 @@ public sealed class OllamaAnswerGenerator
         }
 
         throw new InvalidOperationException(
-            "Ollama did not produce a valid grounded answer after retrying.");
+            "Ollama did not produce a valid grounded answer after retrying.",
+            lastRecoverableException);
     }
 
     private async Task<string> GenerateAttemptAsync(
@@ -205,7 +229,7 @@ public sealed class OllamaAnswerGenerator
 
         if (string.IsNullOrWhiteSpace(content))
         {
-            throw new InvalidOperationException(
+            throw new RetryableAnswerGenerationException(
                 "Ollama returned an empty answer.");
         }
 
@@ -222,7 +246,7 @@ public sealed class OllamaAnswerGenerator
         }
         catch (JsonException exception)
         {
-            throw new InvalidOperationException(
+            throw new RetryableAnswerGenerationException(
                 "Ollama returned an invalid structured answer.",
                 exception);
         }
@@ -232,7 +256,7 @@ public sealed class OllamaAnswerGenerator
 
         if (string.IsNullOrWhiteSpace(answer))
         {
-            throw new InvalidOperationException(
+            throw new RetryableAnswerGenerationException(
                 "Ollama returned a structured response without an answer.");
         }
 
@@ -250,31 +274,17 @@ public sealed class OllamaAnswerGenerator
             Non ripetere la domanda.
             Estrai dalle fonti fatti concreti che rispondono alla domanda.
             Se le fonti contengono informazioni pertinenti, riportale esplicitamente.
-            Includi almeno una citazione valida come [S1] nella risposta.
+            Quando possibile includi citazioni come [S1], [S2], ecc.
+            Mantieni la risposta concisa.
             """;
     }
 
     private static bool IsAcceptableGroundedAnswer(
         string question,
-        string answer,
-        IReadOnlyList<AnswerContextSource> sources)
+        string answer)
     {
-        if (NormalizeComparableText(answer) ==
-            NormalizeComparableText(question))
-        {
-            return false;
-        }
-
-        if (sources.Count == 0)
-        {
-            return true;
-        }
-
-        return sources.Any(
-            source =>
-                answer.Contains(
-                    $"[{source.Label}]",
-                    StringComparison.OrdinalIgnoreCase));
+        return NormalizeComparableText(answer) !=
+            NormalizeComparableText(question);
     }
 
     private static string NormalizeComparableText(
@@ -391,6 +401,25 @@ public sealed class OllamaAnswerGenerator
         }
 
         return builder.ToString();
+    }
+
+    private sealed class RetryableAnswerGenerationException
+        : Exception
+    {
+        public RetryableAnswerGenerationException(
+            string message)
+            : base(message)
+        {
+        }
+
+        public RetryableAnswerGenerationException(
+            string message,
+            Exception innerException)
+            : base(
+                message,
+                innerException)
+        {
+        }
     }
 
     private sealed record OllamaChatRequest(
