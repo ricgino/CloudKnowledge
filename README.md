@@ -73,7 +73,7 @@ The API applies EF Core migrations automatically only in the Compose environment
 
 The Web container proxies `/api` to the API container, so browser traffic remains same-origin. When running Angular through `ng serve`, the Angular development proxy forwards `/api` to the local HTTPS API instead.
 
-Ollama intentionally remains host-side for local development. It is not the intended production AI deployment model; a managed cloud AI provider will replace it for Azure deployment.
+Ollama intentionally remains host-side for local development. It is not the intended production AI deployment model; a managed cloud AI provider replaces it for Azure deployment.
 
 ### Stop the stack
 
@@ -86,6 +86,23 @@ To also remove local PostgreSQL and Azurite data:
 ```powershell
 docker compose down -v
 ```
+
+## Azure deployment branch
+
+Azure deployment work is isolated on `feat/azure-deployment` and PR #6 while the local Docker baseline remains on `feat/team-hierarchy-document-library`.
+
+The Azure target keeps the same application architecture and replaces local emulators/providers with managed Azure services:
+
+- Azure Container Apps for Web, API and Worker
+- Azure Container Registry
+- Azure Database for PostgreSQL Flexible Server + pgvector
+- Azure Blob Storage
+- Azure Service Bus
+- Microsoft Entra External ID
+- managed Azure OpenAI-compatible inference
+- Terraform and GitHub OIDC deployment automation
+
+The Azure branch preserves 768-dimensional embeddings and PostgreSQL/pgvector rather than introducing a separate vector-search product.
 
 ## Engineering goals
 
@@ -102,15 +119,11 @@ docker compose down -v
 
 ## Next cloud milestones
 
-- Azure Container Registry
-- Azure Container Apps
-- Managed PostgreSQL
-- Azure Storage
-- Azure Service Bus
-- Managed AI provider
-- Key Vault + Managed Identity
-- OpenTelemetry / Application Insights
-- Terraform deployment
+- Validate and apply Azure Terraform
+- Configure Azure managed AI deployments
+- Add GitHub OIDC deployment workflow
+- Run Azure end-to-end smoke tests with a second user
+- Harden service access with managed identity/private networking where justified
 
 ## Architecture decisions
 
