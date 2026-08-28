@@ -42,19 +42,21 @@
   <section class="upload-card">
     <div>
       <p class="eyebrow">Add knowledge</p>
-      <h2>Upload a document</h2>
+      <h2>Upload documents</h2>
       <p>
-        PDF, DOCX and TXT are supported. Keep the document personal or share it with a team where you have direct membership. Structural parent teams never grant implicit access.
+        Select one or more PDF, DOCX or TXT files. Every file in the batch is uploaded with the access selected below. Structural parent teams never grant implicit access.
       </p>
     </div>
 
     <div class="upload-controls">
       <label class="file-picker">
-        <span>{{ selectedFile?.name ?? 'Choose PDF, DOCX or TXT' }}</span>
+        <span>{{ selectedFilesLabel }}</span>
         <input
           type="file"
+          multiple
           accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
           (change)="onFileSelected($event)"
+          [disabled]="uploading"
         />
       </label>
 
@@ -62,7 +64,8 @@
         <span>Access</span>
         <select
           [value]="selectedTeamId"
-          (change)="onSelectedTeamChanged($event)">
+          (change)="onSelectedTeamChanged($event)"
+          [disabled]="uploading">
           <option value="">Personal only</option>
           @for (team of uploadTeams; track team.id) {
             <option [value]="team.id">
@@ -76,8 +79,8 @@
         type="button"
         class="primary-button"
         (click)="upload()"
-        [disabled]="!selectedFile || uploading">
-        {{ uploading ? 'Uploading...' : 'Upload document' }}
+        [disabled]="selectedFiles.length === 0 || uploading">
+        {{ uploadButtonLabel }}
       </button>
     </div>
   </section>
