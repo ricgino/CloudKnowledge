@@ -7,7 +7,13 @@ import {
 } from '@angular/common/http';
 
 import {
-  Observable
+  catchError,
+  concatMap,
+  from,
+  map,
+  Observable,
+  of,
+  toArray
 } from 'rxjs';
 
 import {
@@ -48,6 +54,15 @@ export interface DocumentItem
   status: string;
   isOwner: boolean;
   sharedTeams?: DocumentAccessTeam[] | null;
+}
+
+export interface DocumentUploadOutcome
+{
+  fileName: string;
+  succeeded: boolean;
+  document?: DocumentItem;
+  errorStatus?: number;
+  errorMessage?: string;
 }
 
 export interface DocumentsPageResponse
@@ -194,6 +209,39 @@ export class Documents
     return this.http.post<DocumentItem>(
       `${apiBaseUrl}/api/documents`,
       formData);
+  }
+
+  uploadDocuments(
+    files: readonly File[],
+    teamId?: string):
+    Observable<DocumentUploadOutcome[]>
+  {
+    return from(files)
+      .pipe(
+        concatMap(
+          file =>
+            this.uploadDocument(
+              file,
+              teamId)
+              .pipe(
+                map(
+                  document =>
+                    ({
+                      fileName: file.name,
+                      succeeded: true,
+                      document
+                    }) satisfies DocumentUploadOutcome),
+                catchError(
+                  error =>
+                    of(
+                      ({
+                        fileName: file.name,
+                        succeeded: false,
+                        errorStatus: error?.status,
+                        errorMessage: error?.error?.message
+                      }) satisfies DocumentUploadOutcome))
+              )),
+        toArray());
   }
 
   deleteDocument(
