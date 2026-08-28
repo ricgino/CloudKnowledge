@@ -11,6 +11,8 @@ namespace CloudKnowledge.Infrastructure.Documents;
 public sealed class OllamaAnswerGenerator
     : IAnswerGenerator
 {
+    private const int MaximumAttempts = 2;
+
     private readonly HttpClient _httpClient;
     private readonly string _model;
     private readonly double _temperature;
@@ -113,7 +115,7 @@ public sealed class OllamaAnswerGenerator
             - Sii conciso ma completo.
             """;
 
-        var userPrompt =
+        var baseUserPrompt =
             $"""
             DOMANDA:
             {question}
@@ -125,6 +127,46 @@ public sealed class OllamaAnswerGenerator
             le fonti sopra riportate.
             """;
 
+        for (var attempt = 1;
+             attempt <= MaximumAttempts;
+             attempt++)
+        {
+            var userPrompt =
+                attempt == 1
+                    ? baseUserPrompt
+                    : BuildCorrectivePrompt(
+                        baseUserPrompt);
+
+            var answer =
+                await GenerateAttemptAsync(
+                    systemPrompt,
+                    userPrompt,
+                    cancellationToken);
+
+            if (IsAcceptableGroundedAnswer(
+                    question,
+                    answer,
+                    sources))
+            {
+                return answer;
+            }
+
+            _logger.LogWarning(
+                "Ollama produced a degenerate grounded answer on attempt {Attempt} of {MaximumAttempts}; retrying={Retrying}.",
+                attempt,
+                MaximumAttempts,
+                attempt < MaximumAttempts);
+        }
+
+        throw new InvalidOperationException(
+            "Ollama did not produce a valid grounded answer after retrying.");
+    }
+
+    private async Task<string> GenerateAttemptAsync(
+        string systemPrompt,
+        string userPrompt,
+        CancellationToken cancellationToken)
+    {
         var request =
             new OllamaChatRequest(
                 _model,
@@ -195,6 +237,79 @@ public sealed class OllamaAnswerGenerator
         }
 
         return RemoveThinkingContent(answer);
+    }
+
+    private static string BuildCorrectivePrompt(
+        string baseUserPrompt)
+    {
+        return
+            $"""
+            {baseUserPrompt}
+
+            ATTENZIONE: il tentativo precedente non era una risposta valida.
+            Non ripetere la domanda.
+            Estrai dalle fonti fatti concreti che rispondono alla domanda.
+            Se le fonti contengono informazioni pertinenti, riportale esplicitamente.
+            Includi almeno una citazione valida come [S1] nella risposta.
+            """;
+    }
+
+    private static bool IsAcceptableGroundedAnswer(
+        string question,
+        string answer,
+        IReadOnlyList<AnswerContextSource> sources)
+    {
+        if (NormalizeComparableText(answer) ==
+            NormalizeComparableText(question))
+        {
+            return false;
+        }
+
+        if (sources.Count == 0)
+        {
+            return true;
+        }
+
+        return sources.Any(
+            source =>
+                answer.Contains(
+                    $"[{source.Label}]",
+                    StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeComparableText(
+        string value)
+    {
+        var builder =
+            new StringBuilder();
+
+        var previousWasSeparator =
+            false;
+
+        foreach (var character in value.Trim())
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                builder.Append(
+                    char.ToLowerInvariant(character));
+
+                previousWasSeparator =
+                    false;
+
+                continue;
+            }
+
+            if (!previousWasSeparator &&
+                builder.Length > 0)
+            {
+                builder.Append(' ');
+                previousWasSeparator = true;
+            }
+        }
+
+        return builder
+            .ToString()
+            .Trim();
     }
 
     private static OllamaResponseFormat CreateAnswerFormat()
