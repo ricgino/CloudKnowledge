@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using Azure.Storage.Blobs;
 using CloudKnowledge.Api.Authentication;
+using CloudKnowledge.Api.Database;
 using CloudKnowledge.Api.Notifications;
 using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.Access;
@@ -30,7 +31,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using Pgvector.EntityFrameworkCore;
 
-var builder = WebApplication.CreateBuilder(args);
+var migrationOnly =
+    DatabaseStartupMode.IsMigrationOnly(args);
+
+var builder =
+    WebApplication.CreateBuilder(
+        DatabaseStartupMode.RemoveMigrationArgument(args));
 
 builder.Services
     .AddAuthentication(
@@ -348,7 +354,8 @@ if (builder.Configuration.GetValue<bool>(
 
 var app = builder.Build();
 
-if (app.Configuration.GetValue<bool>(
+if (migrationOnly ||
+    app.Configuration.GetValue<bool>(
         "Database:ApplyMigrationsOnStartup"))
 {
     await using var scope =
@@ -359,6 +366,11 @@ if (app.Configuration.GetValue<bool>(
             .GetRequiredService<CloudKnowledgeDbContext>();
 
     await dbContext.Database.MigrateAsync();
+
+    if (migrationOnly)
+    {
+        return;
+    }
 }
 
 if (app.Environment.IsDevelopment())
