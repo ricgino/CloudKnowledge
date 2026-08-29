@@ -2,7 +2,6 @@
 **/*.tfstate
 **/*.tfstate.*
 **/*.tfplan
-**/.terraform.lock.hcl
 **/terraform.tfvars
 **/*.auto.tfvars
 !**/*.tfvars.example
