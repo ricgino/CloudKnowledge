@@ -61,6 +61,17 @@ foreach ($fragment in $credentialInspectionFragments) {
     }
 }
 
+$windowsPowerShellAudienceFragments = @(
+    '[object[]]$existingAudiences = @()',
+    '[object[]]$existingAudiences = @($existingCredential.audiences)'
+)
+
+foreach ($fragment in $windowsPowerShellAudienceFragments) {
+    if (-not $content.Contains($fragment, [System.StringComparison]::Ordinal)) {
+        throw "configure-github-oidc.ps1 must keep federated credential audiences as an explicit array under Windows PowerShell strict mode: $fragment"
+    }
+}
+
 if (-not $content.Contains('"federated-credential", "update"', [System.StringComparison]::Ordinal)) {
     throw "configure-github-oidc.ps1 must update an existing federated credential when its OIDC settings are stale."
 }
