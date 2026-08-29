@@ -235,7 +235,6 @@ builder.Services.AddSingleton<IEmbeddingGenerator>(
                 httpClient,
                 aiConfiguration.EmbeddingModel,
                 aiConfiguration.ApiKey!,
-                aiConfiguration.ApiVersion!,
                 aiConfiguration.EmbeddingDimensions);
         }
 
@@ -260,7 +259,6 @@ builder.Services.AddSingleton<IAnswerGenerator>(
                 httpClient,
                 aiConfiguration.AnswerModel!,
                 aiConfiguration.ApiKey!,
-                aiConfiguration.ApiVersion!,
                 aiConfiguration.AnswerTemperature,
                 aiConfiguration.AnswerMaxTokens);
         }
