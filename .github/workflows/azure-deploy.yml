@@ -2,6 +2,12 @@ name: Azure Deployment
 
 on:
   workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply the Terraform plan after review"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -112,13 +118,52 @@ jobs:
           terraform_version: 1.15.8
           terraform_wrapper: false
 
+      - name: Initialize Terraform remote state
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          terraform -chdir=infra/azure/platform init \
+            -reconfigure \
+            -backend-config="use_cli=true" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="tenant_id=$AZURE_TENANT_ID" \
+            -backend-config="storage_account_name=$AZURE_TF_STATE_STORAGE_ACCOUNT" \
+            -backend-config="container_name=$AZURE_TF_STATE_CONTAINER" \
+            -backend-config="key=$AZURE_TF_STATE_KEY"
+
+      - name: Validate Terraform
+        shell: bash
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra/azure/platform validate
+
+      - name: Plan Azure platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra/azure/platform plan \
+            -out=cloudknowledge.tfplan
+
+      - name: Stop after plan for review
+        if: ${{ !inputs.apply }}
+        shell: bash
+        run: |
+          echo "### CloudKnowledge Azure plan only" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "No Azure platform resources were applied by this run." >> "$GITHUB_STEP_SUMMARY"
+          echo "Review the Terraform plan in the 'Plan Azure platform' step." >> "$GITHUB_STEP_SUMMARY"
+          echo "When the plan is approved, rerun this workflow with apply=true." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Login to Azure Container Registry
+        if: ${{ inputs.apply }}
         shell: bash
         run: |
           set -euo pipefail
           az acr login --name "$AZURE_ACR_NAME"
 
       - name: Build and push immutable images
+        if: ${{ inputs.apply }}
         shell: bash
         run: |
           set -euo pipefail
@@ -150,34 +195,8 @@ jobs:
           docker push "$ACR_SERVER/cloudknowledge-worker:${GITHUB_SHA}"
           docker push "$ACR_SERVER/cloudknowledge-web:${GITHUB_SHA}"
 
-      - name: Initialize Terraform remote state
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          terraform -chdir=infra/azure/platform init \
-            -reconfigure \
-            -backend-config="use_cli=true" \
-            -backend-config="use_azuread_auth=true" \
-            -backend-config="tenant_id=$AZURE_TENANT_ID" \
-            -backend-config="storage_account_name=$AZURE_TF_STATE_STORAGE_ACCOUNT" \
-            -backend-config="container_name=$AZURE_TF_STATE_CONTAINER" \
-            -backend-config="key=$AZURE_TF_STATE_KEY"
-
-      - name: Validate Terraform
-        shell: bash
-        run: |
-          set -euo pipefail
-          terraform -chdir=infra/azure/platform validate
-
-      - name: Plan Azure platform
-        shell: bash
-        run: |
-          set -euo pipefail
-          terraform -chdir=infra/azure/platform plan \
-            -out=cloudknowledge.tfplan
-
       - name: Apply Azure platform
+        if: ${{ inputs.apply }}
         shell: bash
         run: |
           set -euo pipefail
@@ -186,6 +205,7 @@ jobs:
             cloudknowledge.tfplan
 
       - name: Run database migrations
+        if: ${{ inputs.apply }}
         shell: bash
         run: |
           set -euo pipefail
@@ -231,6 +251,7 @@ jobs:
           exit 1
 
       - name: Publish deployment URL
+        if: ${{ inputs.apply }}
         id: deployment
         shell: bash
         run: |
@@ -244,6 +265,7 @@ jobs:
           echo "Image tag: \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Smoke check public Web endpoint
+        if: ${{ inputs.apply }}
         shell: bash
         env:
           WEB_URL: ${{ steps.deployment.outputs.web_url }}
