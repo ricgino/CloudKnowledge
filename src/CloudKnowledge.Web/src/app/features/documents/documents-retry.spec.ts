@@ -37,9 +37,11 @@ describe('document retry', () => {
           Observable<void>;
       }).retryDocument;
 
+    expect(retryDocument)
+      .toBeDefined();
+
     if (!retryDocument)
     {
-      fail('Documents.retryDocument is not implemented.');
       return;
     }
 
