@@ -1,0 +1,21 @@
+subscription_id     = "00000000-0000-0000-0000-000000000000"
+resource_group_name = "rg-cloudknowledge-demo"
+acr_name            = "cloudknowledgedemo000000"
+image_tag           = "0123456789abcdef0123456789abcdef01234567"
+
+postgres_admin_login    = "cloudknowledgeadmin"
+postgres_admin_password = "set-through-TF_VAR_postgres_admin_password"
+
+azure_ad_instance      = "https://cloudknowledgecustomers.ciamlogin.com/"
+azure_ad_tenant_id     = "24761888-7338-4aac-9cca-eede0c9651b2"
+azure_ad_api_client_id = "3553ddee-92f1-464e-a409-4395bddb3898"
+
+azure_openai_endpoint             = "https://your-resource.openai.azure.com/"
+azure_openai_api_key              = "set-through-TF_VAR_azure_openai_api_key"
+azure_openai_api_version          = "2025-04-01-preview"
+azure_openai_embedding_deployment = "embedding-small"
+azure_openai_answer_deployment    = "answer-small"
+
+embedding_dimensions = 768
+answer_temperature   = 0.1
+answer_max_tokens    = 256
