@@ -106,6 +106,9 @@ builder.Services.AddScoped<
     IDocumentRepository,
     EfDocumentRepository>();
 
+builder.Services.AddSingleton<
+    IDocumentProcessingDiagnostics,
+    LoggingDocumentProcessingDiagnostics>();
 builder.Services.AddScoped<ProcessDocumentUseCase>();
 builder.Services.AddScoped<FailDocumentUseCase>();
 
