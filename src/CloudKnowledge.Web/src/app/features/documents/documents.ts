@@ -253,6 +253,15 @@ export class Documents
       `${apiBaseUrl}/api/documents/${documentId}`);
   }
 
+  retryDocument(
+    documentId: string):
+    Observable<void>
+  {
+    return this.http.post<void>(
+      `${apiBaseUrl}/api/documents/${documentId}/retry`,
+      null);
+  }
+
   downloadDocument(
     documentId: string):
     Observable<Blob>
