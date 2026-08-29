@@ -247,7 +247,7 @@ else {
 }
 
 Ensure-RoleAssignment $principalObjectId "Contributor" $resourceGroupId
-Ensure-RoleAssignment $principalObjectId "User Access Administrator" $resourceGroupId
+Ensure-RoleAssignment $principalObjectId "Role Based Access Control Administrator" $acrId
 Ensure-RoleAssignment $principalObjectId "AcrPush" $acrId
 Ensure-RoleAssignment $principalObjectId "Storage Blob Data Contributor" $stateAccountId
 
