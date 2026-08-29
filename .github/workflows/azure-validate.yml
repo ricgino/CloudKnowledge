@@ -79,35 +79,15 @@ jobs:
         with:
           terraform_version: 1.15.8
 
-      - name: Generate provider lock files
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          terraform -chdir=infra/azure/bootstrap providers lock \
-            -platform=linux_amd64 \
-            -platform=windows_amd64
-
-          terraform -chdir=infra/azure/platform providers lock \
-            -platform=linux_amd64 \
-            -platform=windows_amd64
-
-          echo "=== BOOTSTRAP_LOCK_BEGIN ==="
-          cat infra/azure/bootstrap/.terraform.lock.hcl
-          echo "=== BOOTSTRAP_LOCK_END ==="
-          echo "=== PLATFORM_LOCK_BEGIN ==="
-          cat infra/azure/platform/.terraform.lock.hcl
-          echo "=== PLATFORM_LOCK_END ==="
-
       - name: Terraform format
         run: terraform fmt -check -diff -recursive infra/azure
 
       - name: Validate bootstrap
         run: |
-          terraform -chdir=infra/azure/bootstrap init -backend=false
+          terraform -chdir=infra/azure/bootstrap init -backend=false -lockfile=readonly
           terraform -chdir=infra/azure/bootstrap validate
 
       - name: Validate platform
         run: |
-          terraform -chdir=infra/azure/platform init -backend=false
+          terraform -chdir=infra/azure/platform init -backend=false -lockfile=readonly
           terraform -chdir=infra/azure/platform validate
