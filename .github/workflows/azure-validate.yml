@@ -35,7 +35,7 @@ jobs:
           terraform_version: 1.15.8
 
       - name: Terraform format
-        run: terraform fmt -check -recursive infra/azure
+        run: terraform fmt -check -diff -recursive infra/azure
 
       - name: Validate bootstrap
         run: |
