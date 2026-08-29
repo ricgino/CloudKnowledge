@@ -4,10 +4,7 @@ param(
     [string]$GitHubEnvironment = "azure-demo",
     [string]$ApplicationDisplayName = "CloudKnowledge GitHub Deploy",
     [string]$AzureAdTenantId = "24761888-7338-4aac-9cca-eede0c9651b2",
-    [string]$AzureAdApiClientId = "3553ddee-92f1-464e-a409-4395bddb3898",
-    [string]$AzureOpenAiEndpoint = "",
-    [string]$AzureOpenAiEmbeddingDeployment = "",
-    [string]$AzureOpenAiAnswerDeployment = ""
+    [string]$AzureAdApiClientId = "3553ddee-92f1-464e-a409-4395bddb3898"
 )
 
 Set-StrictMode -Version Latest
@@ -269,33 +266,16 @@ Set-GitHubEnvironmentVariable "AZURE_TF_STATE_KEY" $stateKey
 Set-GitHubEnvironmentVariable "AZURE_AD_TENANT_ID" $AzureAdTenantId
 Set-GitHubEnvironmentVariable "AZURE_AD_API_CLIENT_ID" $AzureAdApiClientId
 
-if (-not [string]::IsNullOrWhiteSpace($AzureOpenAiEndpoint)) {
-    Set-GitHubEnvironmentVariable "AZURE_OPENAI_ENDPOINT" $AzureOpenAiEndpoint.Trim()
-}
-
-if (-not [string]::IsNullOrWhiteSpace($AzureOpenAiEmbeddingDeployment)) {
-    Set-GitHubEnvironmentVariable "AZURE_OPENAI_EMBEDDING_DEPLOYMENT" $AzureOpenAiEmbeddingDeployment.Trim()
-}
-
-if (-not [string]::IsNullOrWhiteSpace($AzureOpenAiAnswerDeployment)) {
-    Set-GitHubEnvironmentVariable "AZURE_OPENAI_ANSWER_DEPLOYMENT" $AzureOpenAiAnswerDeployment.Trim()
-}
-
 Write-Host ""
 Write-Host "GitHub OIDC configuration completed."
 Write-Host "Application ID: $appId"
 Write-Host "OIDC subject:   $subject"
 Write-Host "Environment:    $GitHubEnvironment"
 Write-Host ""
-Write-Host "Before the first deployment, configure these GitHub environment values:"
-Write-Host "  Variables:"
-Write-Host "    AZURE_OPENAI_ENDPOINT"
-Write-Host "    AZURE_OPENAI_EMBEDDING_DEPLOYMENT"
-Write-Host "    AZURE_OPENAI_ANSWER_DEPLOYMENT"
-Write-Host "  Secrets:"
-Write-Host "    POSTGRES_ADMIN_PASSWORD"
-Write-Host "    AZURE_OPENAI_API_KEY"
+Write-Host "Before the first deployment, configure these GitHub environment secrets:"
+Write-Host "  POSTGRES_ADMIN_PASSWORD"
+Write-Host "  OPENAI_API_KEY"
 Write-Host ""
-Write-Host "Example secret commands:"
+Write-Host "Secret commands (values are prompted interactively):"
 Write-Host "  gh secret set POSTGRES_ADMIN_PASSWORD --repo $Repository --env $GitHubEnvironment"
-Write-Host "  gh secret set AZURE_OPENAI_API_KEY --repo $Repository --env $GitHubEnvironment"
+Write-Host "  gh secret set OPENAI_API_KEY --repo $Repository --env $GitHubEnvironment"
