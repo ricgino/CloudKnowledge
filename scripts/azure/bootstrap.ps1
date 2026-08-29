@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$SubscriptionId = "",
-    [string]$Location = "westeurope",
+    [string]$ResourceGroupLocation = "westeurope",
+    [string]$WorkloadLocation = "italynorth",
     [string]$ResourcePrefix = "cloudknowledge",
     [string]$Environment = "demo",
     [switch]$AutoApprove
@@ -54,16 +55,18 @@ else {
     $account = az account show --output json | ConvertFrom-Json
 }
 
-Write-Host "Azure account: $($account.name)"
-Write-Host "Subscription: $SubscriptionId"
-Write-Host "Region:       $Location"
-Write-Host "Prefix:       $ResourcePrefix"
-Write-Host "Environment:  $Environment"
+Write-Host "Azure account:          $($account.name)"
+Write-Host "Subscription:           $SubscriptionId"
+Write-Host "Resource group region:  $ResourceGroupLocation"
+Write-Host "Workload region:        $WorkloadLocation"
+Write-Host "Prefix:                 $ResourcePrefix"
+Write-Host "Environment:            $Environment"
 Write-Host ""
 
 Invoke-Native "terraform" @(
     "-chdir=$bootstrapPath",
-    "init"
+    "init",
+    "-lockfile=readonly"
 )
 
 Invoke-Native "terraform" @(
@@ -71,14 +74,15 @@ Invoke-Native "terraform" @(
     "plan",
     "-out=$planPath",
     "-var=subscription_id=$SubscriptionId",
-    "-var=location=$Location",
+    "-var=resource_group_location=$ResourceGroupLocation",
+    "-var=workload_location=$WorkloadLocation",
     "-var=resource_prefix=$ResourcePrefix",
     "-var=environment=$Environment"
 )
 
 if (-not $AutoApprove) {
     Write-Host ""
-    Write-Host "Terraform plan created. This will create the CloudKnowledge Azure bootstrap resources."
+    Write-Host "Terraform plan created. Review the region and resource actions above."
     $confirmation = Read-Host "Type DEPLOY to apply the plan"
 
     if ($confirmation -cne "DEPLOY") {
@@ -100,6 +104,8 @@ finally {
 }
 
 $resourceGroup = terraform -chdir=$bootstrapPath output -raw resource_group_name
+$resourceGroupLocation = terraform -chdir=$bootstrapPath output -raw resource_group_location
+$workloadLocation = terraform -chdir=$bootstrapPath output -raw workload_location
 $acrName = terraform -chdir=$bootstrapPath output -raw acr_name
 $acrLoginServer = terraform -chdir=$bootstrapPath output -raw acr_login_server
 $stateAccount = terraform -chdir=$bootstrapPath output -raw terraform_state_storage_account_name
@@ -108,11 +114,13 @@ $stateKey = terraform -chdir=$bootstrapPath output -raw terraform_state_key
 
 Write-Host ""
 Write-Host "Azure bootstrap completed."
-Write-Host "Resource group:     $resourceGroup"
-Write-Host "ACR:                $acrName"
-Write-Host "ACR login server:   $acrLoginServer"
-Write-Host "TF state account:   $stateAccount"
-Write-Host "TF state container: $stateContainer"
-Write-Host "TF state key:       $stateKey"
+Write-Host "Resource group:         $resourceGroup"
+Write-Host "Resource group region:  $resourceGroupLocation"
+Write-Host "Workload region:        $workloadLocation"
+Write-Host "ACR:                    $acrName"
+Write-Host "ACR login server:       $acrLoginServer"
+Write-Host "TF state account:       $stateAccount"
+Write-Host "TF state container:     $stateContainer"
+Write-Host "TF state key:           $stateKey"
 Write-Host ""
 Write-Host "Next: run ./scripts/azure/configure-github-oidc.ps1"
