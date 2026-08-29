@@ -147,6 +147,15 @@ builder.Services.AddSingleton<IEmbeddingGenerator>(
                 aiConfiguration.EmbeddingDimensions);
         }
 
+        if (aiConfiguration.IsOpenAi)
+        {
+            return new OpenAiEmbeddingGenerator(
+                httpClient,
+                aiConfiguration.EmbeddingModel,
+                aiConfiguration.ApiKey!,
+                aiConfiguration.EmbeddingDimensions);
+        }
+
         return new OllamaEmbeddingGenerator(
             httpClient,
             aiConfiguration.EmbeddingModel,
