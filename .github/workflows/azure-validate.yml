@@ -8,6 +8,8 @@ on:
       - "infra/azure/**"
       - "scripts/azure/**"
       - "tests/azure/**"
+      - "src/CloudKnowledge.Application/Document/ProcessDocument/**"
+      - "src/CloudKnowledge.Worker/**"
       - "src/CloudKnowledge.Web/nginx.conf.template"
       - ".github/workflows/azure-deploy.yml"
       - ".github/workflows/azure-validate.yml"
@@ -19,6 +21,8 @@ on:
       - "infra/azure/**"
       - "scripts/azure/**"
       - "tests/azure/**"
+      - "src/CloudKnowledge.Application/Document/ProcessDocument/**"
+      - "src/CloudKnowledge.Worker/**"
       - "src/CloudKnowledge.Web/nginx.conf.template"
       - ".github/workflows/azure-deploy.yml"
       - ".github/workflows/azure-validate.yml"
@@ -85,6 +89,10 @@ jobs:
       - name: Test CloudKnowledge Web internal API proxy contract
         shell: pwsh
         run: ./tests/azure/web-proxy-tests.ps1
+
+      - name: Test Worker processing diagnostics contract
+        shell: pwsh
+        run: ./tests/azure/worker-processing-diagnostics-tests.ps1
 
       - name: Test direct OpenAI deployment contract
         shell: pwsh
