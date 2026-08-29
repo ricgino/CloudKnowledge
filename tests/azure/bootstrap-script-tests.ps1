@@ -42,4 +42,12 @@ if ($registrationPosition -lt 0 -or $terraformInitPosition -lt 0 -or $registrati
     throw "Azure provider registration must happen before Terraform initialization."
 }
 
-Write-Host "Azure bootstrap provider-registration contract passed."
+if ($content.Contains('terraform -chdir=$bootstrapPath output', [System.StringComparison]::Ordinal)) {
+    throw "bootstrap.ps1 must not pass a literal '-chdir=`$bootstrapPath' token when reading Terraform outputs."
+}
+
+if (-not $content.Contains('terraform "-chdir=$Directory" output -raw $Name', [System.StringComparison]::Ordinal)) {
+    throw "bootstrap.ps1 must read Terraform outputs through an expanded quoted -chdir argument."
+}
+
+Write-Host "Azure bootstrap script contract passed."
