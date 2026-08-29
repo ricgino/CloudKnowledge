@@ -28,6 +28,7 @@ It demonstrates production-oriented backend and cloud engineering practices: aut
 - Azure Blob Storage / Azurite for local development
 - Azure Service Bus / Service Bus emulator for local development
 - Ollama for local embeddings and answer generation
+- Provider-neutral cloud AI boundary with direct OpenAI and AzureOpenAI support
 - Microsoft Entra External ID for authentication
 
 The application is a modular monolith with a separate background worker. Components are split only where asynchronous processing provides a clear architectural benefit.
@@ -74,7 +75,7 @@ The API applies EF Core migrations automatically only in the Compose environment
 
 The Web container proxies `/api` to the API container, so browser traffic remains same-origin. When running Angular through `ng serve`, the Angular development proxy forwards `/api` to the local HTTPS API instead.
 
-Ollama intentionally remains host-side for local development. It is not the intended production AI deployment model; a managed cloud AI provider replaces it for Azure deployment.
+Ollama intentionally remains host-side for local development. It is not the intended production AI deployment model; a cloud provider replaces it for the Azure-hosted demo.
 
 ### Stop the stack
 
@@ -92,7 +93,7 @@ docker compose down -v
 
 Azure deployment work is isolated on `feat/azure-deployment` and draft PR #6 while the local Docker baseline remains on `feat/team-hierarchy-document-library`.
 
-The Azure target keeps the same application architecture and replaces local emulators/providers with managed Azure services:
+The Azure target keeps the same application architecture and replaces local emulators/providers with cloud services:
 
 - Azure Container Apps for Web, API and Worker
 - Azure Container Registry
@@ -100,11 +101,11 @@ The Azure target keeps the same application architecture and replaces local emul
 - Azure Blob Storage
 - Azure Service Bus
 - Microsoft Entra External ID
-- managed Azure OpenAI-compatible inference
+- direct OpenAI API inference for the current demo, with AzureOpenAI retained as a supported provider
 - Terraform remote state in Azure Storage
 - GitHub Actions deployment through Microsoft Entra workload identity federation / OIDC
 
-The Azure branch preserves 768-dimensional embeddings and PostgreSQL/pgvector rather than introducing a separate vector-search product.
+The current cloud demo configuration uses `text-embedding-3-small` at 768 dimensions and `gpt-4.1-nano`. Azure OpenAI discovery is retained so the deployment can move back to Azure-hosted inference when the subscription exposes a usable model catalog.
 
 Bootstrap is intentionally explicit:
 
@@ -116,7 +117,7 @@ gh auth login
 ./scripts/azure/configure-github-oidc.ps1
 ```
 
-After the managed AI deployment variables and the two required GitHub Environment secrets are configured, deployment runs manually through:
+After the two required GitHub Environment secrets, `POSTGRES_ADMIN_PASSWORD` and `OPENAI_API_KEY`, are configured, deployment runs manually through:
 
 ```text
 Actions -> Azure Deployment -> Run workflow
@@ -141,8 +142,7 @@ Full setup, cost guardrails, Entra redirect instructions, E2E checklist and tear
 
 ## Next cloud milestones
 
-- run the first real Azure bootstrap against the Free subscription
-- select the lowest-cost managed AI deployments that preserve the current RAG contract
+- configure the direct OpenAI API credential and PostgreSQL deployment secret
 - execute the protected Azure Deployment workflow
 - add the generated Azure Web redirect URI to Entra External ID
 - run the complete Azure E2E smoke test with a second user
