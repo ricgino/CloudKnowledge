@@ -150,11 +150,6 @@ resource "azurerm_container_app" "api" {
       }
 
       env {
-        name  = "Ai__ApiVersion"
-        value = var.azure_openai_api_version
-      }
-
-      env {
         name  = "Ai__EmbeddingDeployment"
         value = var.azure_openai_embedding_deployment
       }
@@ -338,11 +333,6 @@ resource "azurerm_container_app" "worker" {
       env {
         name        = "Ai__ApiKey"
         secret_name = "azure-openai-key"
-      }
-
-      env {
-        name  = "Ai__ApiVersion"
-        value = var.azure_openai_api_version
       }
 
       env {
@@ -547,11 +537,6 @@ resource "azurerm_container_app_job" "database_migration" {
       env {
         name        = "Ai__ApiKey"
         secret_name = "azure-openai-key"
-      }
-
-      env {
-        name  = "Ai__ApiVersion"
-        value = var.azure_openai_api_version
       }
 
       env {
