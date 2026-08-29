@@ -12,7 +12,6 @@ azure_ad_api_client_id = "3553ddee-92f1-464e-a409-4395bddb3898"
 
 azure_openai_endpoint             = "https://your-resource.openai.azure.com/"
 azure_openai_api_key              = "set-through-TF_VAR_azure_openai_api_key"
-azure_openai_api_version          = "2025-04-01-preview"
 azure_openai_embedding_deployment = "embedding-small"
 azure_openai_answer_deployment    = "answer-small"
 
