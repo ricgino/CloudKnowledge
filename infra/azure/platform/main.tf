@@ -1,6 +1,6 @@
 locals {
   deterministic_suffix = substr(md5("${var.subscription_id}-${var.resource_group_name}"), 0, 6)
-  compact_prefix        = replace("${var.resource_prefix}${var.environment}", "-", "")
+  compact_prefix       = replace("${var.resource_prefix}${var.environment}", "-", "")
 
   postgres_server_name = substr("psql-${var.resource_prefix}-${var.environment}-${local.deterministic_suffix}", 0, 63)
   storage_account_name = substr("st${local.compact_prefix}${local.deterministic_suffix}", 0, 24)
