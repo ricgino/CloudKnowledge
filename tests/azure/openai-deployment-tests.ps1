@@ -55,7 +55,6 @@ $requiredWorkflowFragments = @(
     'OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}',
     'TF_VAR_ai_provider:',
     'TF_VAR_ai_endpoint:',
-    'TF_VAR_ai_api_key:',
     'TF_VAR_ai_embedding_model:',
     'TF_VAR_ai_answer_model:'
 )
@@ -107,6 +106,21 @@ $applyGuardCount = ([regex]::Matches(
 
 if ($applyGuardCount -lt 6) {
     throw "Azure deployment must guard registry login, image push, apply, migration, URL publication, and smoke check. Found $applyGuardCount guards."
+}
+
+$planCredentialFragments = @(
+    'name: Configure Terraform AI credential',
+    'APPLY_REQUESTED:',
+    'plan-only-placeholder',
+    'Missing GitHub environment value: OPENAI_API_KEY',
+    'TF_VAR_ai_api_key=$OPENAI_API_KEY',
+    'TF_VAR_ai_api_key=plan-only-placeholder'
+)
+
+foreach ($fragment in $planCredentialFragments) {
+    if (-not $workflow.Contains($fragment, [System.StringComparison]::Ordinal)) {
+        throw "Azure plan/apply credential handling is missing: $fragment"
+    }
 }
 
 Write-Host "Direct OpenAI Azure deployment contract passed."
