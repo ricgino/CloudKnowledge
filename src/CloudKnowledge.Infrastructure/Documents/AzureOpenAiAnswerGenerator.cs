@@ -11,7 +11,6 @@ public sealed class AzureOpenAiAnswerGenerator
     private readonly HttpClient _httpClient;
     private readonly string _deployment;
     private readonly string _apiKey;
-    private readonly string _apiVersion;
     private readonly double _temperature;
     private readonly int _maxTokens;
 
@@ -19,7 +18,6 @@ public sealed class AzureOpenAiAnswerGenerator
         HttpClient httpClient,
         string deployment,
         string apiKey,
-        string apiVersion,
         double temperature,
         int maxTokens)
     {
@@ -39,13 +37,6 @@ public sealed class AzureOpenAiAnswerGenerator
                 nameof(apiKey));
         }
 
-        if (string.IsNullOrWhiteSpace(apiVersion))
-        {
-            throw new ArgumentException(
-                "API version cannot be empty.",
-                nameof(apiVersion));
-        }
-
         if (temperature < 0 || temperature > 2)
         {
             throw new ArgumentOutOfRangeException(
@@ -61,7 +52,6 @@ public sealed class AzureOpenAiAnswerGenerator
         _httpClient = httpClient;
         _deployment = deployment.Trim();
         _apiKey = apiKey.Trim();
-        _apiVersion = apiVersion.Trim();
         _temperature = temperature;
         _maxTokens = maxTokens;
     }
@@ -73,6 +63,7 @@ public sealed class AzureOpenAiAnswerGenerator
     {
         var requestBody =
             new AzureOpenAiChatRequest(
+                _deployment,
                 [
                     new AzureOpenAiChatMessage(
                         "system",
@@ -89,7 +80,7 @@ public sealed class AzureOpenAiAnswerGenerator
         using var request =
             new HttpRequestMessage(
                 HttpMethod.Post,
-                BuildRequestPath())
+                "/openai/v1/chat/completions")
             {
                 Content =
                     JsonContent.Create(
@@ -125,13 +116,6 @@ public sealed class AzureOpenAiAnswerGenerator
         }
 
         return answer.Trim();
-    }
-
-    private string BuildRequestPath()
-    {
-        return
-            $"/openai/deployments/{Uri.EscapeDataString(_deployment)}/chat/completions" +
-            $"?api-version={Uri.EscapeDataString(_apiVersion)}";
     }
 
     private static string BuildSystemPrompt()
@@ -179,6 +163,8 @@ public sealed class AzureOpenAiAnswerGenerator
     }
 
     private sealed record AzureOpenAiChatRequest(
+        [property: JsonPropertyName("model")]
+        string Model,
         [property: JsonPropertyName("messages")]
         AzureOpenAiChatMessage[] Messages,
         [property: JsonPropertyName("temperature")]
