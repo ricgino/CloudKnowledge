@@ -1,6 +1,7 @@
 locals {
   deterministic_suffix = substr(md5("${var.subscription_id}-${var.resource_group_name}"), 0, 6)
   compact_prefix       = replace("${var.resource_prefix}${var.environment}", "-", "")
+  workload_location    = data.azurerm_container_registry.cloudknowledge.location
 
   postgres_server_name = substr("psql-${var.resource_prefix}-${var.environment}-${local.deterministic_suffix}", 0, 63)
   storage_account_name = substr("st${local.compact_prefix}${local.deterministic_suffix}", 0, 24)
@@ -18,7 +19,7 @@ locals {
 resource "azurerm_postgresql_flexible_server" "cloudknowledge" {
   name                          = local.postgres_server_name
   resource_group_name           = data.azurerm_resource_group.cloudknowledge.name
-  location                      = data.azurerm_resource_group.cloudknowledge.location
+  location                      = local.workload_location
   version                       = "18"
   administrator_login           = var.postgres_admin_login
   administrator_password        = var.postgres_admin_password
@@ -58,7 +59,7 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "azure_services" {
 resource "azurerm_storage_account" "documents" {
   name                            = local.storage_account_name
   resource_group_name             = data.azurerm_resource_group.cloudknowledge.name
-  location                        = data.azurerm_resource_group.cloudknowledge.location
+  location                        = local.workload_location
   account_tier                    = "Standard"
   account_replication_type        = "LRS"
   account_kind                    = "StorageV2"
@@ -77,7 +78,7 @@ resource "azurerm_storage_container" "documents" {
 
 resource "azurerm_servicebus_namespace" "cloudknowledge" {
   name                = local.servicebus_name
-  location            = data.azurerm_resource_group.cloudknowledge.location
+  location            = local.workload_location
   resource_group_name = data.azurerm_resource_group.cloudknowledge.name
   sku                 = "Standard"
   minimum_tls_version = "1.2"
@@ -102,7 +103,7 @@ resource "azurerm_servicebus_queue" "document_ready_events" {
 
 resource "azurerm_log_analytics_workspace" "cloudknowledge" {
   name                = "log-${var.resource_prefix}-${var.environment}-${local.deterministic_suffix}"
-  location            = data.azurerm_resource_group.cloudknowledge.location
+  location            = local.workload_location
   resource_group_name = data.azurerm_resource_group.cloudknowledge.name
   sku                 = "PerGB2018"
   retention_in_days   = 30
@@ -112,7 +113,7 @@ resource "azurerm_log_analytics_workspace" "cloudknowledge" {
 
 resource "azurerm_container_app_environment" "cloudknowledge" {
   name                       = "cae-${var.resource_prefix}-${var.environment}"
-  location                   = data.azurerm_resource_group.cloudknowledge.location
+  location                   = local.workload_location
   resource_group_name        = data.azurerm_resource_group.cloudknowledge.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.cloudknowledge.id
 
@@ -121,7 +122,7 @@ resource "azurerm_container_app_environment" "cloudknowledge" {
 
 resource "azurerm_user_assigned_identity" "container_apps" {
   name                = "id-${var.resource_prefix}-${var.environment}-containers"
-  location            = data.azurerm_resource_group.cloudknowledge.location
+  location            = local.workload_location
   resource_group_name = data.azurerm_resource_group.cloudknowledge.name
 
   tags = local.tags
