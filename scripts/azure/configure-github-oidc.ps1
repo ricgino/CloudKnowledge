@@ -244,7 +244,10 @@ if ($LASTEXITCODE -ne 0) {
 $existingCredential = $existingCredentialJson | ConvertFrom-Json
 $existingSubject = if ($null -ne $existingCredential) { [string]$existingCredential.subject } else { "" }
 $existingIssuer = if ($null -ne $existingCredential) { [string]$existingCredential.issuer } else { "" }
-$existingAudiences = if ($null -ne $existingCredential) { @($existingCredential.audiences) } else { @() }
+[object[]]$existingAudiences = @()
+if ($null -ne $existingCredential -and $null -ne $existingCredential.audiences) {
+    [object[]]$existingAudiences = @($existingCredential.audiences)
+}
 $hasExpectedAudience = $existingAudiences.Count -eq 1 -and [string]::Equals(
     [string]$existingAudiences[0],
     $audience,
