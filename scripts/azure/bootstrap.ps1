@@ -31,6 +31,21 @@ function Invoke-Native {
     }
 }
 
+function Get-RequiredTerraformOutput {
+    param(
+        [Parameter(Mandatory)][string]$Directory,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    $value = terraform "-chdir=$Directory" output -raw $Name
+
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($value)) {
+        throw "Terraform output '$Name' could not be read from '$Directory'."
+    }
+
+    return ([string]$value).Trim()
+}
+
 function Ensure-AzureProviderRegistration {
     param(
         [Parameter(Mandatory)][string]$Namespace,
@@ -178,14 +193,14 @@ finally {
     Remove-Item $planPath -ErrorAction SilentlyContinue
 }
 
-$resourceGroup = terraform -chdir=$bootstrapPath output -raw resource_group_name
-$resourceGroupLocation = terraform -chdir=$bootstrapPath output -raw resource_group_location
-$workloadLocation = terraform -chdir=$bootstrapPath output -raw workload_location
-$acrName = terraform -chdir=$bootstrapPath output -raw acr_name
-$acrLoginServer = terraform -chdir=$bootstrapPath output -raw acr_login_server
-$stateAccount = terraform -chdir=$bootstrapPath output -raw terraform_state_storage_account_name
-$stateContainer = terraform -chdir=$bootstrapPath output -raw terraform_state_container_name
-$stateKey = terraform -chdir=$bootstrapPath output -raw terraform_state_key
+$resourceGroup = Get-RequiredTerraformOutput -Directory $bootstrapPath -Name "resource_group_name"
+$resourceGroupLocation = Get-RequiredTerraformOutput -Directory $bootstrapPath -Name "resource_group_location"
+$workloadLocation = Get-RequiredTerraformOutput -Directory $bootstrapPath -Name "workload_location"
+$acrName = Get-RequiredTerraformOutput -Directory $bootstrapPath -Name "acr_name"
+$acrLoginServer = Get-RequiredTerraformOutput -Directory $bootstrapPath -Name "acr_login_server"
+$stateAccount = Get-RequiredTerraformOutput -Directory $bootstrapPath -Name "terraform_state_storage_account_name"
+$stateContainer = Get-RequiredTerraformOutput -Directory $bootstrapPath -Name "terraform_state_container_name"
+$stateKey = Get-RequiredTerraformOutput -Directory $bootstrapPath -Name "terraform_state_key"
 
 Write-Host ""
 Write-Host "Azure bootstrap completed."
