@@ -7,7 +7,6 @@ public sealed record AiProviderConfiguration(
     string Provider,
     Uri BaseUrl,
     string? ApiKey,
-    string? ApiVersion,
     string EmbeddingModel,
     string? AnswerModel,
     int EmbeddingDimensions,
@@ -104,7 +103,6 @@ public sealed record AiProviderConfiguration(
                 provider,
                 baseUrl,
                 ApiKey: null,
-                ApiVersion: null,
                 embeddingModel,
                 answerModel,
                 dimensions,
@@ -122,11 +120,6 @@ public sealed record AiProviderConfiguration(
                 configuration,
                 "Ai:ApiKey");
 
-        var apiVersion =
-            GetRequired(
-                configuration,
-                "Ai:ApiVersion");
-
         var embeddingDeployment =
             GetRequired(
                 configuration,
@@ -143,7 +136,6 @@ public sealed record AiProviderConfiguration(
             provider,
             endpoint,
             apiKey,
-            apiVersion,
             embeddingDeployment,
             answerDeployment,
             dimensions,
