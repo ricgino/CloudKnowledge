@@ -74,12 +74,6 @@ variable "azure_openai_api_key" {
   sensitive   = true
 }
 
-variable "azure_openai_api_version" {
-  description = "Azure OpenAI REST API version."
-  type        = string
-  default     = "2025-04-01-preview"
-}
-
 variable "azure_openai_embedding_deployment" {
   description = "Azure OpenAI embedding deployment name."
   type        = string
