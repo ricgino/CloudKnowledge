@@ -79,4 +79,26 @@ foreach ($fragment in $obsoleteWorkflowFragments) {
     }
 }
 
+$requiredSafetyFragments = @(
+    'apply:',
+    'type: boolean',
+    'default: false',
+    'if: ${{ inputs.apply }}',
+    'if: ${{ !inputs.apply }}'
+)
+
+foreach ($fragment in $requiredSafetyFragments) {
+    if (-not $workflow.Contains($fragment, [System.StringComparison]::Ordinal)) {
+        throw "Azure deployment workflow is missing explicit apply safety: $fragment"
+    }
+}
+
+$applyGuardCount = ([regex]::Matches(
+    $workflow,
+    [regex]::Escape('if: ${{ inputs.apply }}'))).Count
+
+if ($applyGuardCount -lt 4) {
+    throw "Azure deployment must guard apply, migration, URL publication, and smoke check behind inputs.apply. Found $applyGuardCount guards."
+}
+
 Write-Host "Direct OpenAI Azure deployment contract passed."
