@@ -31,6 +31,59 @@ function Invoke-Native {
     }
 }
 
+function Ensure-AzureProviderRegistration {
+    param(
+        [Parameter(Mandatory)][string]$Namespace,
+        [Parameter(Mandatory)][string]$SubscriptionId
+    )
+
+    $registrationState = az provider show `
+        --namespace $Namespace `
+        --subscription $SubscriptionId `
+        --query registrationState `
+        --output tsv `
+        --only-show-errors
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not inspect Azure resource provider '$Namespace'."
+    }
+
+    if ([string]::Equals(
+            [string]$registrationState,
+            "Registered",
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-Host "Azure provider already registered: $Namespace"
+        return
+    }
+
+    Write-Host "Registering Azure provider: $Namespace"
+
+    Invoke-Native "az" @(
+        "provider", "register",
+        "--namespace", $Namespace,
+        "--subscription", $SubscriptionId,
+        "--wait",
+        "--only-show-errors"
+    )
+
+    $registrationState = az provider show `
+        --namespace $Namespace `
+        --subscription $SubscriptionId `
+        --query registrationState `
+        --output tsv `
+        --only-show-errors
+
+    if ($LASTEXITCODE -ne 0 -or
+        -not [string]::Equals(
+            [string]$registrationState,
+            "Registered",
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Azure resource provider '$Namespace' did not reach Registered state. Current state: '$registrationState'."
+    }
+
+    Write-Host "Azure provider registered: $Namespace"
+}
+
 Assert-Command "az"
 Assert-Command "terraform"
 
@@ -61,6 +114,28 @@ Write-Host "Resource group region:  $ResourceGroupLocation"
 Write-Host "Workload region:        $WorkloadLocation"
 Write-Host "Prefix:                 $ResourcePrefix"
 Write-Host "Environment:            $Environment"
+Write-Host ""
+
+$requiredProviders = @(
+    "Microsoft.ContainerRegistry",
+    "Microsoft.Storage",
+    "Microsoft.DBforPostgreSQL",
+    "Microsoft.ServiceBus",
+    "Microsoft.App",
+    "Microsoft.OperationalInsights",
+    "Microsoft.ManagedIdentity",
+    "Microsoft.Authorization"
+)
+
+Write-Host "Ensuring required Azure resource providers are registered..."
+
+foreach ($providerNamespace in $requiredProviders) {
+    Ensure-AzureProviderRegistration `
+        -Namespace $providerNamespace `
+        -SubscriptionId $SubscriptionId
+}
+
+Write-Host "All required Azure resource providers are registered."
 Write-Host ""
 
 Invoke-Native "terraform" @(
