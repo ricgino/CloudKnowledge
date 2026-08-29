@@ -20,6 +20,7 @@ resource "azurerm_postgresql_flexible_server" "cloudknowledge" {
   name                          = local.postgres_server_name
   resource_group_name           = data.azurerm_resource_group.cloudknowledge.name
   location                      = local.workload_location
+  zone                          = "1"
   version                       = "18"
   administrator_login           = var.postgres_admin_login
   administrator_password        = var.postgres_admin_password
