@@ -4,8 +4,13 @@ output "resource_group_name" {
 }
 
 output "resource_group_location" {
-  description = "Azure region selected for CloudKnowledge."
+  description = "Metadata region of the CloudKnowledge resource group."
   value       = azurerm_resource_group.cloudknowledge.location
+}
+
+output "workload_location" {
+  description = "Azure region used by CloudKnowledge workload resources."
+  value       = azurerm_container_registry.cloudknowledge.location
 }
 
 output "acr_name" {
