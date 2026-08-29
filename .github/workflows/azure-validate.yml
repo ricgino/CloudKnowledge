@@ -76,6 +76,10 @@ jobs:
         shell: pwsh
         run: ./tests/azure/ai-discovery-script-tests.ps1
 
+      - name: Test Azure platform deployment contract
+        shell: pwsh
+        run: ./tests/azure/platform-deployment-tests.ps1
+
       - name: Test direct OpenAI deployment contract
         shell: pwsh
         run: ./tests/azure/openai-deployment-tests.ps1
