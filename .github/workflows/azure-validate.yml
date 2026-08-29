@@ -6,6 +6,8 @@ on:
       - feat/azure-deployment
     paths:
       - "infra/azure/**"
+      - "scripts/azure/**"
+      - ".github/workflows/azure-deploy.yml"
       - ".github/workflows/azure-validate.yml"
   pull_request:
     branches:
@@ -13,6 +15,8 @@ on:
       - main
     paths:
       - "infra/azure/**"
+      - "scripts/azure/**"
+      - ".github/workflows/azure-deploy.yml"
       - ".github/workflows/azure-validate.yml"
   workflow_dispatch:
 
@@ -24,11 +28,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  terraform:
+  validate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+
+      - name: Parse Azure PowerShell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+
+          Get-ChildItem scripts/azure -Filter *.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$errors) | Out-Null
+
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host "::error file=$($_.FullName)::PowerShell parse failed."
+              $errors | ForEach-Object { Write-Error $_.Message }
+            }
+            else {
+              Write-Host "PowerShell parse passed: $($_.Name)"
+            }
+          }
+
+          if ($failed) {
+            exit 1
+          }
+
+      - name: Parse Azure workflow YAML
+        shell: ruby {0}
+        run: |
+          require "yaml"
+
+          [
+            ".github/workflows/azure-deploy.yml",
+            ".github/workflows/azure-validate.yml"
+          ].each do |path|
+            YAML.parse_file(path)
+            puts "YAML parse passed: #{path}"
+          end
 
       - uses: hashicorp/setup-terraform@v3
         with:
