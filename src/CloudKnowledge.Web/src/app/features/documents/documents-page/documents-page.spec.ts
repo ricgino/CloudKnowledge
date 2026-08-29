@@ -229,6 +229,111 @@ describe('DocumentsPage deletion capability', () => {
   });
 });
 
+describe('DocumentsPage retry capability', () => {
+  it('retries a failed owned document and refreshes the list', () => {
+    const retriedIds: string[] = [];
+    let loadCalls = 0;
+
+    const documentsService = {
+      retryDocument: (documentId: string) =>
+      {
+        retriedIds.push(documentId);
+        return of(undefined);
+      },
+      getDocuments: () =>
+      {
+        loadCalls++;
+
+        return of({
+          items: [],
+          page: 1,
+          pageSize: 20,
+          totalCount: 0,
+          totalPages: 0
+        });
+      }
+    };
+
+    const page =
+      createPage(documentsService);
+
+    const retryDocument =
+      (page as unknown as {
+        retryDocument?: (document: unknown) => void;
+      }).retryDocument;
+
+    expect(retryDocument)
+      .toBeDefined();
+
+    if (!retryDocument)
+    {
+      return;
+    }
+
+    retryDocument.call(
+      page,
+      {
+        id: 'failed-owned',
+        fileName: 'failed-owned.pdf',
+        contentType: 'application/pdf',
+        status: 'Failed',
+        isOwner: true,
+        canDelete: true,
+        sharedTeams: []
+      });
+
+    expect(retriedIds)
+      .toEqual([
+        'failed-owned'
+      ]);
+    expect(loadCalls)
+      .toBe(1);
+  });
+
+  it('does not retry a failed document owned by someone else', () => {
+    const retriedIds: string[] = [];
+
+    const documentsService = {
+      retryDocument: (documentId: string) =>
+      {
+        retriedIds.push(documentId);
+        return of(undefined);
+      }
+    };
+
+    const page =
+      createPage(documentsService);
+
+    const retryDocument =
+      (page as unknown as {
+        retryDocument?: (document: unknown) => void;
+      }).retryDocument;
+
+    expect(retryDocument)
+      .toBeDefined();
+
+    if (!retryDocument)
+    {
+      return;
+    }
+
+    retryDocument.call(
+      page,
+      {
+        id: 'failed-other-owner',
+        fileName: 'failed-other-owner.pdf',
+        contentType: 'application/pdf',
+        status: 'Failed',
+        isOwner: false,
+        canDelete: false,
+        sharedTeams: []
+      });
+
+    expect(retriedIds)
+      .toEqual([]);
+  });
+});
+
 function createPage(
   documentsService: unknown =
     {
