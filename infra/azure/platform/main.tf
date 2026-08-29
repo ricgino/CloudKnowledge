@@ -116,6 +116,7 @@ resource "azurerm_container_app_environment" "cloudknowledge" {
   location                   = local.workload_location
   resource_group_name        = data.azurerm_resource_group.cloudknowledge.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.cloudknowledge.id
+  logs_destination           = "log-analytics"
 
   tags = local.tags
 }
