@@ -27,4 +27,20 @@ if (-not $environmentBody.Contains(
     throw "Container Apps Environment must explicitly use logs_destination = log-analytics when a Log Analytics workspace ID is configured."
 }
 
+$postgresMatch = [regex]::Match(
+    $platform,
+    'resource\s+"azurerm_postgresql_flexible_server"\s+"cloudknowledge"\s*\{(?<body>[\s\S]*?)\n\}')
+
+if (-not $postgresMatch.Success) {
+    throw "Azure platform is missing the CloudKnowledge PostgreSQL Flexible Server resource."
+}
+
+$postgresBody = $postgresMatch.Groups["body"].Value
+
+if (-not $postgresBody.Contains(
+    'zone                          = "1"',
+    [System.StringComparison]::Ordinal)) {
+    throw "PostgreSQL must pin availability zone 1 so recovery plans do not propose changing the already-provisioned server zone."
+}
+
 Write-Host "Azure platform deployment contract passed."
