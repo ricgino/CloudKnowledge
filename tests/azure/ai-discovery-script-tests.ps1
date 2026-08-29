@@ -12,6 +12,9 @@ $content = Get-Content -Raw $scriptPath
 
 $requiredFragments = @(
     '"italynorth"',
+    '"swedencentral"',
+    'FallbackLocations',
+    '[AllowEmptyCollection()]',
     'Microsoft.CognitiveServices',
     '"provider", "register"',
     '"--wait"',
@@ -20,7 +23,9 @@ $requiredFragments = @(
     'text-embedding-3-small',
     'gpt-4.1-mini',
     'gpt-4o-mini',
-    'gpt-4.1-nano'
+    'gpt-4.1-nano',
+    'No model catalog entries returned',
+    'trying next region'
 )
 
 foreach ($fragment in $requiredFragments) {
