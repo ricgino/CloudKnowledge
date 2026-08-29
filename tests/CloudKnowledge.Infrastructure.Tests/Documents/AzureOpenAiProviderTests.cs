@@ -10,14 +10,13 @@ namespace CloudKnowledge.Infrastructure.Tests.Documents;
 public sealed class AzureOpenAiProviderTests
 {
     [Fact]
-    public void Configuration_ShouldSelectAzureOpenAiAndKeepConfiguredDimensions()
+    public void Configuration_ShouldSelectAzureOpenAiWithoutDatedApiVersion()
     {
         var configuration = new ConfigurationManager
         {
             ["Ai:Provider"] = "AzureOpenAI",
             ["Ai:Endpoint"] = "https://cloudknowledge.openai.azure.com/",
             ["Ai:ApiKey"] = "test-key",
-            ["Ai:ApiVersion"] = "2025-04-01-preview",
             ["Ai:EmbeddingDeployment"] = "embedding-small",
             ["Ai:AnswerDeployment"] = "answer-small",
             ["Ai:EmbeddingDimensions"] = "768",
@@ -36,7 +35,7 @@ public sealed class AzureOpenAiProviderTests
     }
 
     [Fact]
-    public async Task EmbeddingGenerator_ShouldCallAzureDeploymentAndReturnEmbeddings()
+    public async Task EmbeddingGenerator_ShouldUseV1EndpointAndDeploymentAsModel()
     {
         var handler = new RecordingHandler(
             """
@@ -57,7 +56,6 @@ public sealed class AzureOpenAiProviderTests
             httpClient,
             deployment: "embedding-small",
             apiKey: "test-key",
-            apiVersion: "2025-04-01-preview",
             dimensions: 3);
 
         var result = await sut.GenerateAsync(
@@ -68,14 +66,22 @@ public sealed class AzureOpenAiProviderTests
         Assert.Equal([0.1f, 0.2f, 0.3f], result[0]);
         Assert.Equal([0.4f, 0.5f, 0.6f], result[1]);
         Assert.Equal(
-            "/openai/deployments/embedding-small/embeddings?api-version=2025-04-01-preview",
-            handler.RequestUri?.PathAndQuery);
+            "/openai/v1/embeddings",
+            handler.RequestUri?.AbsolutePath);
+        Assert.Empty(handler.RequestUri?.Query ?? string.Empty);
         Assert.Equal("test-key", handler.ApiKey);
-        Assert.Contains("\"dimensions\":3", handler.RequestBody);
+
+        using var requestJson =
+            JsonDocument.Parse(
+                Assert.IsType<string>(handler.RequestBody));
+
+        var root = requestJson.RootElement;
+        Assert.Equal("embedding-small", root.GetProperty("model").GetString());
+        Assert.Equal(3, root.GetProperty("dimensions").GetInt32());
     }
 
     [Fact]
-    public async Task AnswerGenerator_ShouldCallAzureDeploymentAndReturnGroundedContent()
+    public async Task AnswerGenerator_ShouldUseV1EndpointAndDeploymentAsModel()
     {
         var handler = new RecordingHandler(
             """
@@ -100,7 +106,6 @@ public sealed class AzureOpenAiProviderTests
             httpClient,
             deployment: "answer-small",
             apiKey: "test-key",
-            apiVersion: "2025-04-01-preview",
             temperature: 0.1,
             maxTokens: 256);
 
@@ -118,8 +123,9 @@ public sealed class AzureOpenAiProviderTests
 
         Assert.Equal("Alperia Smart Services Srl. [S1]", result);
         Assert.Equal(
-            "/openai/deployments/answer-small/chat/completions?api-version=2025-04-01-preview",
-            handler.RequestUri?.PathAndQuery);
+            "/openai/v1/chat/completions",
+            handler.RequestUri?.AbsolutePath);
+        Assert.Empty(handler.RequestUri?.Query ?? string.Empty);
         Assert.Equal("test-key", handler.ApiKey);
 
         using var requestJson =
@@ -130,6 +136,7 @@ public sealed class AzureOpenAiProviderTests
         var messages = root.GetProperty("messages");
         var userMessage = messages[1].GetProperty("content").GetString();
 
+        Assert.Equal("answer-small", root.GetProperty("model").GetString());
         Assert.NotNull(userMessage);
         Assert.Contains("Qual è l'azienda?", userMessage);
         Assert.Contains("[S1]", userMessage);
