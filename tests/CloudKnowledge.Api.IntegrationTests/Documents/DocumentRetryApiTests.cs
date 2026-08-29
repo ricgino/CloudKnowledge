@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using CloudKnowledge.Api.Contracts.Teams;
 using CloudKnowledge.Domain.Documents;
+using CloudKnowledge.Domain.Users;
 using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -108,6 +109,102 @@ public sealed class DocumentRetryApiTests
 
         Assert.Equal(
             documentId,
+            factory.ProcessingQueue.PublishedDocumentId);
+    }
+
+    [Fact]
+    public async Task Retry_WhenCurrentUserDoesNotOwnDocument_ShouldReturnNotFoundWithoutRequeueing()
+    {
+        await using var postgres =
+            new PostgreSqlBuilder(
+                "pgvector/pgvector:0.8.6-pg18")
+                .WithDatabase("cloudknowledge_document_retry_owner_api_test")
+                .WithUsername("cloudknowledge")
+                .WithPassword("cloudknowledge_test")
+                .Build();
+
+        await postgres.StartAsync();
+
+        using var factory =
+            new CloudKnowledgeApiFactory(
+                postgres.GetConnectionString(),
+                "UseDevelopmentStorage=true");
+
+        using var client =
+            factory.CreateClient(
+                new()
+                {
+                    BaseAddress =
+                        new Uri("https://localhost")
+                });
+
+        await ApplyMigrationsAsync(factory);
+
+        await CreateTeamAsync(
+            client,
+            "Retry Owner Guard Team");
+
+        Guid documentId;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext =
+                scope.ServiceProvider
+                    .GetRequiredService<CloudKnowledgeDbContext>();
+
+            var otherUser =
+                UserAccount.Create(
+                    "other.retry.owner@example.com",
+                    "Other Retry Owner");
+
+            dbContext.UserAccounts.Add(otherUser);
+
+            var document =
+                Document.Create(
+                    "failed-other-owner.txt",
+                    "text/plain");
+
+            document.AssignUserOwner(
+                otherUser.Id);
+            document.MarkAsProcessing();
+            document.MarkAsFailed();
+
+            documentId = document.Id;
+
+            dbContext.Documents.Add(document);
+            await dbContext.SaveChangesAsync();
+        }
+
+        Assert.Null(
+            factory.ProcessingQueue.PublishedDocumentId);
+
+        var response =
+            await client.PostAsync(
+                $"/api/documents/{documentId}/retry",
+                content: null);
+
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            response.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext =
+                scope.ServiceProvider
+                    .GetRequiredService<CloudKnowledgeDbContext>();
+
+            var status =
+                await dbContext.Documents
+                    .Where(document => document.Id == documentId)
+                    .Select(document => document.Status)
+                    .SingleAsync();
+
+            Assert.Equal(
+                DocumentStatus.Failed,
+                status);
+        }
+
+        Assert.Null(
             factory.ProcessingQueue.PublishedDocumentId);
     }
 
