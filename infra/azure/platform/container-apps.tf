@@ -424,7 +424,7 @@ resource "azurerm_container_app" "web" {
 
 resource "azurerm_container_app_job" "database_migration" {
   name                         = "caj-${var.resource_prefix}-${var.environment}-migrate"
-  location                     = data.azurerm_resource_group.cloudknowledge.location
+  location                     = local.workload_location
   resource_group_name          = data.azurerm_resource_group.cloudknowledge.name
   container_app_environment_id = azurerm_container_app_environment.cloudknowledge.id
   replica_timeout_in_seconds   = 600
