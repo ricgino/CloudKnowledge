@@ -15,11 +15,18 @@ public sealed record AiProviderConfiguration(
 {
     public const string OllamaProvider = "Ollama";
     public const string AzureOpenAiProvider = "AzureOpenAI";
+    public const string OpenAiProvider = "OpenAI";
 
     public bool IsAzureOpenAi =>
         string.Equals(
             Provider,
             AzureOpenAiProvider,
+            StringComparison.Ordinal);
+
+    public bool IsOpenAi =>
+        string.Equals(
+            Provider,
+            OpenAiProvider,
             StringComparison.Ordinal);
 
     public static AiProviderConfiguration From(
@@ -50,11 +57,18 @@ public sealed record AiProviderConfiguration(
         {
             provider = AzureOpenAiProvider;
         }
+        else if (string.Equals(
+                     provider,
+                     OpenAiProvider,
+                     StringComparison.OrdinalIgnoreCase))
+        {
+            provider = OpenAiProvider;
+        }
         else
         {
             throw new InvalidOperationException(
                 $"Unsupported AI provider '{provider}'. " +
-                $"Supported providers are {OllamaProvider} and {AzureOpenAiProvider}.");
+                $"Supported providers are {OllamaProvider}, {AzureOpenAiProvider}, and {OpenAiProvider}.");
         }
 
         var dimensions =
@@ -119,6 +133,31 @@ public sealed record AiProviderConfiguration(
             GetRequired(
                 configuration,
                 "Ai:ApiKey");
+
+        if (provider == OpenAiProvider)
+        {
+            var embeddingModel =
+                GetRequired(
+                    configuration,
+                    "Ai:EmbeddingModel");
+
+            var answerModel =
+                requireAnswerGenerator
+                    ? GetRequired(
+                        configuration,
+                        "Ai:AnswerModel")
+                    : configuration["Ai:AnswerModel"];
+
+            return new AiProviderConfiguration(
+                provider,
+                endpoint,
+                apiKey,
+                embeddingModel,
+                answerModel,
+                dimensions,
+                temperature,
+                maxTokens);
+        }
 
         var embeddingDeployment =
             GetRequired(
