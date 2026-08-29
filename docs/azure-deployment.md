@@ -43,6 +43,7 @@ Deployment artifacts are stored in Azure Container Registry. Terraform state is 
 - PostgreSQL/pgvector remains the vector store. Azure AI Search is not introduced.
 - Embedding dimensions remain exactly 768, matching the current database schema.
 - Ollama remains the local AI provider. Azure uses the managed provider only when `Ai:Provider=AzureOpenAI`.
+- The Azure provider uses the current `/openai/v1` REST surface. Deployment names are sent in the `model` field, so no dated Azure OpenAI `api-version` setting is required.
 - The browser talks only to the public Web host. Nginx proxies `/api` to the internal API Container App, preserving same-origin browser traffic.
 - API, Web and Worker use `min_replicas = 0` to reduce idle cost.
 - EF Core migrations are executed through a dedicated manual Container Apps Job using `CloudKnowledge.Api.dll --migrate`.
@@ -138,7 +139,7 @@ repo:ricgino/CloudKnowledge:environment:azure-demo
 
 4. grants the deployment principal only the roles needed within CloudKnowledge resources:
    - `Contributor` on the CloudKnowledge resource group;
-   - `User Access Administrator` on the CloudKnowledge resource group, required for Terraform-managed role assignments;
+   - `Role Based Access Control Administrator` on the CloudKnowledge ACR only, so Terraform can assign `AcrPull` to the Container Apps identity;
    - `AcrPush` on the CloudKnowledge ACR;
    - `Storage Blob Data Contributor` on the Terraform-state storage account;
 5. writes the non-secret Azure/GitHub environment variables with `gh variable set`.
@@ -161,9 +162,18 @@ No client secret is created.
 
 The managed AI resource is intentionally not hard-coded in Terraform yet. Model availability, region availability and price can change independently of the application architecture.
 
+CloudKnowledge uses the Azure OpenAI v1 REST endpoints:
+
+```text
+/openai/v1/embeddings
+/openai/v1/chat/completions
+```
+
+The configured deployment name is sent as `model`; no dated `api-version` variable is required.
+
 Create/select an Azure OpenAI / Microsoft Foundry deployment that provides:
 
-- one embedding deployment capable of returning 768 dimensions;
+- one embedding deployment capable of returning exactly 768 dimensions;
 - one chat-completions deployment for grounded RAG answers.
 
 Then configure these GitHub Environment variables on `azure-demo`:
