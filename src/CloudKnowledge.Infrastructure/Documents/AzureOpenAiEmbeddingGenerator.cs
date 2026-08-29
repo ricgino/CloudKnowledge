@@ -10,7 +10,6 @@ public sealed class AzureOpenAiEmbeddingGenerator
     private readonly HttpClient _httpClient;
     private readonly string _deployment;
     private readonly string _apiKey;
-    private readonly string _apiVersion;
 
     public int Dimensions { get; }
 
@@ -18,7 +17,6 @@ public sealed class AzureOpenAiEmbeddingGenerator
         HttpClient httpClient,
         string deployment,
         string apiKey,
-        string apiVersion,
         int dimensions)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
@@ -37,13 +35,6 @@ public sealed class AzureOpenAiEmbeddingGenerator
                 nameof(apiKey));
         }
 
-        if (string.IsNullOrWhiteSpace(apiVersion))
-        {
-            throw new ArgumentException(
-                "API version cannot be empty.",
-                nameof(apiVersion));
-        }
-
         if (dimensions <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -53,7 +44,6 @@ public sealed class AzureOpenAiEmbeddingGenerator
         _httpClient = httpClient;
         _deployment = deployment.Trim();
         _apiKey = apiKey.Trim();
-        _apiVersion = apiVersion.Trim();
         Dimensions = dimensions;
     }
 
@@ -68,6 +58,7 @@ public sealed class AzureOpenAiEmbeddingGenerator
 
         var requestBody =
             new AzureOpenAiEmbeddingRequest(
+                _deployment,
                 inputs.ToArray(),
                 Dimensions,
                 EncodingFormat: "float");
@@ -75,7 +66,7 @@ public sealed class AzureOpenAiEmbeddingGenerator
         using var request =
             new HttpRequestMessage(
                 HttpMethod.Post,
-                BuildRequestPath())
+                "/openai/v1/embeddings")
             {
                 Content =
                     JsonContent.Create(
@@ -125,14 +116,9 @@ public sealed class AzureOpenAiEmbeddingGenerator
         return embeddings!;
     }
 
-    private string BuildRequestPath()
-    {
-        return
-            $"/openai/deployments/{Uri.EscapeDataString(_deployment)}/embeddings" +
-            $"?api-version={Uri.EscapeDataString(_apiVersion)}";
-    }
-
     private sealed record AzureOpenAiEmbeddingRequest(
+        [property: JsonPropertyName("model")]
+        string Model,
         [property: JsonPropertyName("input")]
         string[] Input,
         [property: JsonPropertyName("dimensions")]
