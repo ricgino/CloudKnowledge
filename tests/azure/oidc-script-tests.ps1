@@ -39,12 +39,34 @@ foreach ($fragment in $immutableSubjectFragments) {
     }
 }
 
+$expectedIssuerFragment = '$issuer = "https://token.actions.githubusercontent.com"'
+if (-not $content.Contains($expectedIssuerFragment, [System.StringComparison]::Ordinal)) {
+    throw "configure-github-oidc.ps1 must use the exact GitHub OIDC issuer without a trailing slash."
+}
+
+if ($content.Contains('issuer      = "https://token.actions.githubusercontent.com/"', [System.StringComparison]::Ordinal)) {
+    throw "configure-github-oidc.ps1 must not register the GitHub OIDC issuer with a trailing slash."
+}
+
+$credentialInspectionFragments = @(
+    'issuer:issuer',
+    'audiences:audiences',
+    '$existingIssuer',
+    '$existingAudiences'
+)
+
+foreach ($fragment in $credentialInspectionFragments) {
+    if (-not $content.Contains($fragment, [System.StringComparison]::Ordinal)) {
+        throw "configure-github-oidc.ps1 must inspect subject, issuer, and audience before deciding whether the federated credential is current: $fragment"
+    }
+}
+
 if (-not $content.Contains('"federated-credential", "update"', [System.StringComparison]::Ordinal)) {
-    throw "configure-github-oidc.ps1 must update an existing federated credential when its subject is stale."
+    throw "configure-github-oidc.ps1 must update an existing federated credential when its OIDC settings are stale."
 }
 
 if (-not $content.Contains('"--federated-credential-id", $credentialName', [System.StringComparison]::Ordinal)) {
     throw "configure-github-oidc.ps1 must identify the existing federated credential when updating it."
 }
 
-Write-Host "GitHub OIDC service-principal and immutable-subject contract passed."
+Write-Host "GitHub OIDC service-principal and immutable-credential contract passed."
