@@ -35,8 +35,8 @@ data "azurerm_client_config" "current" {}
 
 locals {
   deterministic_suffix = substr(md5(var.subscription_id), 0, 6)
-  resource_group_name   = "rg-${var.resource_prefix}-${var.environment}"
-  compact_prefix        = replace("${var.resource_prefix}${var.environment}", "-", "")
-  acr_name              = substr("${local.compact_prefix}${local.deterministic_suffix}", 0, 50)
-  state_account_name    = substr("st${local.compact_prefix}${local.deterministic_suffix}", 0, 24)
+  resource_group_name  = "rg-${var.resource_prefix}-${var.environment}"
+  compact_prefix       = replace("${var.resource_prefix}${var.environment}", "-", "")
+  acr_name             = substr("${local.compact_prefix}${local.deterministic_suffix}", 0, 50)
+  state_account_name   = substr("st${local.compact_prefix}${local.deterministic_suffix}", 0, 24)
 }
