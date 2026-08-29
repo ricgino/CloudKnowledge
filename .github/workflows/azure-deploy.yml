@@ -44,7 +44,6 @@ jobs:
       AI_EMBEDDING_MODEL: "text-embedding-3-small"
       AI_ANSWER_MODEL: "gpt-4.1-nano"
       POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
@@ -57,7 +56,6 @@ jobs:
       TF_VAR_azure_ad_api_client_id: ${{ vars.AZURE_AD_API_CLIENT_ID }}
       TF_VAR_ai_provider: "OpenAI"
       TF_VAR_ai_endpoint: "https://api.openai.com/"
-      TF_VAR_ai_api_key: ${{ secrets.OPENAI_API_KEY }}
       TF_VAR_ai_embedding_model: "text-embedding-3-small"
       TF_VAR_ai_answer_model: "gpt-4.1-nano"
 
@@ -86,7 +84,6 @@ jobs:
             AI_EMBEDDING_MODEL
             AI_ANSWER_MODEL
             POSTGRES_ADMIN_PASSWORD
-            OPENAI_API_KEY
           )
 
           missing=0
@@ -99,6 +96,26 @@ jobs:
 
           if [ "$missing" -ne 0 ]; then
             exit 1
+          fi
+
+      - name: Configure Terraform AI credential
+        shell: bash
+        env:
+          APPLY_REQUESTED: ${{ inputs.apply || startsWith(github.ref, 'refs/tags/azure-apply-') }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ "$APPLY_REQUESTED" = "true" ]; then
+            if [ -z "${OPENAI_API_KEY:-}" ]; then
+              echo "::error::Missing GitHub environment value: OPENAI_API_KEY"
+              exit 1
+            fi
+
+            echo "::add-mask::$OPENAI_API_KEY"
+            echo "TF_VAR_ai_api_key=$OPENAI_API_KEY" >> "$GITHUB_ENV"
+          else
+            echo "TF_VAR_ai_api_key=plan-only-placeholder" >> "$GITHUB_ENV"
           fi
 
       - name: Login to Azure with OIDC
