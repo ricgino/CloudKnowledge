@@ -49,6 +49,7 @@ export class DocumentsPage
   selectedTeamId = '';
   deletingDocumentId = '';
   downloadingDocumentId = '';
+  retryingDocumentId = '';
 
   errorMessage = '';
   successMessage = '';
@@ -537,6 +538,45 @@ export class DocumentsPage
           this.errorMessage =
             `Unable to download document (HTTP ${error.status}).`;
           this.downloadingDocumentId = '';
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  retryDocument(
+    document: DocumentItem):
+    void
+  {
+    if (
+      !document.isOwner ||
+      document.status !== 'Failed' ||
+      this.retryingDocumentId === document.id)
+    {
+      return;
+    }
+
+    this.retryingDocumentId =
+      document.id;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.documentsService
+      .retryDocument(document.id)
+      .subscribe({
+        next: () =>
+        {
+          this.retryingDocumentId = '';
+          this.successMessage =
+            `${document.fileName} queued for retry.`;
+          this.loadDocuments();
+        },
+        error: error =>
+        {
+          this.errorMessage =
+            error.status === 404
+              ? 'This document cannot be retried.'
+              : `Unable to retry document (HTTP ${error.status}).`;
+          this.retryingDocumentId = '';
           this.cdr.detectChanges();
         }
       });
