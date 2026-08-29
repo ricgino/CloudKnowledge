@@ -3,10 +3,16 @@ variable "subscription_id" {
   type        = string
 }
 
-variable "location" {
-  description = "Azure region for shared CloudKnowledge resources."
+variable "resource_group_location" {
+  description = "Metadata region for the CloudKnowledge resource group. This can differ from workload resource regions."
   type        = string
   default     = "westeurope"
+}
+
+variable "workload_location" {
+  description = "Azure region for ACR, Terraform state, and the CloudKnowledge workload resources."
+  type        = string
+  default     = "italynorth"
 }
 
 variable "resource_prefix" {
