@@ -1,6 +1,6 @@
 resource "azurerm_resource_group" "cloudknowledge" {
   name     = local.resource_group_name
-  location = var.location
+  location = var.resource_group_location
 
   tags = {
     application = "CloudKnowledge"
@@ -12,7 +12,7 @@ resource "azurerm_resource_group" "cloudknowledge" {
 resource "azurerm_container_registry" "cloudknowledge" {
   name                = local.acr_name
   resource_group_name = azurerm_resource_group.cloudknowledge.name
-  location            = azurerm_resource_group.cloudknowledge.location
+  location            = var.workload_location
   sku                 = "Standard"
   admin_enabled       = false
 
@@ -22,7 +22,7 @@ resource "azurerm_container_registry" "cloudknowledge" {
 resource "azurerm_storage_account" "terraform_state" {
   name                            = local.state_account_name
   resource_group_name             = azurerm_resource_group.cloudknowledge.name
-  location                        = azurerm_resource_group.cloudknowledge.location
+  location                        = var.workload_location
   account_tier                    = "Standard"
   account_replication_type        = "LRS"
   account_kind                    = "StorageV2"
