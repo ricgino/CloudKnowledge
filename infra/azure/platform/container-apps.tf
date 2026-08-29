@@ -30,8 +30,8 @@ resource "azurerm_container_app" "api" {
   }
 
   secret {
-    name  = "azure-openai-key"
-    value = var.azure_openai_api_key
+    name  = "ai-api-key"
+    value = var.ai_api_key
   }
 
   template {
@@ -136,27 +136,27 @@ resource "azurerm_container_app" "api" {
 
       env {
         name  = "Ai__Provider"
-        value = "AzureOpenAI"
+        value = var.ai_provider
       }
 
       env {
         name  = "Ai__Endpoint"
-        value = var.azure_openai_endpoint
+        value = var.ai_endpoint
       }
 
       env {
         name        = "Ai__ApiKey"
-        secret_name = "azure-openai-key"
+        secret_name = "ai-api-key"
       }
 
       env {
-        name  = "Ai__EmbeddingDeployment"
-        value = var.azure_openai_embedding_deployment
+        name  = "Ai__EmbeddingModel"
+        value = var.ai_embedding_model
       }
 
       env {
-        name  = "Ai__AnswerDeployment"
-        value = var.azure_openai_answer_deployment
+        name  = "Ai__AnswerModel"
+        value = var.ai_answer_model
       }
 
       env {
@@ -246,8 +246,8 @@ resource "azurerm_container_app" "worker" {
   }
 
   secret {
-    name  = "azure-openai-key"
-    value = var.azure_openai_api_key
+    name  = "ai-api-key"
+    value = var.ai_api_key
   }
 
   template {
@@ -322,22 +322,22 @@ resource "azurerm_container_app" "worker" {
 
       env {
         name  = "Ai__Provider"
-        value = "AzureOpenAI"
+        value = var.ai_provider
       }
 
       env {
         name  = "Ai__Endpoint"
-        value = var.azure_openai_endpoint
+        value = var.ai_endpoint
       }
 
       env {
         name        = "Ai__ApiKey"
-        secret_name = "azure-openai-key"
+        secret_name = "ai-api-key"
       }
 
       env {
-        name  = "Ai__EmbeddingDeployment"
-        value = var.azure_openai_embedding_deployment
+        name  = "Ai__EmbeddingModel"
+        value = var.ai_embedding_model
       }
 
       env {
@@ -461,8 +461,8 @@ resource "azurerm_container_app_job" "database_migration" {
   }
 
   secret {
-    name  = "azure-openai-key"
-    value = var.azure_openai_api_key
+    name  = "ai-api-key"
+    value = var.ai_api_key
   }
 
   template {
@@ -526,27 +526,27 @@ resource "azurerm_container_app_job" "database_migration" {
 
       env {
         name  = "Ai__Provider"
-        value = "AzureOpenAI"
+        value = var.ai_provider
       }
 
       env {
         name  = "Ai__Endpoint"
-        value = var.azure_openai_endpoint
+        value = var.ai_endpoint
       }
 
       env {
         name        = "Ai__ApiKey"
-        secret_name = "azure-openai-key"
+        secret_name = "ai-api-key"
       }
 
       env {
-        name  = "Ai__EmbeddingDeployment"
-        value = var.azure_openai_embedding_deployment
+        name  = "Ai__EmbeddingModel"
+        value = var.ai_embedding_model
       }
 
       env {
-        name  = "Ai__AnswerDeployment"
-        value = var.azure_openai_answer_deployment
+        name  = "Ai__AnswerModel"
+        value = var.ai_answer_model
       }
 
       env {
