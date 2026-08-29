@@ -39,11 +39,11 @@ foreach ($fragment in $immutableSubjectFragments) {
     }
 }
 
-if (-not $content.Contains('az ad app federated-credential update', [System.StringComparison]::Ordinal)) {
+if (-not $content.Contains('"federated-credential", "update"', [System.StringComparison]::Ordinal)) {
     throw "configure-github-oidc.ps1 must update an existing federated credential when its subject is stale."
 }
 
-if (-not $content.Contains('--federated-credential-id', [System.StringComparison]::Ordinal)) {
+if (-not $content.Contains('"--federated-credential-id", $credentialName', [System.StringComparison]::Ordinal)) {
     throw "configure-github-oidc.ps1 must identify the existing federated credential when updating it."
 }
 
