@@ -22,7 +22,7 @@ if (-not $content.Contains('--filter "appId eq ''$appId''"', [System.StringCompa
     throw "configure-github-oidc.ps1 must filter service principals by appId so an absent service principal is represented by an empty result."
 }
 
-if (-not $content.Contains('"ad", "sp", "create"', [System.StringComparison]::Ordinal)) {
+if (-not $content.Contains('az ad sp create', [System.StringComparison]::Ordinal)) {
     throw "configure-github-oidc.ps1 must create the service principal when the lookup returns no result."
 }
 
