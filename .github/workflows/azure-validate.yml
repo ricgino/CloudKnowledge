@@ -7,6 +7,7 @@ on:
     paths:
       - "infra/azure/**"
       - "scripts/azure/**"
+      - "tests/azure/**"
       - ".github/workflows/azure-deploy.yml"
       - ".github/workflows/azure-validate.yml"
   pull_request:
@@ -16,6 +17,7 @@ on:
     paths:
       - "infra/azure/**"
       - "scripts/azure/**"
+      - "tests/azure/**"
       - ".github/workflows/azure-deploy.yml"
       - ".github/workflows/azure-validate.yml"
   workflow_dispatch:
@@ -61,6 +63,10 @@ jobs:
           if ($failed) {
             exit 1
           }
+
+      - name: Test Azure bootstrap script contract
+        shell: pwsh
+        run: ./tests/azure/bootstrap-script-tests.ps1
 
       - name: Parse Azure workflow YAML
         shell: ruby {0}
