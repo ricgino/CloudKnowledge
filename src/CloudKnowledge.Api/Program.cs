@@ -238,6 +238,15 @@ builder.Services.AddSingleton<IEmbeddingGenerator>(
                 aiConfiguration.EmbeddingDimensions);
         }
 
+        if (aiConfiguration.IsOpenAi)
+        {
+            return new OpenAiEmbeddingGenerator(
+                httpClient,
+                aiConfiguration.EmbeddingModel,
+                aiConfiguration.ApiKey!,
+                aiConfiguration.EmbeddingDimensions);
+        }
+
         return new OllamaEmbeddingGenerator(
             httpClient,
             aiConfiguration.EmbeddingModel,
@@ -256,6 +265,16 @@ builder.Services.AddSingleton<IAnswerGenerator>(
         if (aiConfiguration.IsAzureOpenAi)
         {
             return new AzureOpenAiAnswerGenerator(
+                httpClient,
+                aiConfiguration.AnswerModel!,
+                aiConfiguration.ApiKey!,
+                aiConfiguration.AnswerTemperature,
+                aiConfiguration.AnswerMaxTokens);
+        }
+
+        if (aiConfiguration.IsOpenAi)
+        {
+            return new OpenAiAnswerGenerator(
                 httpClient,
                 aiConfiguration.AnswerModel!,
                 aiConfiguration.ApiKey!,
