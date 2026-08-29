@@ -229,10 +229,12 @@ else {
 $principalObjectId = [string]$servicePrincipal.id
 $credentialName = "github-$($GitHubEnvironment -replace '[^A-Za-z0-9-]', '-')"
 $subject = "repo:$ownerLogin@$ownerId/$repositoryName@$repositoryId`:environment:$GitHubEnvironment"
+$issuer = "https://token.actions.githubusercontent.com"
+$audience = "api://AzureADTokenExchange"
 
 $existingCredentialJson = az ad app federated-credential list `
     --id $appId `
-    --query "[?name=='$credentialName'] | [0].{name:name,subject:subject}" `
+    --query "[?name=='$credentialName'] | [0].{name:name,subject:subject,issuer:issuer,audiences:audiences}" `
     --output json
 
 if ($LASTEXITCODE -ne 0) {
@@ -241,16 +243,29 @@ if ($LASTEXITCODE -ne 0) {
 
 $existingCredential = $existingCredentialJson | ConvertFrom-Json
 $existingSubject = if ($null -ne $existingCredential) { [string]$existingCredential.subject } else { "" }
+$existingIssuer = if ($null -ne $existingCredential) { [string]$existingCredential.issuer } else { "" }
+$existingAudiences = if ($null -ne $existingCredential) { @($existingCredential.audiences) } else { @() }
+$hasExpectedAudience = $existingAudiences.Count -eq 1 -and [string]::Equals(
+    [string]$existingAudiences[0],
+    $audience,
+    [System.StringComparison]::Ordinal
+)
+$credentialIsCurrent =
+    $null -ne $existingCredential -and
+    -not [string]::IsNullOrWhiteSpace([string]$existingCredential.name) -and
+    [string]::Equals($existingSubject, $subject, [System.StringComparison]::Ordinal) -and
+    [string]::Equals($existingIssuer, $issuer, [System.StringComparison]::Ordinal) -and
+    $hasExpectedAudience
 
 if ($null -eq $existingCredential -or [string]::IsNullOrWhiteSpace([string]$existingCredential.name)) {
     Write-Host "Creating federated credential '$credentialName'..."
 
     $credential = [ordered]@{
         name        = $credentialName
-        issuer      = "https://token.actions.githubusercontent.com/"
+        issuer      = $issuer
         subject     = $subject
         description = "CloudKnowledge GitHub Actions deployment through $GitHubEnvironment"
-        audiences   = @("api://AzureADTokenExchange")
+        audiences   = @($audience)
     }
 
     $credentialFile = Join-Path ([System.IO.Path]::GetTempPath()) "cloudknowledge-federated-credential-$([Guid]::NewGuid()).json"
@@ -268,14 +283,14 @@ if ($null -eq $existingCredential -or [string]::IsNullOrWhiteSpace([string]$exis
         Remove-Item $credentialFile -ErrorAction SilentlyContinue
     }
 }
-elseif (-not [string]::Equals($existingSubject, $subject, [System.StringComparison]::Ordinal)) {
-    Write-Host "Updating federated credential '$credentialName' to the immutable GitHub subject..."
+elseif (-not $credentialIsCurrent) {
+    Write-Host "Updating federated credential '$credentialName' to the expected GitHub OIDC settings..."
 
     $credential = [ordered]@{
-        issuer      = "https://token.actions.githubusercontent.com/"
+        issuer      = $issuer
         subject     = $subject
         description = "CloudKnowledge GitHub Actions deployment through $GitHubEnvironment"
-        audiences   = @("api://AzureADTokenExchange")
+        audiences   = @($audience)
     }
 
     $credentialFile = Join-Path ([System.IO.Path]::GetTempPath()) "cloudknowledge-federated-credential-$([Guid]::NewGuid()).json"
@@ -295,7 +310,7 @@ elseif (-not [string]::Equals($existingSubject, $subject, [System.StringComparis
     }
 }
 else {
-    Write-Host "Federated credential '$credentialName' already has the expected immutable subject."
+    Write-Host "Federated credential '$credentialName' already has the expected GitHub OIDC settings."
 }
 
 Ensure-RoleAssignment $principalObjectId "Contributor" $resourceGroupId
@@ -318,7 +333,9 @@ Set-GitHubEnvironmentVariable "AZURE_AD_API_CLIENT_ID" $AzureAdApiClientId
 Write-Host ""
 Write-Host "GitHub OIDC configuration completed."
 Write-Host "Application ID: $appId"
+Write-Host "OIDC issuer:    $issuer"
 Write-Host "OIDC subject:   $subject"
+Write-Host "OIDC audience:  $audience"
 Write-Host "Environment:    $GitHubEnvironment"
 Write-Host ""
 Write-Host "Before the first deployment, configure these GitHub environment secrets:"
