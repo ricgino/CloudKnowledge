@@ -144,7 +144,6 @@ builder.Services.AddSingleton<IEmbeddingGenerator>(
                 httpClient,
                 aiConfiguration.EmbeddingModel,
                 aiConfiguration.ApiKey!,
-                aiConfiguration.ApiVersion!,
                 aiConfiguration.EmbeddingDimensions);
         }
 
