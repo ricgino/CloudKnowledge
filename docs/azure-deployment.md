@@ -16,7 +16,7 @@ Azure Container Apps - Web (public HTTPS, scale to zero)
    v
 Azure Container Apps - API (internal ingress, scale to zero)
    |            |              |
-   |            |              +--> managed Azure OpenAI-compatible inference
+   |            |              +--> OpenAI API inference
    |            |
    |            +--> Azure Blob Storage
    |
@@ -42,13 +42,36 @@ Deployment artifacts are stored in Azure Container Registry. Terraform state is 
 - CloudKnowledge remains a modular monolith with one separate Worker for asynchronous processing.
 - PostgreSQL/pgvector remains the vector store. Azure AI Search is not introduced.
 - Embedding dimensions remain exactly 768, matching the current database schema.
-- Ollama remains the local AI provider. Azure uses the managed provider only when `Ai:Provider=AzureOpenAI`.
-- The Azure provider uses the current `/openai/v1` REST surface. Deployment names are sent in the `model` field, so no dated Azure OpenAI `api-version` setting is required.
+- Ollama remains the local AI provider.
+- The deployed demo uses direct OpenAI API inference because the current Azure subscription exposes OpenAI account SKUs but returned an empty model catalog in all tested regions. AzureOpenAI remains implemented as a supported provider so the deployment can move back to Azure-hosted inference later without rewriting the application boundary.
+- The deployed demo uses `text-embedding-3-small` with 768 dimensions for embeddings and `gpt-4.1-nano` for grounded RAG answers.
 - The browser talks only to the public Web host. Nginx proxies `/api` to the internal API Container App, preserving same-origin browser traffic.
 - API, Web and Worker use `min_replicas = 0` to reduce idle cost.
 - EF Core migrations are executed through a dedicated manual Container Apps Job using `CloudKnowledge.Api.dll --migrate`.
 - Images are tagged with the immutable Git commit SHA.
 - GitHub Actions authenticates to Azure with OIDC. No Azure client secret is stored in GitHub.
+
+## AI provider boundary
+
+CloudKnowledge supports three AI providers:
+
+```text
+Ollama       local development
+AzureOpenAI  Azure-hosted OpenAI-compatible inference when available
+OpenAI       direct OpenAI API; current cloud-demo provider
+```
+
+The Azure deployment workflow currently version-controls these non-secret values:
+
+```text
+Provider:        OpenAI
+Endpoint:        https://api.openai.com/
+Embedding model: text-embedding-3-small
+Answer model:    gpt-4.1-nano
+Dimensions:      768
+```
+
+Only the API key is stored as a GitHub Environment secret. This keeps model selection reviewable in source control while credentials remain outside the repository.
 
 ## Current security posture
 
@@ -57,7 +80,7 @@ The first demo deployment uses a deliberately pragmatic database networking conf
 - PostgreSQL requires TLS.
 - PostgreSQL public network access is enabled.
 - the Azure-services firewall rule is enabled so Container Apps can reach the database without a paid/complex private networking design.
-- PostgreSQL credentials remain Container Apps secrets and Terraform sensitive variables.
+- PostgreSQL credentials and the AI API key remain Container Apps secrets and Terraform sensitive variables.
 
 For a production hardening pass, move PostgreSQL, Storage and Service Bus to private networking/private endpoints and replace connection-string authentication with managed identity where the application/provider boundary supports it cleanly.
 
@@ -158,54 +181,32 @@ api://AzureADTokenExchange
 
 No client secret is created.
 
-## Step 3 - Configure managed AI
+## Step 3 - Configure deployment secrets
 
-The managed AI resource is intentionally not hard-coded in Terraform yet. Model availability, region availability and price can change independently of the application architecture.
-
-CloudKnowledge uses the Azure OpenAI v1 REST endpoints:
+The current demo requires two GitHub Environment secrets:
 
 ```text
-/openai/v1/embeddings
-/openai/v1/chat/completions
+POSTGRES_ADMIN_PASSWORD
+OPENAI_API_KEY
 ```
 
-The configured deployment name is sent as `model`; no dated `api-version` variable is required.
+Create an OpenAI API key for the API project used by the demo and keep it outside the repository.
 
-Create/select an Azure OpenAI / Microsoft Foundry deployment that provides:
-
-- one embedding deployment capable of returning exactly 768 dimensions;
-- one chat-completions deployment for grounded RAG answers.
-
-Then configure these GitHub Environment variables on `azure-demo`:
-
-```text
-AZURE_OPENAI_ENDPOINT
-AZURE_OPENAI_EMBEDDING_DEPLOYMENT
-AZURE_OPENAI_ANSWER_DEPLOYMENT
-```
-
-The OIDC helper can set them when passed explicitly:
-
-```powershell
-./scripts/azure/configure-github-oidc.ps1 `
-  -AzureOpenAiEndpoint "https://<resource>.openai.azure.com/" `
-  -AzureOpenAiEmbeddingDeployment "<embedding-deployment>" `
-  -AzureOpenAiAnswerDeployment "<answer-deployment>"
-```
-
-Set the two required GitHub Environment secrets interactively:
+Set both secrets interactively so their values are not placed on the command line:
 
 ```powershell
 gh secret set POSTGRES_ADMIN_PASSWORD `
   --repo ricgino/CloudKnowledge `
   --env azure-demo
 
-gh secret set AZURE_OPENAI_API_KEY `
+gh secret set OPENAI_API_KEY `
   --repo ricgino/CloudKnowledge `
   --env azure-demo
 ```
 
-Use a unique PostgreSQL password; do not reuse a personal password.
+Use a unique PostgreSQL password; do not reuse a personal password. Never paste either secret into issues, commits, logs or chat messages.
+
+The AI endpoint and model names are not GitHub secrets or environment variables; they are versioned in `.github/workflows/azure-deploy.yml` and passed to Terraform as provider-neutral `ai_*` variables.
 
 ## Step 4 - Run the deployment workflow
 
@@ -287,34 +288,27 @@ PR #6 must remain draft until all of these checks pass against the real Azure de
 
 ## Free-tier and cost posture
 
-Verified against Microsoft Azure pricing/free-services pages on 2026-08-29.
+The Azure infrastructure is deliberately configured for a low-volume portfolio demo and uses scale-to-zero where supported. Azure free allowances and introductory grants depend on the subscription and can change; check Azure Cost Management before leaving the environment running long-term.
 
-| Service | Current free allowance relevant to CloudKnowledge | Period |
-| --- | --- | --- |
-| Azure Container Apps Consumption | 180,000 vCPU-seconds, 360,000 GiB-seconds and 2 million requests per subscription/month | Always-free monthly allowance |
-| Azure Container Registry | 1 Standard registry, 100 GB storage, 10 webhooks | First 12 months for eligible new Azure accounts |
-| Azure Database for PostgreSQL Flexible Server | 750 hours B1ms, 32 GB data storage, 32 GB backup storage | First 12 months for eligible new Azure accounts |
-| Azure Service Bus Standard | 750 hours and 13 million Standard-tier base-unit operations | First 12 months for eligible new Azure accounts |
-| Azure Blob Storage | 5 GB hot LRS block storage, 20,000 reads, 10,000 writes | First 12 months for eligible new Azure accounts |
-| Azure Monitor / Log Analytics | first 5 GB/month of qualifying ingestion per billing account | Current free grant; monitor current pricing |
-| Azure OpenAI / Foundry model inference | usage-dependent; Standard is pay-as-you-go by input/output tokens | Not treated as free by this project |
+Direct OpenAI API inference is separately billed from ChatGPT subscriptions. The selected models are intended to keep low-volume demo inference inexpensive, but API usage is still metered and can generate charges.
 
 Important consequences:
 
 - `min_replicas = 0` is intentional for API, Web and Worker.
-- ACR/PostgreSQL/Service Bus/Blob free grants are time-limited for eligible new accounts; after the 12-month benefit expires these services can generate normal charges.
-- Azure AI inference can generate charges from the first request depending on the selected model/deployment.
-- Log ingestion can generate charges if the free ingestion grant is exceeded.
-- quotas and pricing can change; check Azure Cost Management and the current Azure pricing pages before leaving the demo running long-term.
+- ACR/PostgreSQL/Service Bus/Blob free grants may be time-limited or subscription-dependent; after benefits expire these services can generate normal charges.
+- OpenAI API inference can generate charges from the first request once billing is enabled.
+- Log ingestion can generate charges if free grants are exceeded.
+- quotas and pricing can change; review Azure Cost Management and OpenAI API usage/billing after the first smoke test.
 
 Recommended demo hygiene:
 
 ```text
 keep test traffic low
+disable OpenAI automatic credit recharge if you want strict prepaid control
 avoid large document batches while evaluating AI cost
-use small managed models where they satisfy quality requirements
 keep min replicas at zero
 review Azure Cost Management after the first smoke test
+review OpenAI API usage after the first RAG tests
 remove the environment when it is no longer needed
 ```
 
