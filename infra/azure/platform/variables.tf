@@ -58,30 +58,44 @@ variable "azure_ad_api_client_id" {
   type        = string
 }
 
-variable "azure_openai_endpoint" {
-  description = "Azure OpenAI endpoint used by the API and Worker."
+variable "ai_provider" {
+  description = "AI provider used by the deployed API and Worker."
   type        = string
+  default     = "OpenAI"
 
   validation {
-    condition     = can(regex("^https://", var.azure_openai_endpoint))
-    error_message = "azure_openai_endpoint must be an HTTPS URL."
+    condition     = contains(["OpenAI", "AzureOpenAI"], var.ai_provider)
+    error_message = "ai_provider must be OpenAI or AzureOpenAI for the Azure deployment."
   }
 }
 
-variable "azure_openai_api_key" {
-  description = "Azure OpenAI API key."
+variable "ai_endpoint" {
+  description = "AI provider HTTPS endpoint used by the API and Worker."
+  type        = string
+  default     = "https://api.openai.com/"
+
+  validation {
+    condition     = can(regex("^https://", var.ai_endpoint))
+    error_message = "ai_endpoint must be an HTTPS URL."
+  }
+}
+
+variable "ai_api_key" {
+  description = "AI provider API key."
   type        = string
   sensitive   = true
 }
 
-variable "azure_openai_embedding_deployment" {
-  description = "Azure OpenAI embedding deployment name."
+variable "ai_embedding_model" {
+  description = "Embedding model or Azure OpenAI embedding deployment name."
   type        = string
+  default     = "text-embedding-3-small"
 }
 
-variable "azure_openai_answer_deployment" {
-  description = "Azure OpenAI chat/answer deployment name."
+variable "ai_answer_model" {
+  description = "Answer model or Azure OpenAI answer deployment name."
   type        = string
+  default     = "gpt-4.1-nano"
 }
 
 variable "embedding_dimensions" {
