@@ -72,6 +72,10 @@ jobs:
         shell: pwsh
         run: ./tests/azure/oidc-script-tests.ps1
 
+      - name: Test Azure AI discovery script contract
+        shell: pwsh
+        run: ./tests/azure/ai-discovery-script-tests.ps1
+
       - name: Parse Azure workflow YAML
         shell: ruby {0}
         run: |
