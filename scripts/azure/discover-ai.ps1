@@ -2,6 +2,14 @@
 param(
     [string]$SubscriptionId = "",
     [string]$Location = "italynorth",
+    [string[]]$FallbackLocations = @(
+        "swedencentral",
+        "northeurope",
+        "francecentral",
+        "germanywestcentral",
+        "eastus2",
+        "northcentralus"
+    ),
     [string]$EmbeddingModel = "text-embedding-3-small",
     [string[]]$AnswerCandidates = @(
         "gpt-4.1-mini",
@@ -145,9 +153,16 @@ function Convert-CatalogEntry {
 
 function Select-DeploymentCandidate {
     param(
-        [Parameter(Mandatory)][object[]]$Catalog,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$Catalog,
+
         [Parameter(Mandatory)][string]$ModelName
     )
+
+    if ($Catalog.Count -eq 0) {
+        return $null
+    }
 
     $preferredSkus = @("GlobalStandard", "Standard", "DataZoneStandard")
     $matches = @(
@@ -188,6 +203,103 @@ function Select-DeploymentCandidate {
     return $null
 }
 
+function Get-DiscoveryForLocation {
+    param(
+        [Parameter(Mandatory)][string]$CandidateLocation,
+        [Parameter(Mandatory)][string]$SubscriptionId,
+        [Parameter(Mandatory)][string]$EmbeddingModel,
+        [Parameter(Mandatory)][string[]]$AnswerCandidates
+    )
+
+    Write-Host "Checking OpenAI account SKUs in '$CandidateLocation'..."
+
+    # Read-only catalog command: az cognitiveservices account list-skus
+    $accountSkuJson = az cognitiveservices account list-skus `
+        --kind OpenAI `
+        --location $CandidateLocation `
+        --subscription $SubscriptionId `
+        --output json `
+        --only-show-errors
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Could not list OpenAI account SKUs in '$CandidateLocation'; trying next region."
+        return $null
+    }
+
+    $accountSkus = @($accountSkuJson | ConvertFrom-Json)
+    Write-Host "OpenAI account SKU records returned: $($accountSkus.Count)"
+
+    if ($accountSkus.Count -eq 0) {
+        Write-Host "No OpenAI account SKU records returned; trying next region."
+        return $null
+    }
+
+    Write-Host "Reading model catalog for '$CandidateLocation'..."
+
+    # Read-only catalog command: az cognitiveservices model list
+    $catalogJson = az cognitiveservices model list `
+        --location $CandidateLocation `
+        --subscription $SubscriptionId `
+        --output json `
+        --only-show-errors
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Could not read the model catalog for '$CandidateLocation'; trying next region."
+        return $null
+    }
+
+    if ([string]::IsNullOrWhiteSpace([string]$catalogJson)) {
+        $rawCatalog = @()
+    }
+    else {
+        $rawCatalog = @($catalogJson | ConvertFrom-Json)
+    }
+
+    $catalog = @(
+        foreach ($entry in $rawCatalog) {
+            $converted = Convert-CatalogEntry -Entry $entry
+            if ($null -ne $converted) {
+                $converted
+            }
+        }
+    )
+
+    Write-Host "Model catalog entries returned: $($catalog.Count)"
+
+    if ($catalog.Count -eq 0) {
+        Write-Host "No model catalog entries returned; trying next region."
+        return $null
+    }
+
+    $embedding = Select-DeploymentCandidate -Catalog $catalog -ModelName $EmbeddingModel
+    if ($null -eq $embedding) {
+        Write-Host "Embedding model '$EmbeddingModel' is unavailable in '$CandidateLocation'; trying next region."
+        return $null
+    }
+
+    $answer = $null
+    foreach ($candidateName in $AnswerCandidates) {
+        $candidate = Select-DeploymentCandidate -Catalog $catalog -ModelName $candidateName
+        if ($null -ne $candidate) {
+            $answer = $candidate
+            break
+        }
+    }
+
+    if ($null -eq $answer) {
+        Write-Host "None of the preferred answer models are available in '$CandidateLocation'; trying next region."
+        return $null
+    }
+
+    return [pscustomobject]@{
+        Location              = $CandidateLocation
+        AccountSkuRecordCount = $accountSkus.Count
+        ModelCatalogCount     = $catalog.Count
+        Embedding             = $embedding
+        Answer                = $answer
+    }
+}
+
 Assert-Command "az"
 
 if ([string]::IsNullOrWhiteSpace($SubscriptionId)) {
@@ -206,86 +318,66 @@ else {
 Write-Host "Azure AI discovery"
 Write-Host "Subscription: $SubscriptionId"
 Write-Host "Account:      $($account.name)"
-Write-Host "Location:     $Location"
+Write-Host "Preferred:    $Location"
 Write-Host ""
 
 Ensure-AzureProviderRegistration `
     -Namespace "Microsoft.CognitiveServices" `
     -SubscriptionId $SubscriptionId
 
-Write-Host ""
-Write-Host "Checking OpenAI account SKUs in '$Location'..."
-
-# Read-only catalog command: az cognitiveservices account list-skus
-$accountSkuJson = az cognitiveservices account list-skus `
-    --kind OpenAI `
-    --location $Location `
-    --subscription $SubscriptionId `
-    --output json `
-    --only-show-errors
-
-if ($LASTEXITCODE -ne 0) {
-    throw "Could not list Azure OpenAI account SKUs in '$Location'."
-}
-
-$accountSkus = @($accountSkuJson | ConvertFrom-Json)
-Write-Host "OpenAI account SKU records returned: $($accountSkus.Count)"
-
-Write-Host ""
-Write-Host "Reading model catalog for '$Location'..."
-
-# Read-only catalog command: az cognitiveservices model list
-$catalogJson = az cognitiveservices model list `
-    --location $Location `
-    --subscription $SubscriptionId `
-    --output json `
-    --only-show-errors
-
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace([string]$catalogJson)) {
-    throw "Could not read the Azure AI model catalog for '$Location'."
-}
-
-$rawCatalog = @($catalogJson | ConvertFrom-Json)
-$catalog = @(
-    foreach ($entry in $rawCatalog) {
-        $converted = Convert-CatalogEntry -Entry $entry
-        if ($null -ne $converted) {
-            $converted
-        }
-    }
+$locationsToTry = @(
+    @($Location) + @($FallbackLocations) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -Unique
 )
 
-$embedding = Select-DeploymentCandidate -Catalog $catalog -ModelName $EmbeddingModel
-if ($null -eq $embedding) {
-    throw "Embedding model '$EmbeddingModel' is not present in the Azure catalog for '$Location'."
-}
+Write-Host ""
+Write-Host "Regions to scan: $($locationsToTry -join ', ')"
+Write-Host ""
 
-$answer = $null
-foreach ($candidateName in $AnswerCandidates) {
-    $candidate = Select-DeploymentCandidate -Catalog $catalog -ModelName $candidateName
-    if ($null -ne $candidate) {
-        $answer = $candidate
+$selected = $null
+$scannedLocations = @()
+
+foreach ($candidateLocation in $locationsToTry) {
+    $candidateLocation = $candidateLocation.Trim().ToLowerInvariant()
+    $scannedLocations += $candidateLocation
+
+    Write-Host "--- $candidateLocation ---"
+    $discovery = Get-DiscoveryForLocation `
+        -CandidateLocation $candidateLocation `
+        -SubscriptionId $SubscriptionId `
+        -EmbeddingModel $EmbeddingModel `
+        -AnswerCandidates $AnswerCandidates
+
+    if ($null -ne $discovery) {
+        $selected = $discovery
         break
     }
+
+    Write-Host ""
 }
 
-if ($null -eq $answer) {
-    throw "None of the preferred answer models are present in '$Location': $($AnswerCandidates -join ', ')."
+if ($null -eq $selected) {
+    throw "No scanned Azure region exposed both '$EmbeddingModel' and one preferred answer model for this subscription. Scanned: $($scannedLocations -join ', '). No Azure AI account or model deployment was created."
 }
 
 $result = [pscustomobject]@{
-    SubscriptionId = $SubscriptionId
-    Subscription   = [string]$account.name
-    Location       = $Location
-    AccountSkuRecordCount = $accountSkus.Count
-    Embedding      = $embedding
-    Answer         = $answer
+    SubscriptionId        = $SubscriptionId
+    Subscription          = [string]$account.name
+    PreferredLocation     = $Location
+    SelectedLocation      = $selected.Location
+    ScannedLocations      = $scannedLocations
+    AccountSkuRecordCount = $selected.AccountSkuRecordCount
+    ModelCatalogCount     = $selected.ModelCatalogCount
+    Embedding             = $selected.Embedding
+    Answer                = $selected.Answer
 }
 
 Write-Host ""
 Write-Host "Recommended CloudKnowledge Azure AI candidates"
-Write-Host "Embedding: $($embedding.Name) | version $($embedding.Version) | SKU $($embedding.DeploymentSku)"
-Write-Host "Answer:    $($answer.Name) | version $($answer.Version) | SKU $($answer.DeploymentSku)"
+Write-Host "Location:  $($selected.Location)"
+Write-Host "Embedding: $($selected.Embedding.Name) | version $($selected.Embedding.Version) | SKU $($selected.Embedding.DeploymentSku)"
+Write-Host "Answer:    $($selected.Answer.Name) | version $($selected.Answer.Version) | SKU $($selected.Answer.DeploymentSku)"
 Write-Host ""
 Write-Host "Discovery result JSON:"
 $result | ConvertTo-Json -Depth 6
