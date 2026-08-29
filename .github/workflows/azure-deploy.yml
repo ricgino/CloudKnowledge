@@ -29,11 +29,12 @@ jobs:
       AZURE_TF_STATE_KEY: ${{ vars.AZURE_TF_STATE_KEY }}
       AZURE_AD_TENANT_ID: ${{ vars.AZURE_AD_TENANT_ID }}
       AZURE_AD_API_CLIENT_ID: ${{ vars.AZURE_AD_API_CLIENT_ID }}
-      AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
-      AZURE_OPENAI_EMBEDDING_DEPLOYMENT: ${{ vars.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
-      AZURE_OPENAI_ANSWER_DEPLOYMENT: ${{ vars.AZURE_OPENAI_ANSWER_DEPLOYMENT }}
+      AI_PROVIDER: "OpenAI"
+      AI_ENDPOINT: "https://api.openai.com/"
+      AI_EMBEDDING_MODEL: "text-embedding-3-small"
+      AI_ANSWER_MODEL: "gpt-4.1-nano"
       POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
-      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
@@ -44,10 +45,11 @@ jobs:
       TF_VAR_postgres_admin_password: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
       TF_VAR_azure_ad_tenant_id: ${{ vars.AZURE_AD_TENANT_ID }}
       TF_VAR_azure_ad_api_client_id: ${{ vars.AZURE_AD_API_CLIENT_ID }}
-      TF_VAR_azure_openai_endpoint: ${{ vars.AZURE_OPENAI_ENDPOINT }}
-      TF_VAR_azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
-      TF_VAR_azure_openai_embedding_deployment: ${{ vars.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
-      TF_VAR_azure_openai_answer_deployment: ${{ vars.AZURE_OPENAI_ANSWER_DEPLOYMENT }}
+      TF_VAR_ai_provider: "OpenAI"
+      TF_VAR_ai_endpoint: "https://api.openai.com/"
+      TF_VAR_ai_api_key: ${{ secrets.OPENAI_API_KEY }}
+      TF_VAR_ai_embedding_model: "text-embedding-3-small"
+      TF_VAR_ai_answer_model: "gpt-4.1-nano"
 
     steps:
       - name: Checkout repository
@@ -69,11 +71,12 @@ jobs:
             AZURE_TF_STATE_KEY
             AZURE_AD_TENANT_ID
             AZURE_AD_API_CLIENT_ID
-            AZURE_OPENAI_ENDPOINT
-            AZURE_OPENAI_EMBEDDING_DEPLOYMENT
-            AZURE_OPENAI_ANSWER_DEPLOYMENT
+            AI_PROVIDER
+            AI_ENDPOINT
+            AI_EMBEDDING_MODEL
+            AI_ANSWER_MODEL
             POSTGRES_ADMIN_PASSWORD
-            AZURE_OPENAI_API_KEY
+            OPENAI_API_KEY
           )
 
           missing=0
