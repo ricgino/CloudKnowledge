@@ -101,6 +101,26 @@ $bootstrapPath = Join-Path $repoRoot "infra\azure\bootstrap"
 
 Invoke-Native "gh" @("auth", "status")
 
+$repositoryMetadataJson = gh api "repos/$Repository"
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryMetadataJson)) {
+    throw "Could not read GitHub repository metadata for '$Repository'."
+}
+
+$repositoryMetadata = $repositoryMetadataJson | ConvertFrom-Json
+$ownerLogin = [string]$repositoryMetadata.owner.login
+$ownerId = [string]$repositoryMetadata.owner.id
+$repositoryName = [string]$repositoryMetadata.name
+$repositoryId = [string]$repositoryMetadata.id
+
+if (
+    [string]::IsNullOrWhiteSpace($ownerLogin) -or
+    [string]::IsNullOrWhiteSpace($ownerId) -or
+    [string]::IsNullOrWhiteSpace($repositoryName) -or
+    [string]::IsNullOrWhiteSpace($repositoryId)
+) {
+    throw "GitHub repository metadata is missing the owner/repository IDs required for immutable OIDC subjects."
+}
+
 $account = az account show --output json | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0 -or $null -eq $account) {
     throw "No active Azure CLI account was found. Run 'az login' first."
@@ -208,18 +228,21 @@ else {
 
 $principalObjectId = [string]$servicePrincipal.id
 $credentialName = "github-$($GitHubEnvironment -replace '[^A-Za-z0-9-]', '-')"
-$subject = "repo:$Repository`:environment:$GitHubEnvironment"
+$subject = "repo:$ownerLogin@$ownerId/$repositoryName@$repositoryId`:environment:$GitHubEnvironment"
 
-$existingCredential = az ad app federated-credential list `
+$existingCredentialJson = az ad app federated-credential list `
     --id $appId `
-    --query "[?name=='$credentialName'] | [0].name" `
-    --output tsv
+    --query "[?name=='$credentialName'] | [0].{name:name,subject:subject}" `
+    --output json
 
 if ($LASTEXITCODE -ne 0) {
     throw "Could not inspect federated credentials for application '$appId'."
 }
 
-if ([string]::IsNullOrWhiteSpace($existingCredential)) {
+$existingCredential = $existingCredentialJson | ConvertFrom-Json
+$existingSubject = if ($null -ne $existingCredential) { [string]$existingCredential.subject } else { "" }
+
+if ($null -eq $existingCredential -or [string]::IsNullOrWhiteSpace([string]$existingCredential.name)) {
     Write-Host "Creating federated credential '$credentialName'..."
 
     $credential = [ordered]@{
@@ -245,8 +268,34 @@ if ([string]::IsNullOrWhiteSpace($existingCredential)) {
         Remove-Item $credentialFile -ErrorAction SilentlyContinue
     }
 }
+elseif (-not [string]::Equals($existingSubject, $subject, [System.StringComparison]::Ordinal)) {
+    Write-Host "Updating federated credential '$credentialName' to the immutable GitHub subject..."
+
+    $credential = [ordered]@{
+        issuer      = "https://token.actions.githubusercontent.com/"
+        subject     = $subject
+        description = "CloudKnowledge GitHub Actions deployment through $GitHubEnvironment"
+        audiences   = @("api://AzureADTokenExchange")
+    }
+
+    $credentialFile = Join-Path ([System.IO.Path]::GetTempPath()) "cloudknowledge-federated-credential-$([Guid]::NewGuid()).json"
+
+    try {
+        $credential | ConvertTo-Json -Depth 4 | Set-Content -Path $credentialFile -Encoding utf8
+        Invoke-Native "az" @(
+            "ad", "app", "federated-credential", "update",
+            "--id", $appId,
+            "--federated-credential-id", $credentialName,
+            "--parameters", $credentialFile,
+            "--output", "none"
+        )
+    }
+    finally {
+        Remove-Item $credentialFile -ErrorAction SilentlyContinue
+    }
+}
 else {
-    Write-Host "Federated credential '$credentialName' already exists."
+    Write-Host "Federated credential '$credentialName' already has the expected immutable subject."
 }
 
 Ensure-RoleAssignment $principalObjectId "Contributor" $resourceGroupId
