@@ -83,22 +83,30 @@ $requiredSafetyFragments = @(
     'apply:',
     'type: boolean',
     'default: false',
-    'if: ${{ inputs.apply }}',
-    'if: ${{ !inputs.apply }}'
+    'azure-plan-*',
+    'azure-apply-*',
+    "startsWith(github.ref, 'refs/tags/azure-apply-')"
 )
 
 foreach ($fragment in $requiredSafetyFragments) {
     if (-not $workflow.Contains($fragment, [System.StringComparison]::Ordinal)) {
-        throw "Azure deployment workflow is missing explicit apply safety: $fragment"
+        throw "Azure deployment workflow is missing explicit apply safety or pre-merge trigger: $fragment"
     }
+}
+
+$applyGuard = "if: `${{ inputs.apply || startsWith(github.ref, 'refs/tags/azure-apply-') }}"
+$planOnlyGuard = "if: `${{ !(inputs.apply || startsWith(github.ref, 'refs/tags/azure-apply-')) }}"
+
+if (-not $workflow.Contains($planOnlyGuard, [System.StringComparison]::Ordinal)) {
+    throw "Azure deployment workflow is missing the plan-only guard for manual runs and azure-plan tags."
 }
 
 $applyGuardCount = ([regex]::Matches(
     $workflow,
-    [regex]::Escape('if: ${{ inputs.apply }}'))).Count
+    [regex]::Escape($applyGuard))).Count
 
-if ($applyGuardCount -lt 4) {
-    throw "Azure deployment must guard apply, migration, URL publication, and smoke check behind inputs.apply. Found $applyGuardCount guards."
+if ($applyGuardCount -lt 6) {
+    throw "Azure deployment must guard registry login, image push, apply, migration, URL publication, and smoke check. Found $applyGuardCount guards."
 }
 
 Write-Host "Direct OpenAI Azure deployment contract passed."
