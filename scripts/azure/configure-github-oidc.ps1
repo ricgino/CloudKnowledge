@@ -183,12 +183,18 @@ else {
 
 $appId = [string]$app.appId
 
-$servicePrincipalJson = az ad sp show `
-    --id $appId `
-    --query "{id:id,appId:appId}" `
-    --output json 2>$null
+$servicePrincipalJson = az ad sp list `
+    --filter "appId eq '$appId'" `
+    --query "[0].{id:id,appId:appId}" `
+    --output json
 
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($servicePrincipalJson)) {
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not query the service principal for application '$appId'."
+}
+
+$servicePrincipal = $servicePrincipalJson | ConvertFrom-Json
+
+if ($null -eq $servicePrincipal -or [string]::IsNullOrWhiteSpace([string]$servicePrincipal.id)) {
     Write-Host "Creating service principal..."
     $servicePrincipal = az ad sp create `
         --id $appId `
@@ -200,7 +206,7 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($servicePrincipalJson))
     }
 }
 else {
-    $servicePrincipal = $servicePrincipalJson | ConvertFrom-Json
+    Write-Host "Reusing existing service principal."
 }
 
 $principalObjectId = [string]$servicePrincipal.id
