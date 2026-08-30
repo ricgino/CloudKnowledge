@@ -91,6 +91,10 @@ public sealed class AiRetrievalQueryGenerator
 
             if (queries.Count > 0)
             {
+                _logger.LogInformation(
+                    "Generated retrieval queries: {Queries}",
+                    string.Join(" | ", queries));
+
                 return queries;
             }
         }
@@ -350,6 +354,9 @@ public sealed class AiRetrievalQueryGenerator
             - Produce concise complementary search queries, not long paraphrases.
             - Preserve exact product codes, error codes, numbers and units from the question.
             - Decompose independent constraints or subquestions when useful.
+            - For feasibility questions that combine an operating condition with maintaining rated or nominal performance, dedicate separate queries to the operating range and to rated performance derating, reduction or limitations under that condition.
+            - Name the affected performance quantity explicitly in the limitation query when the user names one, for example current, power, speed, load or capacity.
+            - Prefer coverage of independent answer-critical constraints over multiple near-duplicate environmental or installation queries.
             - Use likely terminology and standard synonyms that may appear in technical source documents.
             - When the user writes in a language other than English, include concise English technical wording when useful because the source documents may be in English.
             - You may introduce standard terminology needed for retrieval, but never invent factual thresholds, limits, dates, values or answers that were not stated by the user.
