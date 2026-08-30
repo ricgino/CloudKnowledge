@@ -4,6 +4,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $platformPath = Join-Path $repoRoot "infra\azure\platform\main.tf"
 $platform = Get-Content -Raw $platformPath
+$containerAppsPath = Join-Path $repoRoot "infra\azure\platform\container-apps.tf"
+$containerApps = Get-Content -Raw $containerAppsPath
 
 $environmentMatch = [regex]::Match(
     $platform,
@@ -41,6 +43,18 @@ if (-not $postgresBody.Contains(
     'zone                          = "1"',
     [System.StringComparison]::Ordinal)) {
     throw "PostgreSQL must pin availability zone 1 so recovery plans do not propose changing the already-provisioned server zone."
+}
+
+if ($containerApps.Contains(
+    'value = "https://${azurerm_container_app.api.latest_revision_fqdn}"',
+    [System.StringComparison]::Ordinal)) {
+    throw "Web API_UPSTREAM must not depend on the API latest revision FQDN because that value changes during the same Terraform apply."
+}
+
+if (-not $containerApps.Contains(
+    'value = "http://ca-${var.resource_prefix}-${var.environment}-api"',
+    [System.StringComparison]::Ordinal)) {
+    throw "Web API_UPSTREAM must use stable same-environment Container Apps service discovery by application name."
 }
 
 Write-Host "Azure platform deployment contract passed."
