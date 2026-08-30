@@ -7,6 +7,12 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    location = /version {
+        default_type application/json;
+        add_header Cache-Control "no-store";
+        return 200 '{"version":"${APP_VERSION}"}';
+    }
+
     location = /api/notifications/stream {
         proxy_pass ${API_UPSTREAM};
         proxy_http_version 1.1;
