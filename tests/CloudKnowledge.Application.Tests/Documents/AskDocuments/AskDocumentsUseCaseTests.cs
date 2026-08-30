@@ -111,6 +111,77 @@ public sealed class AskDocumentsUseCaseTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ComplexQuestion_ShouldTryFocusedRetrievalQueries()
+    {
+        const string question =
+            "Posso installare un ACS880-01 a 3500 metri di altitudine mantenendo la corrente nominale completa? " +
+            "Spiega eventuali limitazioni usando esclusivamente la documentazione disponibile.";
+
+        var relevantResult =
+            new SemanticSearchResult(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                12,
+                "Altitude from 1000 to 4000 m: output current is derated by 1% for every 100 m.",
+                0.22);
+
+        var embeddingGenerator =
+            new RecordingEmbeddingGenerator();
+
+        var semanticSearchRepository =
+            new RecoveringSemanticSearchRepository(
+                relevantResult);
+
+        var searchDocumentsUseCase =
+            new SearchDocumentsUseCase(
+                embeddingGenerator,
+                semanticSearchRepository,
+                new FakeCurrentUser());
+
+        var answerGenerator =
+            new FakeAnswerGenerator(
+                "A 3500 m è necessario applicare un derating [S1].");
+
+        var sut =
+            new AskDocumentsUseCase(
+                searchDocumentsUseCase,
+                answerGenerator);
+
+        var result =
+            await sut.ExecuteAsync(
+                question,
+                5,
+                CancellationToken.None);
+
+        Assert.Equal(
+            "A 3500 m è necessario applicare un derating [S1].",
+            result.Answer);
+
+        Assert.True(
+            semanticSearchRepository.CallCount > 1);
+
+        Assert.Contains(
+            embeddingGenerator.ReceivedInputs,
+            input =>
+                !string.Equals(
+                    input,
+                    question,
+                    StringComparison.Ordinal)
+                && input.Contains(
+                    "ACS880-01",
+                    StringComparison.OrdinalIgnoreCase)
+                && input.Contains(
+                    "altitudine",
+                    StringComparison.OrdinalIgnoreCase)
+                && input.Contains(
+                    "corrente",
+                    StringComparison.OrdinalIgnoreCase));
+
+        Assert.Single(
+            result.Sources);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_TeamScope_ShouldForwardTheSameScopeToSearch()
     {
         var teamId =
@@ -290,6 +361,39 @@ public sealed class AskDocumentsUseCaseTests
         }
     }
 
+    private sealed class RecordingEmbeddingGenerator
+        : IEmbeddingGenerator
+    {
+        public int Dimensions =>
+            3;
+
+        public List<string> ReceivedInputs { get; } =
+            new();
+
+        public Task<IReadOnlyList<float[]>> GenerateAsync(
+            IReadOnlyList<string> inputs,
+            CancellationToken cancellationToken)
+        {
+            ReceivedInputs.AddRange(
+                inputs);
+
+            IReadOnlyList<float[]> embeddings =
+                inputs
+                    .Select(
+                        _ =>
+                            new[]
+                            {
+                                0.1f,
+                                0.2f,
+                                0.3f
+                            })
+                    .ToArray();
+
+            return Task.FromResult(
+                embeddings);
+        }
+    }
+
     private sealed class FakeSemanticSearchRepository
         : IDocumentSemanticSearchRepository
     {
@@ -321,6 +425,43 @@ public sealed class AskDocumentsUseCaseTests
 
             return Task.FromResult(
                 _results);
+        }
+    }
+
+    private sealed class RecoveringSemanticSearchRepository
+        : IDocumentSemanticSearchRepository
+    {
+        private readonly SemanticSearchResult
+            _relevantResult;
+
+        public RecoveringSemanticSearchRepository(
+            SemanticSearchResult relevantResult)
+        {
+            _relevantResult =
+                relevantResult;
+        }
+
+        public int CallCount { get; private set; }
+
+        public Task<IReadOnlyList<SemanticSearchResult>> SearchAccessibleAsync(
+            Guid userId,
+            float[] queryEmbedding,
+            int take,
+            DocumentRetrievalScope scope,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+
+            IReadOnlyList<SemanticSearchResult> results =
+                CallCount == 1
+                    ? Array.Empty<SemanticSearchResult>()
+                    : new[]
+                    {
+                        _relevantResult
+                    };
+
+            return Task.FromResult(
+                results);
         }
     }
 
