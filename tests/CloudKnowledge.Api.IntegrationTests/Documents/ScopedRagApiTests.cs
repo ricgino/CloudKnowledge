@@ -263,12 +263,15 @@ public sealed class ScopedRagApiTests
             ReadSearchDocumentIds(
                 await scopedSearch.Content.ReadAsStringAsync()));
 
+        const string scopedQuestion =
+            "What knowledge is available?";
+
         var scopedAsk =
             await client.PostAsJsonAsync(
                 "/api/ask",
                 new
                 {
-                    question = "What knowledge is available?",
+                    question = scopedQuestion,
                     take = 5,
                     scope = "team",
                     teamId,
@@ -299,6 +302,15 @@ public sealed class ScopedRagApiTests
                 teamDocumentId
             },
             askSourceDocumentIds);
+
+        Assert.True(
+            askJson.RootElement.TryGetProperty(
+                "retrievalQueries",
+                out var retrievalQueries));
+
+        Assert.Equal(
+            scopedQuestion,
+            retrievalQueries[0].GetString());
 
         var unauthorizedTeamId =
             Guid.NewGuid();
