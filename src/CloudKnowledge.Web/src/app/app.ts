@@ -6,6 +6,10 @@ import {
 } from '@angular/core';
 
 import {
+  HttpClient
+} from '@angular/common/http';
+
+import {
   EventMessage,
   EventType,
   InteractionStatus
@@ -37,6 +41,10 @@ type AppSection =
   'teams' |
   'administration';
 
+type VersionResponse = {
+  version: string;
+};
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.html',
@@ -50,6 +58,7 @@ export class App
   activeSection: AppSection = 'knowledge';
   accountName = '';
   accountUsername = '';
+  appVersion = 'dev/local';
 
   notifications: NotificationItem[] = [];
   notificationsOpen = false;
@@ -65,12 +74,15 @@ export class App
     private readonly auth: MsalService,
     private readonly broadcast: MsalBroadcastService,
     private readonly notificationsService: Notifications,
+    private readonly http: HttpClient,
     private readonly cdr: ChangeDetectorRef)
   {
   }
 
   ngOnInit(): void
   {
+    this.loadAppVersion();
+
     if (
       window.location.pathname ===
       '/redirect')
@@ -132,6 +144,14 @@ export class App
           this.updateLoginState();
           this.cdr.detectChanges();
         });
+  }
+
+  get shortAppVersion(): string
+  {
+    return /^[0-9a-f]{40}$/i.test(
+      this.appVersion)
+      ? this.appVersion.slice(0, 8)
+      : this.appVersion;
   }
 
   get unreadNotificationCount(): number
@@ -216,6 +236,34 @@ export class App
   {
     this.shutdownNotifications();
     this.auth.logoutRedirect();
+  }
+
+  private loadAppVersion(): void
+  {
+    this.http
+      .get<VersionResponse>(
+        '/version')
+      .subscribe({
+        next: response =>
+        {
+          if (
+            response &&
+            typeof response.version === 'string' &&
+            response.version.trim().length > 0)
+          {
+            this.appVersion =
+              response.version.trim();
+
+            this.cdr.detectChanges();
+          }
+        },
+        error: error =>
+        {
+          console.warn(
+            'Unable to load application version; using local fallback.',
+            error);
+        }
+      });
   }
 
   private updateLoginState(): void
