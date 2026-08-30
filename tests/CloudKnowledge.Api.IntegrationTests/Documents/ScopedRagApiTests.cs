@@ -312,6 +312,74 @@ public sealed class ScopedRagApiTests
             scopedQuestion,
             retrievalQueries[0].GetString());
 
+        Assert.True(
+            askJson.RootElement.TryGetProperty(
+                "retrievalDiagnostics",
+                out var retrievalDiagnostics));
+
+        var originalDiagnostics =
+            retrievalDiagnostics[0];
+
+        Assert.Equal(
+            "original",
+            originalDiagnostics
+                .GetProperty("kind")
+                .GetString());
+
+        Assert.Equal(
+            scopedQuestion,
+            originalDiagnostics
+                .GetProperty("query")
+                .GetString());
+
+        Assert.True(
+            originalDiagnostics.TryGetProperty(
+                "semanticCandidates",
+                out var semanticCandidates));
+
+        var semanticCandidate =
+            semanticCandidates[0];
+
+        Assert.True(
+            semanticCandidate.TryGetProperty(
+                "documentId",
+                out _));
+        Assert.True(
+            semanticCandidate.TryGetProperty(
+                "chunkId",
+                out _));
+        Assert.Equal(
+            1,
+            semanticCandidate
+                .GetProperty("rank")
+                .GetInt32());
+
+        Assert.True(
+            originalDiagnostics.TryGetProperty(
+                "lexicalCandidates",
+                out _));
+
+        var hybridCandidate =
+            originalDiagnostics
+                .GetProperty("hybridCandidates")[0];
+
+        Assert.True(
+            hybridCandidate.TryGetProperty(
+                "channel",
+                out _));
+        Assert.True(
+            hybridCandidate.TryGetProperty(
+                "fusedScore",
+                out _));
+        Assert.True(
+            hybridCandidate.TryGetProperty(
+                "navigationPenalty",
+                out _));
+        Assert.True(
+            hybridCandidate.TryGetProperty(
+                "selected",
+                out _));
+
         var unauthorizedTeamId =
             Guid.NewGuid();
 
