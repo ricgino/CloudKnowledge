@@ -232,7 +232,22 @@ public sealed class OpenAiProviderTests
 
         var root = requestJson.RootElement;
         var messages = root.GetProperty("messages");
+        var systemMessage = messages[0].GetProperty("content").GetString();
         var userMessage = messages[1].GetProperty("content").GetString();
+
+        Assert.NotNull(systemMessage);
+        Assert.Contains(
+            "operating range",
+            systemMessage,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "rated performance",
+            systemMessage,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "derating",
+            systemMessage,
+            StringComparison.OrdinalIgnoreCase);
 
         Assert.NotNull(userMessage);
         Assert.Contains(question, userMessage);
