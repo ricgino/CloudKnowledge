@@ -86,7 +86,7 @@ public sealed class AskDocumentsUseCaseTests
 
         Assert.Equal(
             0.80,
-            result.Sources[0].Similarity,
+            result.Sources[0].Similarity!.Value,
             precision: 10);
 
         Assert.Equal(
@@ -95,7 +95,7 @@ public sealed class AskDocumentsUseCaseTests
 
         Assert.Equal(
             0.65,
-            result.Sources[1].Similarity,
+            result.Sources[1].Similarity!.Value,
             precision: 10);
 
         Assert.NotNull(

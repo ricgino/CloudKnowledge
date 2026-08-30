@@ -12,6 +12,7 @@ using CloudKnowledge.Application.Documents.DeleteDocument;
 using CloudKnowledge.Application.Documents.DownloadDocument;
 using CloudKnowledge.Application.Documents.GetDocument;
 using CloudKnowledge.Application.Documents.GetDocuments;
+using CloudKnowledge.Application.Documents.HybridSearchDocuments;
 using CloudKnowledge.Application.Documents.SearchDocuments;
 using CloudKnowledge.Application.Documents.Sharing;
 using CloudKnowledge.Application.Notifications;
@@ -300,8 +301,6 @@ builder.Services.AddSingleton<IRetrievalQueryGenerator>(
             serviceProvider
                 .GetRequiredService<ILogger<AiRetrievalQueryGenerator>>()));
 
-builder.Services.AddScoped<AskDocumentsUseCase>();
-
 builder.Services.AddScoped<
     ITeamScopeResolver,
     EfTeamScopeResolver>();
@@ -319,6 +318,14 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     LexicalSearchDocumentsUseCase>();
+
+builder.Services.AddSingleton<
+    ChunkNavigationQualityClassifier>();
+
+builder.Services.AddScoped<
+    HybridSearchDocumentsUseCase>();
+
+builder.Services.AddScoped<AskDocumentsUseCase>();
 
 builder.Services.AddScoped<
     IDocumentAccessRepository,
