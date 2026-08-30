@@ -16,15 +16,36 @@ public sealed class AskDocumentsUseCase
     private readonly IAnswerGenerator
         _answerGenerator;
 
+    private readonly IRetrievalQueryGenerator?
+        _retrievalQueryGenerator;
+
     public AskDocumentsUseCase(
         SearchDocumentsUseCase searchDocumentsUseCase,
         IAnswerGenerator answerGenerator)
+        : this(
+            searchDocumentsUseCase,
+            answerGenerator,
+            retrievalQueryGenerator: null)
+    {
+    }
+
+    public AskDocumentsUseCase(
+        SearchDocumentsUseCase searchDocumentsUseCase,
+        IAnswerGenerator answerGenerator,
+        IRetrievalQueryGenerator? retrievalQueryGenerator)
     {
         _searchDocumentsUseCase =
-            searchDocumentsUseCase;
+            searchDocumentsUseCase ??
+            throw new ArgumentNullException(
+                nameof(searchDocumentsUseCase));
 
         _answerGenerator =
-            answerGenerator;
+            answerGenerator ??
+            throw new ArgumentNullException(
+                nameof(answerGenerator));
+
+        _retrievalQueryGenerator =
+            retrievalQueryGenerator;
     }
 
     public Task<AskDocumentsResult> ExecuteAsync(
@@ -118,15 +139,29 @@ public sealed class AskDocumentsUseCase
         DocumentRetrievalScope scope,
         CancellationToken cancellationToken)
     {
+        var focusedQueries =
+            _retrievalQueryGenerator is null
+                ? RetrievalQueryPlanner.CreateFocusedQueries(
+                    question,
+                    MaximumFocusedQueries)
+                : await _retrievalQueryGenerator.GenerateAsync(
+                    question,
+                    MaximumFocusedQueries,
+                    cancellationToken);
+
         var queries =
             new[]
             {
                 question.Trim()
             }
             .Concat(
-                RetrievalQueryPlanner.CreateFocusedQueries(
-                    question,
-                    MaximumFocusedQueries))
+                focusedQueries)
+            .Where(
+                query =>
+                    !string.IsNullOrWhiteSpace(query))
+            .Select(
+                query =>
+                    query.Trim())
             .Distinct(
                 StringComparer.OrdinalIgnoreCase)
             .ToArray();
