@@ -120,6 +120,25 @@ describe('App', () => {
         'Private knowledge, securely searchable.');
   });
 
+  it('should always render the deployed build version', () => {
+    const fixture =
+      TestBed.createComponent(App);
+
+    fixture.detectChanges();
+
+    const compiled =
+      fixture.nativeElement as HTMLElement;
+
+    const versionBadge =
+      compiled.querySelector('.build-version');
+
+    expect(versionBadge)
+      .not.toBeNull();
+
+    expect(versionBadge?.textContent)
+      .toContain('Build');
+  });
+
   it('marks currently visible unread notifications as read when the panel opens', () => {
     const fixture =
       TestBed.createComponent(App);
