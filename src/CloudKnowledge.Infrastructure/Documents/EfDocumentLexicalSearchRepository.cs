@@ -2,6 +2,7 @@ using CloudKnowledge.Application.Documents.SearchDocuments;
 using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using NpgsqlTypes;
 
 namespace CloudKnowledge.Infrastructure.Documents;
@@ -72,65 +73,75 @@ public sealed class EfDocumentLexicalSearchRepository
                 scope,
                 cancellationToken);
 
-        var rows =
-            await (
-                from chunk
-                    in _dbContext.DocumentChunks
-                        .AsNoTracking()
+        try
+        {
+            var rows =
+                await (
+                    from chunk
+                        in _dbContext.DocumentChunks
+                            .AsNoTracking()
 
-                join document
-                    in accessibleDocuments
+                    join document
+                        in accessibleDocuments
 
-                    on chunk.DocumentId
-                    equals document.Id
+                        on chunk.DocumentId
+                        equals document.Id
 
-                let searchVector =
-                    EF.Property<NpgsqlTsVector>(
-                        chunk,
-                        "SearchVector")
+                    let searchVector =
+                        EF.Property<NpgsqlTsVector>(
+                            chunk,
+                            "SearchVector")
 
-                where searchVector.Matches(
-                    EF.Functions.WebSearchToTsQuery(
-                        "simple",
-                        normalizedQuery))
-
-                orderby searchVector
-                    .RankCoverDensity(
+                    where searchVector.Matches(
                         EF.Functions.WebSearchToTsQuery(
                             "simple",
                             normalizedQuery))
-                    descending
 
-                select new
-                {
-                    chunk.DocumentId,
+                    orderby searchVector
+                        .RankCoverDensity(
+                            EF.Functions.WebSearchToTsQuery(
+                                "simple",
+                                normalizedQuery))
+                        descending
 
-                    ChunkId =
-                        chunk.Id,
+                    select new
+                    {
+                        chunk.DocumentId,
 
-                    chunk.Position,
-                    chunk.Content,
+                        ChunkId =
+                            chunk.Id,
 
-                    Rank =
-                        searchVector
-                            .RankCoverDensity(
-                                EF.Functions.WebSearchToTsQuery(
-                                    "simple",
-                                    normalizedQuery))
-                })
-                .Take(take)
-                .ToListAsync(
-                    cancellationToken);
+                        chunk.Position,
+                        chunk.Content,
 
-        return rows
-            .Select(
-                row =>
-                    new LexicalSearchResult(
-                        row.DocumentId,
-                        row.ChunkId,
-                        row.Position,
-                        row.Content,
-                        row.Rank))
-            .ToArray();
+                        Rank =
+                            searchVector
+                                .RankCoverDensity(
+                                    EF.Functions.WebSearchToTsQuery(
+                                        "simple",
+                                        normalizedQuery))
+                    })
+                    .Take(take)
+                    .ToListAsync(
+                        cancellationToken);
+
+            return rows
+                .Select(
+                    row =>
+                        new LexicalSearchResult(
+                            row.DocumentId,
+                            row.ChunkId,
+                            row.Position,
+                            row.Content,
+                            row.Rank))
+                .ToArray();
+        }
+        catch (PostgresException exception)
+            when (exception.SqlState == "42601")
+        {
+            throw new LexicalQuerySyntaxException(
+                "PostgreSQL could not parse the lexical retrieval query.",
+                exception);
+        }
     }
 }
