@@ -107,7 +107,7 @@ public sealed class LexicalSearchAccessTests
             (string?)await columnCommand.ExecuteScalarAsync();
 
         Assert.Equal(
-            "USER-DEFINED",
+            "tsvector",
             dataType);
 
         await using var indexCommand =
