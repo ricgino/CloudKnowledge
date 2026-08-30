@@ -66,6 +66,7 @@ public sealed class AskController
         return Ok(
             new AskDocumentsResponse(
                 result.Answer,
-                sources));
+                sources,
+                result.RetrievalQueries));
     }
 }
