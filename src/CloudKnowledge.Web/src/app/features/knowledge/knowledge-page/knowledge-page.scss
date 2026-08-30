@@ -247,6 +247,44 @@ select:disabled,
   line-height: 1.7;
 }
 
+.retrieval-diagnostics {
+  margin-top: 1rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #dfe5f2;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.retrieval-diagnostics summary {
+  cursor: pointer;
+  color: #465675;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.retrieval-diagnostics ol {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.75rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.retrieval-diagnostics li span {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: #7a8496;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.retrieval-diagnostics code {
+  overflow-wrap: anywhere;
+  color: #25314a;
+  font-size: 0.76rem;
+  white-space: normal;
+}
+
 .sources {
   margin-top: 1.1rem;
   padding-top: 1rem;
