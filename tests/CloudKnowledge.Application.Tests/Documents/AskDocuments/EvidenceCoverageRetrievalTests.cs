@@ -91,6 +91,15 @@ public sealed class EvidenceCoverageRetrievalTests
             source =>
                 source.ChunkId == deratingChunk.ChunkId);
 
+        Assert.Equal(
+            [
+                question,
+                "ACS880-01 installation altitude 3500 m",
+                "ACS880-01 altitude operating limits",
+                "ACS880-01 output current derating above 1000 m"
+            ],
+            result.RetrievalQueries);
+
         Assert.NotNull(answerGenerator.ReceivedSources);
 
         Assert.Contains(
