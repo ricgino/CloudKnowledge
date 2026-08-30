@@ -59,6 +59,15 @@ if (-not $containerApps.Contains(
     throw "Web API_UPSTREAM must use stable same-environment Container Apps service discovery by application name."
 }
 
+if (-not $containerApps.Contains(
+    'name  = "APP_VERSION"',
+    [System.StringComparison]::Ordinal) -or
+    -not $containerApps.Contains(
+        'value = var.image_tag',
+        [System.StringComparison]::Ordinal)) {
+    throw "Web container must receive APP_VERSION from the immutable image_tag/git SHA."
+}
+
 if ($outputs.Contains(
     'value       = "https://${azurerm_container_app.web.latest_revision_fqdn}"',
     [System.StringComparison]::Ordinal)) {
