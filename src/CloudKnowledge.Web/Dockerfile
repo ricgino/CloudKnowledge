@@ -11,6 +11,7 @@ RUN npm run build
 FROM nginxinc/nginx-unprivileged:1.29-alpine AS final
 
 ENV API_UPSTREAM=http://api:8080
+ENV APP_VERSION=dev/local
 
 COPY src/CloudKnowledge.Web/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist/cloudknowledge-web/browser /usr/share/nginx/html
