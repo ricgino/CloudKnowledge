@@ -291,6 +291,15 @@ builder.Services.AddSingleton<IAnswerGenerator>(
                 .GetRequiredService<ILogger<OllamaAnswerGenerator>>());
     });
 
+builder.Services.AddSingleton<IRetrievalQueryGenerator>(
+    serviceProvider =>
+        new AiRetrievalQueryGenerator(
+            serviceProvider
+                .GetRequiredService<HttpClient>(),
+            aiConfiguration,
+            serviceProvider
+                .GetRequiredService<ILogger<AiRetrievalQueryGenerator>>()));
+
 builder.Services.AddScoped<AskDocumentsUseCase>();
 
 builder.Services.AddScoped<
