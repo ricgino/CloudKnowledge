@@ -93,6 +93,7 @@ export interface AskDocumentsResponse
 {
   answer: string;
   sources: AskDocumentSource[];
+  retrievalQueries: string[];
 }
 
 export function isSupportedDocumentFileName(
