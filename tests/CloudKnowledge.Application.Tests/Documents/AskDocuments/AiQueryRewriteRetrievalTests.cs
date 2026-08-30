@@ -1,5 +1,6 @@
 using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.AskDocuments;
+using CloudKnowledge.Application.Documents.HybridSearchDocuments;
 using CloudKnowledge.Application.Documents.SearchDocuments;
 using CloudKnowledge.Application.Users;
 
@@ -35,6 +36,11 @@ public sealed class AiQueryRewriteRetrievalTests
                 semanticSearchRepository,
                 new FakeCurrentUser());
 
+        var hybridSearchDocumentsUseCase =
+            new HybridSearchDocumentsUseCase(
+                searchDocumentsUseCase,
+                new ChunkNavigationQualityClassifier());
+
         var answerGenerator =
             new FakeAnswerGenerator();
 
@@ -44,7 +50,7 @@ public sealed class AiQueryRewriteRetrievalTests
 
         var sut =
             new AskDocumentsUseCase(
-                searchDocumentsUseCase,
+                hybridSearchDocumentsUseCase,
                 answerGenerator,
                 retrievalQueryGenerator);
 

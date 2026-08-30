@@ -10,7 +10,7 @@ public sealed class HybridSearchDocumentsUseCase
     private readonly SearchDocumentsUseCase
         _semanticSearch;
 
-    private readonly LexicalSearchDocumentsUseCase
+    private readonly LexicalSearchDocumentsUseCase?
         _lexicalSearch;
 
     private readonly ChunkNavigationQualityClassifier
@@ -18,17 +18,31 @@ public sealed class HybridSearchDocumentsUseCase
 
     public HybridSearchDocumentsUseCase(
         SearchDocumentsUseCase semanticSearch,
-        LexicalSearchDocumentsUseCase lexicalSearch,
         ChunkNavigationQualityClassifier navigationClassifier)
     {
         _semanticSearch =
-            semanticSearch;
-
-        _lexicalSearch =
-            lexicalSearch;
+            semanticSearch ??
+            throw new ArgumentNullException(
+                nameof(semanticSearch));
 
         _navigationClassifier =
-            navigationClassifier;
+            navigationClassifier ??
+            throw new ArgumentNullException(
+                nameof(navigationClassifier));
+    }
+
+    public HybridSearchDocumentsUseCase(
+        SearchDocumentsUseCase semanticSearch,
+        LexicalSearchDocumentsUseCase lexicalSearch,
+        ChunkNavigationQualityClassifier navigationClassifier)
+        : this(
+            semanticSearch,
+            navigationClassifier)
+    {
+        _lexicalSearch =
+            lexicalSearch ??
+            throw new ArgumentNullException(
+                nameof(lexicalSearch));
     }
 
     public async Task<HybridSearchDocumentsResult> ExecuteAsync(
@@ -61,21 +75,25 @@ public sealed class HybridSearchDocumentsUseCase
                 scope,
                 cancellationToken);
 
-        IReadOnlyList<LexicalSearchResult> lexicalResults;
+        IReadOnlyList<LexicalSearchResult> lexicalResults =
+            Array.Empty<LexicalSearchResult>();
 
-        try
+        if (_lexicalSearch is not null)
         {
-            lexicalResults =
-                await _lexicalSearch.ExecuteAsync(
-                    query,
-                    take,
-                    scope,
-                    cancellationToken);
-        }
-        catch (LexicalQuerySyntaxException)
-        {
-            lexicalResults =
-                Array.Empty<LexicalSearchResult>();
+            try
+            {
+                lexicalResults =
+                    await _lexicalSearch.ExecuteAsync(
+                        query,
+                        take,
+                        scope,
+                        cancellationToken);
+            }
+            catch (LexicalQuerySyntaxException)
+            {
+                lexicalResults =
+                    Array.Empty<LexicalSearchResult>();
+            }
         }
 
         var candidates =

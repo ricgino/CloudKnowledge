@@ -1,3 +1,4 @@
+using CloudKnowledge.Application.Documents.HybridSearchDocuments;
 using CloudKnowledge.Application.Documents.SearchDocuments;
 
 namespace CloudKnowledge.Application.Documents.AskDocuments;
@@ -10,8 +11,14 @@ public sealed class AskDocumentsUseCase
     private const int ReciprocalRankConstant =
         60;
 
-    private readonly SearchDocumentsUseCase
-        _searchDocumentsUseCase;
+    private const double NearTieRatio =
+        0.98;
+
+    private const int MaximumDiagnosticCandidates =
+        8;
+
+    private readonly HybridSearchDocumentsUseCase
+        _hybridSearchDocumentsUseCase;
 
     private readonly IAnswerGenerator
         _answerGenerator;
@@ -23,21 +30,33 @@ public sealed class AskDocumentsUseCase
         SearchDocumentsUseCase searchDocumentsUseCase,
         IAnswerGenerator answerGenerator)
         : this(
-            searchDocumentsUseCase,
+            new HybridSearchDocumentsUseCase(
+                searchDocumentsUseCase,
+                new ChunkNavigationQualityClassifier()),
             answerGenerator,
             retrievalQueryGenerator: null)
     {
     }
 
     public AskDocumentsUseCase(
-        SearchDocumentsUseCase searchDocumentsUseCase,
+        HybridSearchDocumentsUseCase hybridSearchDocumentsUseCase,
+        IAnswerGenerator answerGenerator)
+        : this(
+            hybridSearchDocumentsUseCase,
+            answerGenerator,
+            retrievalQueryGenerator: null)
+    {
+    }
+
+    public AskDocumentsUseCase(
+        HybridSearchDocumentsUseCase hybridSearchDocumentsUseCase,
         IAnswerGenerator answerGenerator,
         IRetrievalQueryGenerator? retrievalQueryGenerator)
     {
-        _searchDocumentsUseCase =
-            searchDocumentsUseCase ??
+        _hybridSearchDocumentsUseCase =
+            hybridSearchDocumentsUseCase ??
             throw new ArgumentNullException(
-                nameof(searchDocumentsUseCase));
+                nameof(hybridSearchDocumentsUseCase));
 
         _answerGenerator =
             answerGenerator ??
@@ -90,19 +109,17 @@ public sealed class AskDocumentsUseCase
                 scope,
                 cancellationToken);
 
-        var searchResults =
-            retrieval.Results;
-
-        if (searchResults.Count == 0)
+        if (retrieval.Results.Count == 0)
         {
             return new AskDocumentsResult(
                 "Non sono state trovate informazioni pertinenti nei documenti.",
                 Array.Empty<AskDocumentsSource>(),
-                retrieval.Queries);
+                retrieval.Queries,
+                retrieval.Diagnostics);
         }
 
         var contextSources =
-            searchResults
+            retrieval.Results
                 .Select(
                     (result, index) =>
                         new AnswerContextSource(
@@ -120,7 +137,7 @@ public sealed class AskDocumentsUseCase
                 cancellationToken);
 
         var sources =
-            searchResults
+            retrieval.Results
                 .Select(
                     (result, index) =>
                         new AskDocumentsSource(
@@ -129,13 +146,16 @@ public sealed class AskDocumentsUseCase
                             result.ChunkId,
                             result.Position,
                             result.Content,
-                            1.0 - result.CosineDistance))
+                            result.CosineDistance.HasValue
+                                ? 1.0 - result.CosineDistance.Value
+                                : null))
                 .ToArray();
 
         return new AskDocumentsResult(
             answer,
             sources,
-            retrieval.Queries);
+            retrieval.Queries,
+            retrieval.Diagnostics);
     }
 
     private async Task<RetrievalExecution> RetrieveAsync(
@@ -144,6 +164,9 @@ public sealed class AskDocumentsUseCase
         DocumentRetrievalScope scope,
         CancellationToken cancellationToken)
     {
+        var originalQuery =
+            question.Trim();
+
         var focusedQueries =
             _retrievalQueryGenerator is null
                 ? RetrievalQueryPlanner.CreateFocusedQueries(
@@ -162,22 +185,17 @@ public sealed class AskDocumentsUseCase
                 .Select(
                     query =>
                         query.Trim())
+                .Where(
+                    query =>
+                        !string.Equals(
+                            query,
+                            originalQuery,
+                            StringComparison.OrdinalIgnoreCase))
                 .Distinct(
                     StringComparer.OrdinalIgnoreCase)
                 .Take(
                     MaximumFocusedQueries)
                 .ToArray();
-
-        var queries =
-            new[]
-            {
-                question.Trim()
-            }
-            .Concat(
-                normalizedFocusedQueries)
-            .Distinct(
-                StringComparer.OrdinalIgnoreCase)
-            .ToArray();
 
         var candidateTake =
             Math.Min(
@@ -186,31 +204,52 @@ public sealed class AskDocumentsUseCase
                     8,
                     take * 2));
 
-        var fusedResults =
-            new Dictionary<Guid, FusedSearchResult>();
+        var executions =
+            new List<QueryExecution>();
 
-        var resultsByQuery =
-            new Dictionary<string, IReadOnlyList<SemanticSearchResult>>(
-                StringComparer.OrdinalIgnoreCase);
+        var allQueries =
+            new[]
+            {
+                originalQuery
+            }
+            .Concat(
+                normalizedFocusedQueries)
+            .ToArray();
 
-        foreach (var query in queries)
+        for (var index = 0;
+             index < allQueries.Length;
+             index++)
         {
-            var queryResults =
-                await _searchDocumentsUseCase.ExecuteAsync(
+            var query =
+                allQueries[index];
+
+            var result =
+                await _hybridSearchDocumentsUseCase.ExecuteAsync(
                     query,
                     candidateTake,
                     scope,
                     cancellationToken);
 
-            resultsByQuery[query] =
-                queryResults;
+            executions.Add(
+                new QueryExecution(
+                    index == 0
+                        ? AskRetrievalQueryKind.Original
+                        : AskRetrievalQueryKind.Focused,
+                    query,
+                    result));
+        }
 
+        var fusedResults =
+            new Dictionary<Guid, CrossQueryFusedResult>();
+
+        foreach (var execution in executions)
+        {
             for (var index = 0;
-                 index < queryResults.Count;
+                 index < execution.Result.Results.Count;
                  index++)
             {
                 var result =
-                    queryResults[index];
+                    execution.Result.Results[index];
 
                 var reciprocalRankScore =
                     1d /
@@ -229,80 +268,223 @@ public sealed class AskDocumentsUseCase
 
                 fusedResults.Add(
                     result.ChunkId,
-                    new FusedSearchResult(
+                    new CrossQueryFusedResult(
                         result,
                         reciprocalRankScore));
             }
         }
 
-        var orderedFusedResults =
-            fusedResults
-                .Values
-                .OrderByDescending(
-                    result => result.Score)
-                .ThenBy(
-                    result => result.Result.CosineDistance)
-                .ThenBy(
-                    result => result.Result.ChunkId)
-                .ToArray();
+        var selectedResults =
+            new List<HybridSearchResult>();
 
         var selectedChunkIds =
             new HashSet<Guid>();
 
-        foreach (var focusedQuery in normalizedFocusedQueries)
+        var selectedPerDocument =
+            new Dictionary<Guid, int>();
+
+        foreach (var execution in executions.Where(
+                     item =>
+                         item.Kind ==
+                         AskRetrievalQueryKind.Focused))
         {
-            if (selectedChunkIds.Count >= take)
+            if (selectedResults.Count >= take)
             {
                 break;
             }
 
-            if (!resultsByQuery.TryGetValue(
-                    focusedQuery,
-                    out var queryResults) ||
-                queryResults.Count == 0)
+            var evidence =
+                execution.Result.Results
+                    .FirstOrDefault(
+                        result =>
+                            !selectedChunkIds.Contains(
+                                result.ChunkId));
+
+            if (evidence is null)
             {
                 continue;
             }
 
-            selectedChunkIds.Add(
-                queryResults[0].ChunkId);
+            var representative =
+                fusedResults[evidence.ChunkId]
+                    .Result;
+
+            AddSelected(
+                representative,
+                selectedResults,
+                selectedChunkIds,
+                selectedPerDocument);
         }
 
-        foreach (var fusedResult in orderedFusedResults)
-        {
-            if (selectedChunkIds.Count >= take)
-            {
-                break;
-            }
-
-            selectedChunkIds.Add(
-                fusedResult.Result.ChunkId);
-        }
-
-        var selectedResults =
-            orderedFusedResults
+        var remaining =
+            fusedResults.Values
                 .Where(
                     result =>
-                        selectedChunkIds.Contains(
+                        !selectedChunkIds.Contains(
                             result.Result.ChunkId))
-                .Take(take)
-                .Select(
-                    result => result.Result)
-                .ToArray();
+                .ToList();
+
+        while (selectedResults.Count < take
+               && remaining.Count > 0)
+        {
+            var ranked =
+                remaining
+                    .OrderByDescending(
+                        result =>
+                            result.Score)
+                    .ThenBy(
+                        result =>
+                            result.Result.CosineDistance
+                            ?? double.MaxValue)
+                    .ThenBy(
+                        result =>
+                            result.Result.ChunkId)
+                    .ToArray();
+
+            var bestScore =
+                ranked[0].Score;
+
+            var nearTieCandidates =
+                ranked
+                    .Where(
+                        result =>
+                            IsNearTie(
+                                result.Score,
+                                bestScore))
+                    .ToArray();
+
+            var chosen =
+                nearTieCandidates
+                    .OrderBy(
+                        result =>
+                            selectedPerDocument.TryGetValue(
+                                result.Result.DocumentId,
+                                out var count)
+                                ? count
+                                : 0)
+                    .ThenByDescending(
+                        result =>
+                            result.Score)
+                    .ThenBy(
+                        result =>
+                            result.Result.CosineDistance
+                            ?? double.MaxValue)
+                    .ThenBy(
+                        result =>
+                            result.Result.ChunkId)
+                    .First();
+
+            AddSelected(
+                chosen.Result,
+                selectedResults,
+                selectedChunkIds,
+                selectedPerDocument);
+
+            remaining.Remove(
+                chosen);
+        }
+
+        var diagnostics =
+            BuildDiagnostics(
+                executions,
+                selectedChunkIds);
 
         return new RetrievalExecution(
             selectedResults,
-            queries);
+            allQueries,
+            diagnostics);
     }
 
-    private sealed record RetrievalExecution(
-        IReadOnlyList<SemanticSearchResult> Results,
-        IReadOnlyList<string> Queries);
-
-    private sealed class FusedSearchResult
+    private static IReadOnlyList<AskRetrievalQueryDiagnostics> BuildDiagnostics(
+        IReadOnlyList<QueryExecution> executions,
+        IReadOnlySet<Guid> selectedChunkIds)
     {
-        public FusedSearchResult(
-            SemanticSearchResult result,
+        return executions
+            .Select(
+                execution =>
+                    new AskRetrievalQueryDiagnostics(
+                        execution.Kind,
+                        execution.Query,
+                        execution.Result.Diagnostics
+                            .SemanticCandidates
+                            .Take(
+                                MaximumDiagnosticCandidates)
+                            .ToArray(),
+                        execution.Result.Diagnostics
+                            .LexicalCandidates
+                            .Take(
+                                MaximumDiagnosticCandidates)
+                            .ToArray(),
+                        execution.Result.Results
+                            .Take(
+                                MaximumDiagnosticCandidates)
+                            .Select(
+                                result =>
+                                    new AskRetrievalHybridCandidate(
+                                        result.DocumentId,
+                                        result.ChunkId,
+                                        result.SemanticRank,
+                                        result.LexicalRank,
+                                        result.FusedScore,
+                                        result.AdjustedFusedScore,
+                                        result.Channel,
+                                        result.NavigationPenalty,
+                                        selectedChunkIds.Contains(
+                                            result.ChunkId)))
+                            .ToArray()))
+            .ToArray();
+    }
+
+    private static bool IsNearTie(
+        double candidateScore,
+        double bestScore)
+    {
+        if (bestScore <= 0)
+        {
+            return candidateScore == bestScore;
+        }
+
+        return candidateScore >=
+            bestScore * NearTieRatio;
+    }
+
+    private static void AddSelected(
+        HybridSearchResult result,
+        ICollection<HybridSearchResult> selectedResults,
+        ISet<Guid> selectedChunkIds,
+        IDictionary<Guid, int> selectedPerDocument)
+    {
+        if (!selectedChunkIds.Add(
+                result.ChunkId))
+        {
+            return;
+        }
+
+        selectedResults.Add(
+            result);
+
+        selectedPerDocument[result.DocumentId] =
+            selectedPerDocument.TryGetValue(
+                result.DocumentId,
+                out var count)
+                ? count + 1
+                : 1;
+    }
+
+    private sealed record QueryExecution(
+        AskRetrievalQueryKind Kind,
+        string Query,
+        HybridSearchDocumentsResult Result);
+
+    private sealed record RetrievalExecution(
+        IReadOnlyList<HybridSearchResult> Results,
+        IReadOnlyList<string> Queries,
+        IReadOnlyList<AskRetrievalQueryDiagnostics> Diagnostics);
+
+    private sealed class CrossQueryFusedResult
+    {
+        public CrossQueryFusedResult(
+            HybridSearchResult result,
             double score)
         {
             Result =
@@ -312,7 +494,7 @@ public sealed class AskDocumentsUseCase
                 score;
         }
 
-        public SemanticSearchResult Result
+        public HybridSearchResult Result
         {
             get;
             private set;
@@ -325,18 +507,43 @@ public sealed class AskDocumentsUseCase
         }
 
         public void Add(
-            SemanticSearchResult result,
+            HybridSearchResult result,
             double score)
         {
             Score +=
                 score;
 
-            if (result.CosineDistance <
-                Result.CosineDistance)
+            if (ShouldPreferRepresentative(
+                    result,
+                    Result))
             {
                 Result =
                     result;
             }
+        }
+
+        private static bool ShouldPreferRepresentative(
+            HybridSearchResult candidate,
+            HybridSearchResult current)
+        {
+            if (candidate.CosineDistance.HasValue
+                && !current.CosineDistance.HasValue)
+            {
+                return true;
+            }
+
+            if (candidate.CosineDistance.HasValue
+                && current.CosineDistance.HasValue
+                && candidate.CosineDistance.Value <
+                current.CosineDistance.Value)
+            {
+                return true;
+            }
+
+            return candidate.CosineDistance.HasValue ==
+                   current.CosineDistance.HasValue
+                   && candidate.AdjustedFusedScore >
+                   current.AdjustedFusedScore;
         }
     }
 }

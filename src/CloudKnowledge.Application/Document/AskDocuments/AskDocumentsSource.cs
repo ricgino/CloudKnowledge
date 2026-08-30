@@ -6,4 +6,4 @@ public sealed record AskDocumentsSource(
     Guid ChunkId,
     int Position,
     string Content,
-    double Similarity);
+    double? Similarity);
