@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace CloudKnowledge.Application.Documents.AskDocuments;
 
-internal static class RetrievalQueryPlanner
+public static class RetrievalQueryPlanner
 {
     private const int FocusWindowSize = 6;
     private const int FocusWindowOverlap = 3;
