@@ -127,6 +127,9 @@ public sealed class AzureOpenAiAnswerGenerator
             Rispondi esclusivamente usando le fonti fornite nel contesto.
             Non usare conoscenze esterne e non inventare informazioni mancanti.
             Se il contesto non contiene abbastanza informazioni, dichiaralo chiaramente.
+            L'assenza di una restrizione o di un limite nelle fonti recuperate non è una prova che tale restrizione o limite non esista.
+            Non concludere che un'operazione sia consentita, sicura o possibile senza limitazioni se le fonti non lo affermano esplicitamente.
+            Se fonti diverse forniscono condizioni complementari rilevanti, combinale prima di concludere.
             Rispondi nella stessa lingua della domanda.
             Quando usi una fonte, cita il suo identificatore [S1], [S2], ecc.
             Usa solo identificatori realmente presenti nel contesto.
