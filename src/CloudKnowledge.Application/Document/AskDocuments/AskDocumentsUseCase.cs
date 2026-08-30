@@ -4,6 +4,12 @@ namespace CloudKnowledge.Application.Documents.AskDocuments;
 
 public sealed class AskDocumentsUseCase
 {
+    private const int MaximumFocusedQueries =
+        3;
+
+    private const int ReciprocalRankConstant =
+        60;
+
     private readonly SearchDocumentsUseCase
         _searchDocumentsUseCase;
 
@@ -57,7 +63,7 @@ public sealed class AskDocumentsUseCase
         }
 
         var searchResults =
-            await _searchDocumentsUseCase.ExecuteAsync(
+            await RetrieveAsync(
                 question,
                 take,
                 scope,
@@ -104,5 +110,128 @@ public sealed class AskDocumentsUseCase
         return new AskDocumentsResult(
             answer,
             sources);
+    }
+
+    private async Task<IReadOnlyList<SemanticSearchResult>> RetrieveAsync(
+        string question,
+        int take,
+        DocumentRetrievalScope scope,
+        CancellationToken cancellationToken)
+    {
+        var queries =
+            new[]
+            {
+                question.Trim()
+            }
+            .Concat(
+                RetrievalQueryPlanner.CreateFocusedQueries(
+                    question,
+                    MaximumFocusedQueries))
+            .Distinct(
+                StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var candidateTake =
+            Math.Min(
+                20,
+                Math.Max(
+                    8,
+                    take * 2));
+
+        var fusedResults =
+            new Dictionary<Guid, FusedSearchResult>();
+
+        foreach (var query in queries)
+        {
+            var queryResults =
+                await _searchDocumentsUseCase.ExecuteAsync(
+                    query,
+                    candidateTake,
+                    scope,
+                    cancellationToken);
+
+            for (var index = 0;
+                 index < queryResults.Count;
+                 index++)
+            {
+                var result =
+                    queryResults[index];
+
+                var reciprocalRankScore =
+                    1d /
+                    (ReciprocalRankConstant + index + 1d);
+
+                if (fusedResults.TryGetValue(
+                        result.ChunkId,
+                        out var fusedResult))
+                {
+                    fusedResult.Add(
+                        result,
+                        reciprocalRankScore);
+
+                    continue;
+                }
+
+                fusedResults.Add(
+                    result.ChunkId,
+                    new FusedSearchResult(
+                        result,
+                        reciprocalRankScore));
+            }
+        }
+
+        return fusedResults
+            .Values
+            .OrderByDescending(
+                result => result.Score)
+            .ThenBy(
+                result => result.Result.CosineDistance)
+            .ThenBy(
+                result => result.Result.ChunkId)
+            .Take(take)
+            .Select(
+                result => result.Result)
+            .ToArray();
+    }
+
+    private sealed class FusedSearchResult
+    {
+        public FusedSearchResult(
+            SemanticSearchResult result,
+            double score)
+        {
+            Result =
+                result;
+
+            Score =
+                score;
+        }
+
+        public SemanticSearchResult Result
+        {
+            get;
+            private set;
+        }
+
+        public double Score
+        {
+            get;
+            private set;
+        }
+
+        public void Add(
+            SemanticSearchResult result,
+            double score)
+        {
+            Score +=
+                score;
+
+            if (result.CosineDistance <
+                Result.CosineDistance)
+            {
+                Result =
+                    result;
+            }
+        }
     }
 }
