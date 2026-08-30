@@ -72,11 +72,6 @@ public sealed class EfDocumentLexicalSearchRepository
                 scope,
                 cancellationToken);
 
-        var tsQuery =
-            EF.Functions.WebSearchToTsQuery(
-                "simple",
-                normalizedQuery);
-
         var rows =
             await (
                 from chunk
@@ -95,11 +90,15 @@ public sealed class EfDocumentLexicalSearchRepository
                         "SearchVector")
 
                 where searchVector.Matches(
-                    tsQuery)
+                    EF.Functions.WebSearchToTsQuery(
+                        "simple",
+                        normalizedQuery))
 
                 orderby searchVector
                     .RankCoverDensity(
-                        tsQuery)
+                        EF.Functions.WebSearchToTsQuery(
+                            "simple",
+                            normalizedQuery))
                     descending
 
                 select new
@@ -115,7 +114,9 @@ public sealed class EfDocumentLexicalSearchRepository
                     Rank =
                         searchVector
                             .RankCoverDensity(
-                                tsQuery)
+                                EF.Functions.WebSearchToTsQuery(
+                                    "simple",
+                                    normalizedQuery))
                 })
                 .Take(take)
                 .ToListAsync(
