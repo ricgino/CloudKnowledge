@@ -91,6 +91,20 @@
 
           <p class="answer-text">{{ answer }}</p>
 
+          @if (retrievalQueries.length > 0) {
+            <details class="retrieval-diagnostics">
+              <summary>Retrieval diagnostics · {{ retrievalQueries.length }} queries</summary>
+              <ol>
+                @for (query of retrievalQueries; track $index) {
+                  <li>
+                    <span>{{ $index === 0 ? 'Original' : 'Focused ' + $index }}</span>
+                    <code>{{ query }}</code>
+                  </li>
+                }
+              </ol>
+            </details>
+          }
+
           @if (answerSources.length > 0) {
             <div class="sources">
               <h4>Sources used</h4>
