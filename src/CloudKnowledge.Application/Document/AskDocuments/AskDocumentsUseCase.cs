@@ -83,18 +83,22 @@ public sealed class AskDocumentsUseCase
                 "Take must be between 1 and 10.");
         }
 
-        var searchResults =
+        var retrieval =
             await RetrieveAsync(
                 question,
                 take,
                 scope,
                 cancellationToken);
 
+        var searchResults =
+            retrieval.Results;
+
         if (searchResults.Count == 0)
         {
             return new AskDocumentsResult(
                 "Non sono state trovate informazioni pertinenti nei documenti.",
-                Array.Empty<AskDocumentsSource>());
+                Array.Empty<AskDocumentsSource>(),
+                retrieval.Queries);
         }
 
         var contextSources =
@@ -130,10 +134,11 @@ public sealed class AskDocumentsUseCase
 
         return new AskDocumentsResult(
             answer,
-            sources);
+            sources,
+            retrieval.Queries);
     }
 
-    private async Task<IReadOnlyList<SemanticSearchResult>> RetrieveAsync(
+    private async Task<RetrievalExecution> RetrieveAsync(
         string question,
         int take,
         DocumentRetrievalScope scope,
@@ -274,16 +279,25 @@ public sealed class AskDocumentsUseCase
                 fusedResult.Result.ChunkId);
         }
 
-        return orderedFusedResults
-            .Where(
-                result =>
-                    selectedChunkIds.Contains(
-                        result.Result.ChunkId))
-            .Take(take)
-            .Select(
-                result => result.Result)
-            .ToArray();
+        var selectedResults =
+            orderedFusedResults
+                .Where(
+                    result =>
+                        selectedChunkIds.Contains(
+                            result.Result.ChunkId))
+                .Take(take)
+                .Select(
+                    result => result.Result)
+                .ToArray();
+
+        return new RetrievalExecution(
+            selectedResults,
+            queries);
     }
+
+    private sealed record RetrievalExecution(
+        IReadOnlyList<SemanticSearchResult> Results,
+        IReadOnlyList<string> Queries);
 
     private sealed class FusedSearchResult
     {
