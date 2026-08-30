@@ -398,7 +398,7 @@ resource "azurerm_container_app" "web" {
 
       env {
         name  = "API_UPSTREAM"
-        value = "https://${azurerm_container_app.api.latest_revision_fqdn}"
+        value = "http://ca-${var.resource_prefix}-${var.environment}-api"
       }
     }
   }
