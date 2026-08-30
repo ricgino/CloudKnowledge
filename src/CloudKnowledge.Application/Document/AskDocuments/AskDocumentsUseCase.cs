@@ -149,19 +149,27 @@ public sealed class AskDocumentsUseCase
                     MaximumFocusedQueries,
                     cancellationToken);
 
+        var normalizedFocusedQueries =
+            focusedQueries
+                .Where(
+                    query =>
+                        !string.IsNullOrWhiteSpace(query))
+                .Select(
+                    query =>
+                        query.Trim())
+                .Distinct(
+                    StringComparer.OrdinalIgnoreCase)
+                .Take(
+                    MaximumFocusedQueries)
+                .ToArray();
+
         var queries =
             new[]
             {
                 question.Trim()
             }
             .Concat(
-                focusedQueries)
-            .Where(
-                query =>
-                    !string.IsNullOrWhiteSpace(query))
-            .Select(
-                query =>
-                    query.Trim())
+                normalizedFocusedQueries)
             .Distinct(
                 StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -176,6 +184,10 @@ public sealed class AskDocumentsUseCase
         var fusedResults =
             new Dictionary<Guid, FusedSearchResult>();
 
+        var resultsByQuery =
+            new Dictionary<string, IReadOnlyList<SemanticSearchResult>>(
+                StringComparer.OrdinalIgnoreCase);
+
         foreach (var query in queries)
         {
             var queryResults =
@@ -184,6 +196,9 @@ public sealed class AskDocumentsUseCase
                     candidateTake,
                     scope,
                     cancellationToken);
+
+            resultsByQuery[query] =
+                queryResults;
 
             for (var index = 0;
                  index < queryResults.Count;
@@ -215,14 +230,55 @@ public sealed class AskDocumentsUseCase
             }
         }
 
-        return fusedResults
-            .Values
-            .OrderByDescending(
-                result => result.Score)
-            .ThenBy(
-                result => result.Result.CosineDistance)
-            .ThenBy(
-                result => result.Result.ChunkId)
+        var orderedFusedResults =
+            fusedResults
+                .Values
+                .OrderByDescending(
+                    result => result.Score)
+                .ThenBy(
+                    result => result.Result.CosineDistance)
+                .ThenBy(
+                    result => result.Result.ChunkId)
+                .ToArray();
+
+        var selectedChunkIds =
+            new HashSet<Guid>();
+
+        foreach (var focusedQuery in normalizedFocusedQueries)
+        {
+            if (selectedChunkIds.Count >= take)
+            {
+                break;
+            }
+
+            if (!resultsByQuery.TryGetValue(
+                    focusedQuery,
+                    out var queryResults) ||
+                queryResults.Count == 0)
+            {
+                continue;
+            }
+
+            selectedChunkIds.Add(
+                queryResults[0].ChunkId);
+        }
+
+        foreach (var fusedResult in orderedFusedResults)
+        {
+            if (selectedChunkIds.Count >= take)
+            {
+                break;
+            }
+
+            selectedChunkIds.Add(
+                fusedResult.Result.ChunkId);
+        }
+
+        return orderedFusedResults
+            .Where(
+                result =>
+                    selectedChunkIds.Contains(
+                        result.Result.ChunkId))
             .Take(take)
             .Select(
                 result => result.Result)
