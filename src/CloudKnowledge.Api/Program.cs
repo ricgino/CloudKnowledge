@@ -314,6 +314,13 @@ builder.Services.AddScoped<
     SearchDocumentsUseCase>();
 
 builder.Services.AddScoped<
+    IDocumentLexicalSearchRepository,
+    EfDocumentLexicalSearchRepository>();
+
+builder.Services.AddScoped<
+    LexicalSearchDocumentsUseCase>();
+
+builder.Services.AddScoped<
     IDocumentAccessRepository,
     EfDocumentAccessRepository>();
 
