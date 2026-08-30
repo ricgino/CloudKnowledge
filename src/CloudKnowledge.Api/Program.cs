@@ -325,7 +325,15 @@ builder.Services.AddSingleton<
 builder.Services.AddScoped<
     HybridSearchDocumentsUseCase>();
 
-builder.Services.AddScoped<AskDocumentsUseCase>();
+builder.Services.AddScoped(
+    serviceProvider =>
+        new AskDocumentsUseCase(
+            serviceProvider
+                .GetRequiredService<HybridSearchDocumentsUseCase>(),
+            serviceProvider
+                .GetRequiredService<IAnswerGenerator>(),
+            serviceProvider
+                .GetRequiredService<IRetrievalQueryGenerator>()));
 
 builder.Services.AddScoped<
     IDocumentAccessRepository,
