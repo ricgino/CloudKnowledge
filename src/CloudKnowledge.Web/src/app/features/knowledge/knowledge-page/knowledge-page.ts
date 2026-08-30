@@ -49,6 +49,7 @@ export class KnowledgePage
   question = '';
   answer = '';
   answerSources: AskDocumentSource[] = [];
+  retrievalQueries: string[] = [];
   asking = false;
   downloadingDocumentId = '';
 
@@ -207,6 +208,7 @@ export class KnowledgePage
     this.asking = true;
     this.answer = '';
     this.answerSources = [];
+    this.retrievalQueries = [];
     this.errorMessage = '';
 
     this.documentsService
@@ -219,6 +221,7 @@ export class KnowledgePage
         {
           this.answer = response.answer;
           this.answerSources = response.sources;
+          this.retrievalQueries = response.retrievalQueries ?? [];
           this.asking = false;
           this.cdr.detectChanges();
         },
@@ -305,6 +308,7 @@ export class KnowledgePage
     this.searchSubmitted = false;
     this.answer = '';
     this.answerSources = [];
+    this.retrievalQueries = [];
     this.errorMessage = '';
   }
 }
