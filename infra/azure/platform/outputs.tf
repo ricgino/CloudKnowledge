@@ -1,6 +1,6 @@
 output "web_url" {
   description = "Public CloudKnowledge Web URL."
-  value       = "https://${azurerm_container_app.web.latest_revision_fqdn}"
+  value       = "https://${azurerm_container_app.web.ingress[0].fqdn}"
 }
 
 output "api_fqdn" {
