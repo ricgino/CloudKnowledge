@@ -182,6 +182,98 @@ public sealed class AskDocumentsUseCaseTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_MultipleQueries_ShouldFuseAndDeduplicateResults()
+    {
+        const string question =
+            "Posso installare un AX-400 a 3500 metri di altitudine mantenendo la corrente nominale completa? " +
+            "Spiega eventuali limitazioni.";
+
+        var documentId =
+            Guid.NewGuid();
+
+        var firstChunk =
+            new SemanticSearchResult(
+                documentId,
+                Guid.NewGuid(),
+                1,
+                "General installation notes.",
+                0.10);
+
+        var repeatedChunk =
+            new SemanticSearchResult(
+                documentId,
+                Guid.NewGuid(),
+                9,
+                "Altitude derating affects nominal output current.",
+                0.20);
+
+        var thirdChunk =
+            new SemanticSearchResult(
+                documentId,
+                Guid.NewGuid(),
+                11,
+                "Additional technical limits.",
+                0.25);
+
+        var semanticSearchRepository =
+            new SequencedSemanticSearchRepository(
+                new IReadOnlyList<SemanticSearchResult>[]
+                {
+                    new[]
+                    {
+                        firstChunk,
+                        repeatedChunk
+                    },
+                    new[]
+                    {
+                        repeatedChunk,
+                        thirdChunk
+                    },
+                    new[]
+                    {
+                        repeatedChunk
+                    },
+                    Array.Empty<SemanticSearchResult>()
+                });
+
+        var searchDocumentsUseCase =
+            new SearchDocumentsUseCase(
+                new FakeEmbeddingGenerator(),
+                semanticSearchRepository,
+                new FakeCurrentUser());
+
+        var sut =
+            new AskDocumentsUseCase(
+                searchDocumentsUseCase,
+                new FakeAnswerGenerator(
+                    "Fused answer [S1]"));
+
+        var result =
+            await sut.ExecuteAsync(
+                question,
+                2,
+                CancellationToken.None);
+
+        Assert.Equal(
+            repeatedChunk.ChunkId,
+            result.Sources[0].ChunkId);
+
+        Assert.Equal(
+            result.Sources.Count,
+            result.Sources
+                .Select(source => source.ChunkId)
+                .Distinct()
+                .Count());
+
+        Assert.Equal(
+            2,
+            result.Sources.Count);
+
+        Assert.True(
+            semanticSearchRepository.CallCount > 1);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_TeamScope_ShouldForwardTheSameScopeToSearch()
     {
         var teamId =
@@ -459,6 +551,43 @@ public sealed class AskDocumentsUseCaseTests
                     {
                         _relevantResult
                     };
+
+            return Task.FromResult(
+                results);
+        }
+    }
+
+    private sealed class SequencedSemanticSearchRepository
+        : IDocumentSemanticSearchRepository
+    {
+        private readonly IReadOnlyList<IReadOnlyList<SemanticSearchResult>>
+            _resultsByCall;
+
+        public SequencedSemanticSearchRepository(
+            IReadOnlyList<IReadOnlyList<SemanticSearchResult>> resultsByCall)
+        {
+            _resultsByCall =
+                resultsByCall;
+        }
+
+        public int CallCount { get; private set; }
+
+        public Task<IReadOnlyList<SemanticSearchResult>> SearchAccessibleAsync(
+            Guid userId,
+            float[] queryEmbedding,
+            int take,
+            DocumentRetrievalScope scope,
+            CancellationToken cancellationToken)
+        {
+            var index =
+                CallCount;
+
+            CallCount++;
+
+            var results =
+                index < _resultsByCall.Count
+                    ? _resultsByCall[index]
+                    : Array.Empty<SemanticSearchResult>();
 
             return Task.FromResult(
                 results);
