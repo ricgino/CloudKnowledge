@@ -5,6 +5,7 @@ using System.Text.Json;
 using CloudKnowledge.Application.Documents.AskDocuments;
 using CloudKnowledge.Infrastructure.Documents;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CloudKnowledge.Infrastructure.Tests.Documents;
 
@@ -150,6 +151,96 @@ public sealed class OpenAiProviderTests
         Assert.Contains("[S1]", userMessage);
         Assert.Equal(256, root.GetProperty("max_tokens").GetInt32());
         Assert.Equal(0.1, root.GetProperty("temperature").GetDouble(), 3);
+    }
+
+    [Fact]
+    public async Task RetrievalQueryGenerator_ShouldRewriteComplexQuestionIntoTechnicalQueries()
+    {
+        const string question =
+            "Posso installare un ACS880-01 a 3500 metri di altitudine mantenendo la corrente nominale completa?";
+
+        var handler = new RecordingHandler(
+            """
+            {
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "content": "{\"queries\":[\"ACS880-01 installation altitude 3500 m\",\"ACS880-01 altitude derating output current\"]}"
+                  }
+                }
+              ]
+            }
+            """);
+
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.openai.com/")
+        };
+
+        var configuration =
+            new AiProviderConfiguration(
+                AiProviderConfiguration.OpenAiProvider,
+                new Uri("https://api.openai.com/"),
+                "test-key",
+                "text-embedding-3-small",
+                "gpt-4.1-nano",
+                768,
+                0.1,
+                256);
+
+        var sut =
+            new AiRetrievalQueryGenerator(
+                httpClient,
+                configuration,
+                NullLogger<AiRetrievalQueryGenerator>.Instance);
+
+        var result =
+            await sut.GenerateAsync(
+                question,
+                maximumQueries: 3,
+                CancellationToken.None);
+
+        Assert.Contains(
+            result,
+            query =>
+                query.Contains(
+                    "derating",
+                    StringComparison.OrdinalIgnoreCase));
+
+        Assert.Contains(
+            result,
+            query =>
+                query.Contains(
+                    "ACS880-01",
+                    StringComparison.OrdinalIgnoreCase)
+                && query.Contains(
+                    "3500",
+                    StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(
+            "/v1/chat/completions",
+            handler.RequestUri?.AbsolutePath);
+
+        Assert.Equal(
+            "Bearer",
+            handler.Authorization?.Scheme);
+
+        using var requestJson =
+            JsonDocument.Parse(
+                Assert.IsType<string>(handler.RequestBody));
+
+        var root = requestJson.RootElement;
+        var messages = root.GetProperty("messages");
+        var userMessage = messages[1].GetProperty("content").GetString();
+
+        Assert.NotNull(userMessage);
+        Assert.Contains(question, userMessage);
+        Assert.Equal(
+            "json_object",
+            root.GetProperty("response_format")
+                .GetProperty("type")
+                .GetString());
     }
 
     private sealed class RecordingHandler(string responseJson)
