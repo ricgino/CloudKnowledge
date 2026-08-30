@@ -29,4 +29,26 @@ foreach ($location in $proxyLocations) {
     }
 }
 
-Write-Host "CloudKnowledge Web internal API proxy contract passed."
+$versionLocation = [regex]::Match(
+    $nginx,
+    'location\s*=\s*/version\s*\{(?<body>[\s\S]*?)\n\s*\}')
+
+if (-not $versionLocation.Success) {
+    throw "Web Nginx config must expose an exact /version endpoint."
+}
+
+$versionBody = $versionLocation.Groups["body"].Value
+
+if (-not $versionBody.Contains(
+    '${APP_VERSION}',
+    [System.StringComparison]::Ordinal)) {
+    throw "/version must report APP_VERSION supplied by the deployed Container App revision."
+}
+
+if (-not $versionBody.Contains(
+    'application/json',
+    [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "/version must return JSON so the Web client can display the deployed build."
+}
+
+Write-Host "CloudKnowledge Web internal API proxy and build version contract passed."
