@@ -91,7 +91,89 @@
 
           <p class="answer-text">{{ answer }}</p>
 
-          @if (retrievalQueries.length > 0) {
+          @if (retrievalDiagnostics.length > 0) {
+            <details class="retrieval-diagnostics">
+              <summary>Retrieval diagnostics · {{ retrievalDiagnostics.length }} queries</summary>
+
+              <div class="diagnostic-query-list">
+                @for (diagnostic of retrievalDiagnostics; track $index) {
+                  <section class="diagnostic-query">
+                    <div class="diagnostic-query-heading">
+                      <span>{{ diagnostic.kind === 'original' ? 'Original' : 'Focused ' + $index }}</span>
+                      <code>{{ diagnostic.query }}</code>
+                    </div>
+
+                    <div class="diagnostic-channels">
+                      <div class="diagnostic-channel">
+                        <h5>Semantic</h5>
+                        @if (diagnostic.semanticCandidates.length === 0) {
+                          <p class="diagnostic-empty">No candidates</p>
+                        } @else {
+                          @for (candidate of diagnostic.semanticCandidates; track candidate.chunkId) {
+                            <div class="diagnostic-candidate">
+                              <span>#{{ candidate.rank }}</span>
+                              <code>{{ shortIdentifier(candidate.documentId) }}/{{ shortIdentifier(candidate.chunkId) }}</code>
+                            </div>
+                          }
+                        }
+                      </div>
+
+                      <div class="diagnostic-channel">
+                        <h5>Lexical</h5>
+                        @if (diagnostic.lexicalCandidates.length === 0) {
+                          <p class="diagnostic-empty">No candidates</p>
+                        } @else {
+                          @for (candidate of diagnostic.lexicalCandidates; track candidate.chunkId) {
+                            <div class="diagnostic-candidate">
+                              <span>#{{ candidate.rank }}</span>
+                              <code>{{ shortIdentifier(candidate.documentId) }}/{{ shortIdentifier(candidate.chunkId) }}</code>
+                            </div>
+                          }
+                        }
+                      </div>
+
+                      <div class="diagnostic-channel hybrid-channel">
+                        <h5>Hybrid</h5>
+                        @if (diagnostic.hybridCandidates.length === 0) {
+                          <p class="diagnostic-empty">No candidates</p>
+                        } @else {
+                          @for (candidate of diagnostic.hybridCandidates; track candidate.chunkId) {
+                            <div class="diagnostic-candidate hybrid-candidate" [class.selected]="candidate.selected">
+                              <div class="diagnostic-candidate-main">
+                                <span class="channel-badge">{{ retrievalChannelLabel(candidate.channel) }}</span>
+                                <code>{{ shortIdentifier(candidate.documentId) }}/{{ shortIdentifier(candidate.chunkId) }}</code>
+                              </div>
+
+                              <div class="diagnostic-metadata">
+                                @if (candidate.semanticRank !== null && candidate.semanticRank !== undefined) {
+                                  <span>semantic #{{ candidate.semanticRank }}</span>
+                                }
+                                @if (candidate.lexicalRank !== null && candidate.lexicalRank !== undefined) {
+                                  <span>lexical #{{ candidate.lexicalRank }}</span>
+                                }
+                                @if (candidate.fusedScore !== null && candidate.fusedScore !== undefined) {
+                                  <span>fused {{ candidate.fusedScore.toFixed(4) }}</span>
+                                }
+                                @if (candidate.adjustedFusedScore !== null && candidate.adjustedFusedScore !== undefined) {
+                                  <span>adjusted {{ candidate.adjustedFusedScore.toFixed(4) }}</span>
+                                }
+                                @if (candidate.navigationPenalty) {
+                                  <span class="penalty-flag">Navigation penalty</span>
+                                }
+                                @if (candidate.selected) {
+                                  <span class="selected-flag">Selected</span>
+                                }
+                              </div>
+                            </div>
+                          }
+                        }
+                      </div>
+                    </div>
+                  </section>
+                }
+              </div>
+            </details>
+          } @else if (retrievalQueries.length > 0) {
             <details class="retrieval-diagnostics">
               <summary>Retrieval diagnostics · {{ retrievalQueries.length }} queries</summary>
               <ol>
@@ -118,9 +200,11 @@
                     </div>
 
                     <div class="source-actions">
-                      <span class="match-value">
-                        {{ (source.similarity * 100).toFixed(1) }}%
-                      </span>
+                      @if (source.similarity !== null && source.similarity !== undefined) {
+                        <span class="match-value">
+                          {{ (source.similarity * 100).toFixed(1) }}%
+                        </span>
+                      }
                       <button
                         type="button"
                         class="document-link-button"

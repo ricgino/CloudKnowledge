@@ -6,8 +6,10 @@ import {
 
 import {
   AskDocumentSource,
+  AskRetrievalQueryDiagnostics,
   DocumentItem,
   Documents,
+  HybridRetrievalChannel,
   SearchDocumentResult
 } from '../../documents/documents';
 
@@ -50,6 +52,7 @@ export class KnowledgePage
   answer = '';
   answerSources: AskDocumentSource[] = [];
   retrievalQueries: string[] = [];
+  retrievalDiagnostics: AskRetrievalQueryDiagnostics[] = [];
   asking = false;
   downloadingDocumentId = '';
 
@@ -209,6 +212,7 @@ export class KnowledgePage
     this.answer = '';
     this.answerSources = [];
     this.retrievalQueries = [];
+    this.retrievalDiagnostics = [];
     this.errorMessage = '';
 
     this.documentsService
@@ -222,6 +226,7 @@ export class KnowledgePage
           this.answer = response.answer;
           this.answerSources = response.sources;
           this.retrievalQueries = response.retrievalQueries ?? [];
+          this.retrievalDiagnostics = response.retrievalDiagnostics ?? [];
           this.asking = false;
           this.cdr.detectChanges();
         },
@@ -301,6 +306,32 @@ export class KnowledgePage
     return 'Low';
   }
 
+  retrievalChannelLabel(
+    channel?: HybridRetrievalChannel | null):
+    string
+  {
+    switch (channel)
+    {
+      case 'semantic':
+        return 'Semantic';
+      case 'lexical':
+        return 'Lexical';
+      case 'both':
+        return 'Both';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  shortIdentifier(
+    value: string):
+    string
+  {
+    return value.slice(
+      0,
+      8);
+  }
+
   private clearScopedResults():
     void
   {
@@ -309,6 +340,7 @@ export class KnowledgePage
     this.answer = '';
     this.answerSources = [];
     this.retrievalQueries = [];
+    this.retrievalDiagnostics = [];
     this.errorMessage = '';
   }
 }
