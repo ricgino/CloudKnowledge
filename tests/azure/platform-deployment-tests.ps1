@@ -6,6 +6,8 @@ $platformPath = Join-Path $repoRoot "infra\azure\platform\main.tf"
 $platform = Get-Content -Raw $platformPath
 $containerAppsPath = Join-Path $repoRoot "infra\azure\platform\container-apps.tf"
 $containerApps = Get-Content -Raw $containerAppsPath
+$outputsPath = Join-Path $repoRoot "infra\azure\platform\outputs.tf"
+$outputs = Get-Content -Raw $outputsPath
 
 $environmentMatch = [regex]::Match(
     $platform,
@@ -55,6 +57,18 @@ if (-not $containerApps.Contains(
     'value = "http://ca-${var.resource_prefix}-${var.environment}-api"',
     [System.StringComparison]::Ordinal)) {
     throw "Web API_UPSTREAM must use stable same-environment Container Apps service discovery by application name."
+}
+
+if ($outputs.Contains(
+    'value       = "https://${azurerm_container_app.web.latest_revision_fqdn}"',
+    [System.StringComparison]::Ordinal)) {
+    throw "Public web_url must not use the revision-specific latest_revision_fqdn because the URL becomes stale after a new Container App revision is created."
+}
+
+if (-not $outputs.Contains(
+    'value       = "https://${azurerm_container_app.web.ingress[0].fqdn}"',
+    [System.StringComparison]::Ordinal)) {
+    throw "Public web_url must use the stable Container App ingress FQDN."
 }
 
 Write-Host "Azure platform deployment contract passed."
