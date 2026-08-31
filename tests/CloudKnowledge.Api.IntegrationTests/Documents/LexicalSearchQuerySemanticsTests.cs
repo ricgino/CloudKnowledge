@@ -59,12 +59,38 @@ public sealed class LexicalSearchQuerySemanticsTests
             DocumentChunk.Create(
                 document.Id,
                 0,
-                "Altitude derating: Above 1000 m, output current requires derating for increasing installation altitude.");
+                "Installation site altitude: 0 to 4000 m. At altitudes from 1000 to 4000 m above sea level, the rated output current is decreased by 1% for every 100 m.");
+
+        var navigationDocument =
+            Document.Create(
+                "acs880-related-manuals.pdf",
+                "application/pdf");
+
+        navigationDocument.AssignOwner(
+            user.Id);
+
+        var navigationChunks =
+            Enumerable.Range(0, 8)
+                .Select(
+                    index =>
+                        DocumentChunk.Create(
+                            navigationDocument.Id,
+                            index,
+                            string.Join(
+                                ' ',
+                                Enumerable.Repeat(
+                                    "ACS880-01 related manuals hardware manual product documentation drives",
+                                    80))))
+                .ToArray();
 
         dbContext.AddRange(
             user,
             document,
+            navigationDocument,
             evidenceChunk);
+
+        dbContext.AddRange(
+            navigationChunks);
 
         await dbContext.SaveChangesAsync();
 
@@ -77,15 +103,16 @@ public sealed class LexicalSearchQuerySemanticsTests
         var results =
             await repository.SearchAccessibleAsync(
                 user.Id,
-                "ACS880-01 altitude derating limitations",
-                10,
+                "ACS880-01 rated current at high altitude",
+                5,
                 DocumentRetrievalScope.All,
                 CancellationToken.None);
 
-        Assert.Contains(
-            results,
-            result =>
-                result.ChunkId ==
-                evidenceChunk.Id);
+        Assert.NotEmpty(
+            results);
+
+        Assert.Equal(
+            evidenceChunk.Id,
+            results[0].ChunkId);
     }
 }
