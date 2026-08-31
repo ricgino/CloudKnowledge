@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using CloudKnowledge.Application.Documents.SearchDocuments;
 using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Infrastructure.Persistence;
@@ -67,6 +68,10 @@ public sealed class EfDocumentLexicalSearchRepository
                     (char[]?)null,
                     StringSplitOptions.RemoveEmptyEntries));
 
+        var lexicalQuery =
+            BuildRecallOrientedQuery(
+                normalizedQuery);
+
         var accessibleDocuments =
             await _scopeQuery.CreateAsync(
                 userId,
@@ -95,13 +100,13 @@ public sealed class EfDocumentLexicalSearchRepository
                     where searchVector.Matches(
                         EF.Functions.WebSearchToTsQuery(
                             "simple",
-                            normalizedQuery))
+                            lexicalQuery))
 
                     orderby searchVector
                         .RankCoverDensity(
                             EF.Functions.WebSearchToTsQuery(
                                 "simple",
-                                normalizedQuery))
+                                lexicalQuery))
                         descending
 
                     select new
@@ -119,7 +124,7 @@ public sealed class EfDocumentLexicalSearchRepository
                                 .RankCoverDensity(
                                     EF.Functions.WebSearchToTsQuery(
                                         "simple",
-                                        normalizedQuery))
+                                        lexicalQuery))
                     })
                     .Take(take)
                     .ToListAsync(
@@ -143,5 +148,34 @@ public sealed class EfDocumentLexicalSearchRepository
                 "PostgreSQL could not parse the lexical retrieval query.",
                 exception);
         }
+    }
+
+    private static string BuildRecallOrientedQuery(
+        string query)
+    {
+        var terms =
+            Regex.Matches(
+                    query,
+                    @"[\p{L}\p{N}]+")
+                .Select(
+                    match =>
+                        match.Value)
+                .Where(
+                    term =>
+                        term.Length >= 3 ||
+                        (term.Any(char.IsLetter) &&
+                         term.Any(char.IsDigit)))
+                .Distinct(
+                    StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+        if (terms.Length == 0)
+        {
+            return query;
+        }
+
+        return string.Join(
+            " OR ",
+            terms);
     }
 }
