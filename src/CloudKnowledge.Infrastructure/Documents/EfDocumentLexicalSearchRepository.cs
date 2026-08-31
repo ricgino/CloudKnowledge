@@ -11,6 +11,12 @@ namespace CloudKnowledge.Infrastructure.Documents;
 public sealed class EfDocumentLexicalSearchRepository
     : IDocumentLexicalSearchRepository
 {
+    private const int MinimumCandidatePool =
+        40;
+
+    private const int MaximumCandidatePool =
+        100;
+
     private readonly CloudKnowledgeDbContext
         _dbContext;
 
@@ -68,9 +74,21 @@ public sealed class EfDocumentLexicalSearchRepository
                     (char[]?)null,
                     StringSplitOptions.RemoveEmptyEntries));
 
+        var queryTerms =
+            ExtractTerms(
+                normalizedQuery);
+
         var lexicalQuery =
             BuildRecallOrientedQuery(
-                normalizedQuery);
+                normalizedQuery,
+                queryTerms);
+
+        var candidateTake =
+            Math.Min(
+                MaximumCandidatePool,
+                Math.Max(
+                    MinimumCandidatePool,
+                    take * 5));
 
         var accessibleDocuments =
             await _scopeQuery.CreateAsync(
@@ -97,18 +115,16 @@ public sealed class EfDocumentLexicalSearchRepository
                             chunk,
                             "SearchVector")
 
-                    let tsQuery =
+                    where searchVector.Matches(
                         EF.Functions.WebSearchToTsQuery(
                             "simple",
-                            lexicalQuery)
-
-                    where searchVector.Matches(
-                        tsQuery)
+                            lexicalQuery))
 
                     orderby searchVector
                         .RankCoverDensity(
-                            tsQuery,
-                            NpgsqlTsRankingNormalization.DivideBy1PlusLogLength)
+                            EF.Functions.WebSearchToTsQuery(
+                                "simple",
+                                lexicalQuery))
                         descending
 
                     select new
@@ -124,22 +140,42 @@ public sealed class EfDocumentLexicalSearchRepository
                         Rank =
                             searchVector
                                 .RankCoverDensity(
-                                    tsQuery,
-                                    NpgsqlTsRankingNormalization.DivideBy1PlusLogLength)
+                                    EF.Functions.WebSearchToTsQuery(
+                                        "simple",
+                                        lexicalQuery))
                     })
-                    .Take(take)
+                    .Take(candidateTake)
                     .ToListAsync(
                         cancellationToken);
 
             return rows
                 .Select(
                     row =>
+                        new
+                        {
+                            Row = row,
+                            Coverage = CountMatchedTerms(
+                                row.Content,
+                                queryTerms)
+                        })
+                .OrderByDescending(
+                    item =>
+                        item.Coverage)
+                .ThenByDescending(
+                    item =>
+                        item.Row.Rank)
+                .ThenBy(
+                    item =>
+                        item.Row.ChunkId)
+                .Take(take)
+                .Select(
+                    item =>
                         new LexicalSearchResult(
-                            row.DocumentId,
-                            row.ChunkId,
-                            row.Position,
-                            row.Content,
-                            row.Rank))
+                            item.Row.DocumentId,
+                            item.Row.ChunkId,
+                            item.Row.Position,
+                            item.Row.Content,
+                            item.Row.Rank))
                 .ToArray();
         }
         catch (PostgresException exception)
@@ -151,26 +187,30 @@ public sealed class EfDocumentLexicalSearchRepository
         }
     }
 
-    private static string BuildRecallOrientedQuery(
+    private static IReadOnlyList<string> ExtractTerms(
         string query)
     {
-        var terms =
-            Regex.Matches(
-                    query,
-                    @"[\p{L}\p{N}]+")
-                .Select(
-                    match =>
-                        match.Value)
-                .Where(
-                    term =>
-                        term.Length >= 3 ||
-                        (term.Any(char.IsLetter) &&
-                         term.Any(char.IsDigit)))
-                .Distinct(
-                    StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+        return Regex.Matches(
+                query,
+                @"[\p{L}\p{N}]+")
+            .Select(
+                match =>
+                    match.Value)
+            .Where(
+                term =>
+                    term.Length >= 3 ||
+                    (term.Any(char.IsLetter) &&
+                     term.Any(char.IsDigit)))
+            .Distinct(
+                StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
 
-        if (terms.Length == 0)
+    private static string BuildRecallOrientedQuery(
+        string query,
+        IReadOnlyList<string> terms)
+    {
+        if (terms.Count == 0)
         {
             return query;
         }
@@ -178,5 +218,28 @@ public sealed class EfDocumentLexicalSearchRepository
         return string.Join(
             " OR ",
             terms);
+    }
+
+    private static int CountMatchedTerms(
+        string content,
+        IReadOnlyList<string> queryTerms)
+    {
+        if (queryTerms.Count == 0)
+        {
+            return 0;
+        }
+
+        var contentTerms =
+            Regex.Matches(
+                    content,
+                    @"[\p{L}\p{N}]+")
+                .Select(
+                    match =>
+                        match.Value)
+                .ToHashSet(
+                    StringComparer.OrdinalIgnoreCase);
+
+        return queryTerms.Count(
+            contentTerms.Contains);
     }
 }
