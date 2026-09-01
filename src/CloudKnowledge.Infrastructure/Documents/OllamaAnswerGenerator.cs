@@ -110,6 +110,7 @@ public sealed class OllamaAnswerGenerator
             - Quando una fonte esplicita un'associazione tra due elementi, preserva entrambi gli estremi della relazione nella risposta; non ridurre un'associazione esplicita a un elenco di soli valori se il contesto fornisce anche le entità corrispondenti.
             - Se le fonti supportano solo una parte della domanda, dichiara quale relazione o qualificatore non può essere verificato e rispondi comunque alla parte supportata senza inventare il collegamento mancante.
             - Se il qualificatore non può essere verificato ma una relazione più generale è supportata, dichiara il gap e fornisci comunque le associazioni supportate.
+            - Quando la risposta diretta non è completamente verificabile ma le fonti contengono informazioni pertinenti, non fermarti alla sola dichiarazione del gap: dopo aver dichiarato il limite, riporta i fatti, le associazioni o gli elenchi pertinenti esplicitamente supportati dalle fonti, mantenendo chiaro che non provano il collegamento mancante.
             - Rispondi nella stessa lingua della domanda.
             - Quando affermi qualcosa ricavato dal contesto,
             cita la fonte usando il formato [S1], [S2], ecc.
