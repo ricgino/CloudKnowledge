@@ -149,6 +149,14 @@ public sealed class RelationshipGroundingPromptTests
             "qualificatore non",
             systemPrompt,
             StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "non fermarti alla sola dichiarazione del gap",
+            systemPrompt,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "informazioni pertinenti",
+            systemPrompt,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? ReadSystemPrompt(
