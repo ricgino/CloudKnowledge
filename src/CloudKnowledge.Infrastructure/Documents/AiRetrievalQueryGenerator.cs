@@ -358,6 +358,7 @@ public sealed class AiRetrievalQueryGenerator
             - Name the affected performance quantity explicitly in the limitation query when the user names one, for example current, power, speed, load or capacity.
             - When an answer requires both an entity-to-role or entity-to-attribute mapping and proof of category membership or membership in a requested subset, dedicate separate retrieval queries to the mapping evidence and to the category membership evidence. Do not replace these with near-duplicate paraphrases of the combined question.
             - For those relation-plus-category questions, make the first focused query target the underlying entity-to-role or entity-to-attribute relation without the category qualifier. Use later queries to retrieve category membership or subset evidence.
+            - For relation-plus-category questions, explicitly seek canonical mapping or list headings that may encode the relation, such as principal cast, voice cast, cast and crew, character-to-actor lists, rosters, membership lists, assignment tables or compatibility tables, instead of relying only on paraphrases of the user question.
             - Prefer coverage of independent answer-critical constraints over multiple near-duplicate environmental or installation queries.
             - Use likely terminology and standard synonyms that may appear in technical source documents.
             - When the user writes in a language other than English, include concise English technical wording when useful because the source documents may be in English.
