@@ -112,7 +112,7 @@ public sealed class RelationshipGroundingPromptTests
                     Guid.NewGuid(),
                     Guid.NewGuid(),
                     0,
-                    "Principal Cast: MAYOR KOBAYASHI Kunichi Nomura.")
+                    "Principal Cast: CHIEF Bryan Cranston, REX Edward Norton.")
             ],
             cancellationToken);
     }
@@ -135,6 +135,18 @@ public sealed class RelationshipGroundingPromptTests
             StringComparison.OrdinalIgnoreCase);
         Assert.Contains(
             "parte della domanda",
+            systemPrompt,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "preserva entrambi gli estremi",
+            systemPrompt,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "non ridurre",
+            systemPrompt,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "qualificatore non",
             systemPrompt,
             StringComparison.OrdinalIgnoreCase);
     }
