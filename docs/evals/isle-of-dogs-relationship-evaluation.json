@@ -1,0 +1,36 @@
+{
+  "name": "Isle of Dogs relationship-grounding evaluation",
+  "version": 1,
+  "cases": [
+    {
+      "id": "IOD-01",
+      "category": "entity-mapping-and-category-membership",
+      "question": "quali sono gli attori che doppiano i cani protagonisti del film isola dei cani",
+      "expectedGroundTruth": [
+        "The screenplay identifies the Hero Pack as Rex, King, Boss, Duke and Chief.",
+        "Principal Cast maps Chief to Bryan Cranston, Rex to Edward Norton, Boss to Bill Murray, Duke to Jeff Goldblum and King to Bob Balaban.",
+        "Kunichi Nomura is mapped to Mayor Kobayashi, so he must not be classified as a protagonist dog voice actor from these sources.",
+        "If the retrieved context does not establish both dog/subset membership and actor-character mapping, the answer must explicitly state the missing relation and answer only the supported part."
+      ],
+      "requiredEvidenceGroups": [
+        {
+          "name": "category-membership",
+          "markers": ["Hero Pack", "Rex", "King", "Boss", "Duke", "Chief"]
+        },
+        {
+          "name": "cast-mapping",
+          "markers": ["CHIEF Bryan Cranston", "REX Edward Norton", "BOSS Bill Murray", "DUKE Jeff Goldblum", "KING Bob Balaban"]
+        }
+      ],
+      "mustNotClaim": [
+        "Kunichi Nomura voices a protagonist dog",
+        "Jason Schwartzman voices a protagonist dog unless a retrieved source explicitly establishes that relation"
+      ],
+      "expectedPlannerCoverage": [
+        "character-to-actor or principal-cast mapping",
+        "Hero Pack / main-dog category membership"
+      ],
+      "failureMode": "The system infers category membership or an actor-character relation from co-occurrence, or generates near-duplicate voice-actor queries without retrieving evidence for which characters belong to the requested dog subset."
+    }
+  ]
+}
