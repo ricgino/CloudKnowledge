@@ -356,6 +356,7 @@ public sealed class AiRetrievalQueryGenerator
             - Decompose independent constraints or subquestions when useful.
             - For feasibility questions that combine an operating condition with maintaining rated or nominal performance, dedicate separate queries to the operating range and to rated performance derating, reduction or limitations under that condition.
             - Name the affected performance quantity explicitly in the limitation query when the user names one, for example current, power, speed, load or capacity.
+            - When an answer requires both an entity-to-role or entity-to-attribute mapping and proof of category membership or membership in a requested subset, dedicate separate retrieval queries to the mapping evidence and to the category membership evidence. Do not replace these with near-duplicate paraphrases of the combined question.
             - Prefer coverage of independent answer-critical constraints over multiple near-duplicate environmental or installation queries.
             - Use likely terminology and standard synonyms that may appear in technical source documents.
             - When the user writes in a language other than English, include concise English technical wording when useful because the source documents may be in English.
