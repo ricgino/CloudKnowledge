@@ -58,12 +58,19 @@ public sealed class RelationshipRetrievalPlanningPromptTests
                 maximumQueries: 3,
                 CancellationToken.None);
 
+        Assert.True(result.Count >= 2);
         Assert.Contains(
-            result,
-            query =>
-                query.Contains(
-                    "principal cast",
-                    StringComparison.OrdinalIgnoreCase));
+            "principal cast",
+            result[0],
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            "protagonist",
+            result[0],
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            "Hero Pack",
+            result[0],
+            StringComparison.OrdinalIgnoreCase);
 
         Assert.Contains(
             result,
@@ -93,6 +100,14 @@ public sealed class RelationshipRetrievalPlanningPromptTests
             StringComparison.OrdinalIgnoreCase);
         Assert.Contains(
             "separate retrieval queries",
+            systemPrompt,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "first focused query",
+            systemPrompt,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "without the category qualifier",
             systemPrompt,
             StringComparison.OrdinalIgnoreCase);
     }
