@@ -110,6 +110,18 @@ public sealed class RelationshipRetrievalPlanningPromptTests
             "without the category qualifier",
             systemPrompt,
             StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "canonical mapping or list headings",
+            systemPrompt,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "principal cast",
+            systemPrompt,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "character-to-actor",
+            systemPrompt,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class RecordingHandler(string responseJson)
