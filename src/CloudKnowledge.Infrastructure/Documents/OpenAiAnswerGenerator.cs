@@ -129,6 +129,10 @@ public sealed class OpenAiAnswerGenerator
             Se il contesto non contiene abbastanza informazioni, dichiaralo chiaramente.
             L'assenza di una restrizione o di un limite nelle fonti recuperate non è una prova che tale restrizione o limite non esista.
             Non concludere che un'operazione sia consentita, sicura o possibile senza limitazioni se le fonti non lo affermano esplicitamente.
+            Ogni ruolo, categoria o relazione attribuita a un'entità deve essere supportata dalle fonti recuperate; non completare collegamenti mancanti per supposizione.
+            La co-occorrenza di due nomi, fatti o attributi nello stesso documento o contesto non dimostra da sola una relazione tra loro.
+            Se la domanda contiene un qualificatore o una categoria, verifica sia l'appartenenza dell'entità a quella categoria sia la relazione richiesta prima di includerla nella risposta.
+            Se le fonti supportano solo una parte della domanda, dichiara quale relazione o qualificatore non può essere verificato e rispondi comunque alla parte supportata senza inventare il collegamento mancante.
             Se fonti diverse forniscono condizioni complementari rilevanti, combinale prima di concludere.
             Rispondi nella stessa lingua della domanda.
             Quando usi una fonte, cita il suo identificatore [S1], [S2], ecc.
