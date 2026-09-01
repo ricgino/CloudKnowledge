@@ -127,7 +127,9 @@ public sealed class AskDocumentsUseCase
                             result.DocumentId,
                             result.ChunkId,
                             result.Position,
-                            result.Content))
+                            AnswerContextCompressor.Compress(
+                                result.Content,
+                                retrieval.Queries)))
                 .ToArray();
 
         var answer =
