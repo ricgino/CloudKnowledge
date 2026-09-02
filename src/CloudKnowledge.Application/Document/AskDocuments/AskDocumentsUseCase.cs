@@ -1,5 +1,6 @@
 using CloudKnowledge.Application.Documents.HybridSearchDocuments;
 using CloudKnowledge.Application.Documents.SearchDocuments;
+using CloudKnowledge.Application.Users;
 
 namespace CloudKnowledge.Application.Documents.AskDocuments;
 
@@ -17,6 +18,9 @@ public sealed class AskDocumentsUseCase
     private const int MaximumDiagnosticCandidates =
         8;
 
+    private const int MaximumAdjacentContextChunks =
+        3;
+
     private readonly HybridSearchDocumentsUseCase
         _hybridSearchDocumentsUseCase;
 
@@ -26,6 +30,12 @@ public sealed class AskDocumentsUseCase
     private readonly IRetrievalQueryGenerator?
         _retrievalQueryGenerator;
 
+    private readonly ICurrentUser?
+        _currentUser;
+
+    private readonly IDocumentChunkContextRepository?
+        _documentChunkContextRepository;
+
     public AskDocumentsUseCase(
         SearchDocumentsUseCase searchDocumentsUseCase,
         IAnswerGenerator answerGenerator)
@@ -34,7 +44,9 @@ public sealed class AskDocumentsUseCase
                 searchDocumentsUseCase,
                 new ChunkNavigationQualityClassifier()),
             answerGenerator,
-            retrievalQueryGenerator: null)
+            retrievalQueryGenerator: null,
+            currentUser: null,
+            documentChunkContextRepository: null)
     {
     }
 
@@ -44,7 +56,9 @@ public sealed class AskDocumentsUseCase
         : this(
             hybridSearchDocumentsUseCase,
             answerGenerator,
-            retrievalQueryGenerator: null)
+            retrievalQueryGenerator: null,
+            currentUser: null,
+            documentChunkContextRepository: null)
     {
     }
 
@@ -52,6 +66,21 @@ public sealed class AskDocumentsUseCase
         HybridSearchDocumentsUseCase hybridSearchDocumentsUseCase,
         IAnswerGenerator answerGenerator,
         IRetrievalQueryGenerator? retrievalQueryGenerator)
+        : this(
+            hybridSearchDocumentsUseCase,
+            answerGenerator,
+            retrievalQueryGenerator,
+            currentUser: null,
+            documentChunkContextRepository: null)
+    {
+    }
+
+    public AskDocumentsUseCase(
+        HybridSearchDocumentsUseCase hybridSearchDocumentsUseCase,
+        IAnswerGenerator answerGenerator,
+        IRetrievalQueryGenerator? retrievalQueryGenerator,
+        ICurrentUser? currentUser,
+        IDocumentChunkContextRepository? documentChunkContextRepository)
     {
         _hybridSearchDocumentsUseCase =
             hybridSearchDocumentsUseCase ??
@@ -65,6 +94,12 @@ public sealed class AskDocumentsUseCase
 
         _retrievalQueryGenerator =
             retrievalQueryGenerator;
+
+        _currentUser =
+            currentUser;
+
+        _documentChunkContextRepository =
+            documentChunkContextRepository;
     }
 
     public Task<AskDocumentsResult> ExecuteAsync(
@@ -118,17 +153,23 @@ public sealed class AskDocumentsUseCase
                 retrieval.Diagnostics);
         }
 
+        var evidence =
+            await BuildAnswerEvidenceAsync(
+                retrieval.Results,
+                scope,
+                cancellationToken);
+
         var contextSources =
-            retrieval.Results
+            evidence
                 .Select(
-                    (result, index) =>
+                    (item, index) =>
                         new AnswerContextSource(
                             $"S{index + 1}",
-                            result.DocumentId,
-                            result.ChunkId,
-                            result.Position,
+                            item.DocumentId,
+                            item.ChunkId,
+                            item.Position,
                             AnswerContextCompressor.Compress(
-                                result.Content,
+                                item.Content,
                                 retrieval.Queries)))
                 .ToArray();
 
@@ -139,18 +180,16 @@ public sealed class AskDocumentsUseCase
                 cancellationToken);
 
         var sources =
-            retrieval.Results
+            evidence
                 .Select(
-                    (result, index) =>
+                    (item, index) =>
                         new AskDocumentsSource(
                             $"S{index + 1}",
-                            result.DocumentId,
-                            result.ChunkId,
-                            result.Position,
-                            result.Content,
-                            result.CosineDistance.HasValue
-                                ? 1.0 - result.CosineDistance.Value
-                                : null))
+                            item.DocumentId,
+                            item.ChunkId,
+                            item.Position,
+                            item.Content,
+                            item.Similarity))
                 .ToArray();
 
         return new AskDocumentsResult(
@@ -158,6 +197,81 @@ public sealed class AskDocumentsUseCase
             sources,
             retrieval.Queries,
             retrieval.Diagnostics);
+    }
+
+    private async Task<IReadOnlyList<AnswerEvidence>> BuildAnswerEvidenceAsync(
+        IReadOnlyList<HybridSearchResult> retrievalResults,
+        DocumentRetrievalScope scope,
+        CancellationToken cancellationToken)
+    {
+        var evidence =
+            retrievalResults
+                .Select(
+                    result =>
+                        new AnswerEvidence(
+                            result.DocumentId,
+                            result.ChunkId,
+                            result.Position,
+                            result.Content,
+                            result.CosineDistance.HasValue
+                                ? 1.0 - result.CosineDistance.Value
+                                : null))
+                .ToList();
+
+        if (_currentUser is null ||
+            _documentChunkContextRepository is null)
+        {
+            return evidence;
+        }
+
+        var userId =
+            await _currentUser.GetUserIdAsync(
+                cancellationToken);
+
+        var includedChunkIds =
+            evidence
+                .Select(
+                    item =>
+                        item.ChunkId)
+                .ToHashSet();
+
+        var added =
+            0;
+
+        foreach (var anchor in retrievalResults)
+        {
+            if (added >= MaximumAdjacentContextChunks)
+            {
+                break;
+            }
+
+            var next =
+                await _documentChunkContextRepository.GetAccessibleNextAsync(
+                    userId,
+                    anchor.DocumentId,
+                    anchor.Position,
+                    scope,
+                    cancellationToken);
+
+            if (next is null ||
+                !includedChunkIds.Add(
+                    next.ChunkId))
+            {
+                continue;
+            }
+
+            evidence.Add(
+                new AnswerEvidence(
+                    next.DocumentId,
+                    next.ChunkId,
+                    next.Position,
+                    next.Content,
+                    Similarity: null));
+
+            added++;
+        }
+
+        return evidence;
     }
 
     private async Task<RetrievalExecution> RetrieveAsync(
@@ -472,6 +586,13 @@ public sealed class AskDocumentsUseCase
                 ? count + 1
                 : 1;
     }
+
+    private sealed record AnswerEvidence(
+        Guid DocumentId,
+        Guid ChunkId,
+        int Position,
+        string Content,
+        double? Similarity);
 
     private sealed record QueryExecution(
         AskRetrievalQueryKind Kind,
