@@ -325,6 +325,10 @@ builder.Services.AddSingleton<
 builder.Services.AddScoped<
     HybridSearchDocumentsUseCase>();
 
+builder.Services.AddScoped<
+    IDocumentChunkContextRepository,
+    EfDocumentChunkContextRepository>();
+
 builder.Services.AddScoped(
     serviceProvider =>
         new AskDocumentsUseCase(
@@ -333,7 +337,11 @@ builder.Services.AddScoped(
             serviceProvider
                 .GetRequiredService<IAnswerGenerator>(),
             serviceProvider
-                .GetRequiredService<IRetrievalQueryGenerator>()));
+                .GetRequiredService<IRetrievalQueryGenerator>(),
+            serviceProvider
+                .GetRequiredService<ICurrentUser>(),
+            serviceProvider
+                .GetRequiredService<IDocumentChunkContextRepository>()));
 
 builder.Services.AddScoped<
     IDocumentAccessRepository,
