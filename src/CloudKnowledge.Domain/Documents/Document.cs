@@ -113,6 +113,18 @@ public sealed class Document
             DocumentStatus.Failed;
     }
 
+    public void RetryProcessing()
+    {
+        if (Status != DocumentStatus.Failed)
+        {
+            throw new InvalidOperationException(
+                $"Cannot retry a document with status '{Status}'.");
+        }
+
+        Status =
+            DocumentStatus.Pending;
+    }
+
     private Document(
         Guid id,
         string fileName,

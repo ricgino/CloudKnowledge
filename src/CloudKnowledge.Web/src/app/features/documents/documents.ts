@@ -29,6 +29,15 @@ export type DocumentListScope =
   'owned' |
   'team';
 
+export type RetrievalQueryKind =
+  'original' |
+  'focused';
+
+export type HybridRetrievalChannel =
+  'semantic' |
+  'lexical' |
+  'both';
+
 export interface DocumentsQuery
 {
   page: number;
@@ -84,15 +93,45 @@ export interface SearchDocumentResult
   similarity: number;
 }
 
-export interface AskDocumentSource extends SearchDocumentResult
+export interface AskDocumentSource
 {
   label: string;
+  documentId: string;
+  chunkId: string;
+  position: number;
+  content: string;
+  similarity: number | null;
+}
+
+export interface AskRetrievalCandidate
+{
+  documentId: string;
+  chunkId: string;
+  rank?: number | null;
+  semanticRank?: number | null;
+  lexicalRank?: number | null;
+  fusedScore?: number | null;
+  adjustedFusedScore?: number | null;
+  channel?: HybridRetrievalChannel | null;
+  navigationPenalty?: boolean | null;
+  selected?: boolean | null;
+}
+
+export interface AskRetrievalQueryDiagnostics
+{
+  kind: RetrievalQueryKind;
+  query: string;
+  semanticCandidates: AskRetrievalCandidate[];
+  lexicalCandidates: AskRetrievalCandidate[];
+  hybridCandidates: AskRetrievalCandidate[];
 }
 
 export interface AskDocumentsResponse
 {
   answer: string;
   sources: AskDocumentSource[];
+  retrievalQueries: string[];
+  retrievalDiagnostics?: AskRetrievalQueryDiagnostics[];
 }
 
 export function isSupportedDocumentFileName(
@@ -251,6 +290,15 @@ export class Documents
   {
     return this.http.delete<void>(
       `${apiBaseUrl}/api/documents/${documentId}`);
+  }
+
+  retryDocument(
+    documentId: string):
+    Observable<void>
+  {
+    return this.http.post<void>(
+      `${apiBaseUrl}/api/documents/${documentId}/retry`,
+      null);
   }
 
   downloadDocument(

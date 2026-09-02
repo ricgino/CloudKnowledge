@@ -1,0 +1,5 @@
+subscription_id         = "00000000-0000-0000-0000-000000000000"
+resource_group_location = "westeurope"
+workload_location       = "italynorth"
+resource_prefix         = "cloudknowledge"
+environment             = "demo"

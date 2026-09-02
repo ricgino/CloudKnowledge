@@ -1,6 +1,8 @@
 using Azure.Messaging.ServiceBus;
 using Azure.Storage.Blobs;
 using CloudKnowledge.Api.Authentication;
+using CloudKnowledge.Api.Configuration;
+using CloudKnowledge.Api.Database;
 using CloudKnowledge.Api.Notifications;
 using CloudKnowledge.Application.Documents;
 using CloudKnowledge.Application.Documents.Access;
@@ -10,6 +12,7 @@ using CloudKnowledge.Application.Documents.DeleteDocument;
 using CloudKnowledge.Application.Documents.DownloadDocument;
 using CloudKnowledge.Application.Documents.GetDocument;
 using CloudKnowledge.Application.Documents.GetDocuments;
+using CloudKnowledge.Application.Documents.HybridSearchDocuments;
 using CloudKnowledge.Application.Documents.SearchDocuments;
 using CloudKnowledge.Application.Documents.Sharing;
 using CloudKnowledge.Application.Notifications;
@@ -30,7 +33,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using Pgvector.EntityFrameworkCore;
 
-var builder = WebApplication.CreateBuilder(args);
+var migrationOnly =
+    DatabaseStartupMode.IsMigrationOnly(args);
+
+var builder =
+    WebApplication.CreateBuilder(
+        DatabaseStartupMode.RemoveMigrationArgument(args));
 
 builder.Services
     .AddAuthentication(
@@ -49,19 +57,16 @@ builder.Services.AddCors(
             policy =>
             {
                 var allowedOrigins =
-                    builder.Configuration
-                        .GetSection("Cors:AllowedOrigins")
-                        .Get<string[]>()
-                    ?? [];
+                    CorsAllowedOrigins.Get(
+                        builder.Configuration);
 
-                if (allowedOrigins.Length == 0)
+                if (allowedOrigins.Length > 0)
                 {
-                    throw new InvalidOperationException(
-                        "At least one CORS allowed origin must be configured.");
+                    policy.WithOrigins(
+                        allowedOrigins);
                 }
 
                 policy
-                    .WithOrigins(allowedOrigins)
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             });
@@ -202,78 +207,99 @@ builder.Services.AddSingleton<IDocumentReadyPublisher>(
 
 builder.Services.AddOpenApi();
 
+var aiConfiguration =
+    AiProviderConfiguration.From(
+        builder.Configuration,
+        requireAnswerGenerator: true);
+
 builder.Services.AddSingleton(
-    serviceProvider =>
-    {
-        var configuration =
-            serviceProvider.GetRequiredService<IConfiguration>();
+    aiConfiguration);
 
-        var baseUrl =
-            configuration["Ai:BaseUrl"]
-            ?? throw new InvalidOperationException(
-                "AI base URL was not found.");
-
-        return new HttpClient
+builder.Services.AddSingleton(
+    _ =>
+        new HttpClient
         {
             BaseAddress =
-                new Uri(baseUrl)
-        };
-    });
+                aiConfiguration.BaseUrl
+        });
 
 builder.Services.AddSingleton<IEmbeddingGenerator>(
     serviceProvider =>
     {
-        var configuration =
-            serviceProvider.GetRequiredService<IConfiguration>();
+        var httpClient =
+            serviceProvider
+                .GetRequiredService<HttpClient>();
 
-        var model =
-            configuration["Ai:EmbeddingModel"]
-            ?? throw new InvalidOperationException(
-                "AI embedding model was not found.");
+        if (aiConfiguration.IsAzureOpenAi)
+        {
+            return new AzureOpenAiEmbeddingGenerator(
+                httpClient,
+                aiConfiguration.EmbeddingModel,
+                aiConfiguration.ApiKey!,
+                aiConfiguration.EmbeddingDimensions);
+        }
 
-        var dimensions =
-            configuration.GetValue<int>(
-                "Ai:EmbeddingDimensions");
+        if (aiConfiguration.IsOpenAi)
+        {
+            return new OpenAiEmbeddingGenerator(
+                httpClient,
+                aiConfiguration.EmbeddingModel,
+                aiConfiguration.ApiKey!,
+                aiConfiguration.EmbeddingDimensions);
+        }
 
         return new OllamaEmbeddingGenerator(
-            serviceProvider
-                .GetRequiredService<HttpClient>(),
-            model,
+            httpClient,
+            aiConfiguration.EmbeddingModel,
             inputPrefix:
                 "search_query: ",
-            dimensions);
+            aiConfiguration.EmbeddingDimensions);
     });
 
 builder.Services.AddSingleton<IAnswerGenerator>(
     serviceProvider =>
     {
-        var configuration =
-            serviceProvider.GetRequiredService<IConfiguration>();
+        var httpClient =
+            serviceProvider
+                .GetRequiredService<HttpClient>();
 
-        var model =
-            configuration["Ai:AnswerModel"]
-            ?? throw new InvalidOperationException(
-                "AI answer model was not found.");
+        if (aiConfiguration.IsAzureOpenAi)
+        {
+            return new AzureOpenAiAnswerGenerator(
+                httpClient,
+                aiConfiguration.AnswerModel!,
+                aiConfiguration.ApiKey!,
+                aiConfiguration.AnswerTemperature,
+                aiConfiguration.AnswerMaxTokens);
+        }
 
-        var temperature =
-            configuration.GetValue<double>(
-                "Ai:AnswerTemperature");
-
-        var maxTokens =
-            configuration.GetValue<int>(
-                "Ai:AnswerMaxTokens");
+        if (aiConfiguration.IsOpenAi)
+        {
+            return new OpenAiAnswerGenerator(
+                httpClient,
+                aiConfiguration.AnswerModel!,
+                aiConfiguration.ApiKey!,
+                aiConfiguration.AnswerTemperature,
+                aiConfiguration.AnswerMaxTokens);
+        }
 
         return new OllamaAnswerGenerator(
-            serviceProvider
-                .GetRequiredService<HttpClient>(),
-            model,
-            temperature,
-            maxTokens,
+            httpClient,
+            aiConfiguration.AnswerModel!,
+            aiConfiguration.AnswerTemperature,
+            aiConfiguration.AnswerMaxTokens,
             serviceProvider
                 .GetRequiredService<ILogger<OllamaAnswerGenerator>>());
     });
 
-builder.Services.AddScoped<AskDocumentsUseCase>();
+builder.Services.AddSingleton<IRetrievalQueryGenerator>(
+    serviceProvider =>
+        new AiRetrievalQueryGenerator(
+            serviceProvider
+                .GetRequiredService<HttpClient>(),
+            aiConfiguration,
+            serviceProvider
+                .GetRequiredService<ILogger<AiRetrievalQueryGenerator>>()));
 
 builder.Services.AddScoped<
     ITeamScopeResolver,
@@ -285,6 +311,37 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     SearchDocumentsUseCase>();
+
+builder.Services.AddScoped<
+    IDocumentLexicalSearchRepository,
+    EfDocumentLexicalSearchRepository>();
+
+builder.Services.AddScoped<
+    LexicalSearchDocumentsUseCase>();
+
+builder.Services.AddSingleton<
+    ChunkNavigationQualityClassifier>();
+
+builder.Services.AddScoped<
+    HybridSearchDocumentsUseCase>();
+
+builder.Services.AddScoped<
+    IDocumentChunkContextRepository,
+    EfDocumentChunkContextRepository>();
+
+builder.Services.AddScoped(
+    serviceProvider =>
+        new AskDocumentsUseCase(
+            serviceProvider
+                .GetRequiredService<HybridSearchDocumentsUseCase>(),
+            serviceProvider
+                .GetRequiredService<IAnswerGenerator>(),
+            serviceProvider
+                .GetRequiredService<IRetrievalQueryGenerator>(),
+            serviceProvider
+                .GetRequiredService<ICurrentUser>(),
+            serviceProvider
+                .GetRequiredService<IDocumentChunkContextRepository>()));
 
 builder.Services.AddScoped<
     IDocumentAccessRepository,
@@ -351,7 +408,8 @@ if (builder.Configuration.GetValue<bool>(
 
 var app = builder.Build();
 
-if (app.Configuration.GetValue<bool>(
+if (migrationOnly ||
+    app.Configuration.GetValue<bool>(
         "Database:ApplyMigrationsOnStartup"))
 {
     await using var scope =
@@ -362,6 +420,11 @@ if (app.Configuration.GetValue<bool>(
             .GetRequiredService<CloudKnowledgeDbContext>();
 
     await dbContext.Database.MigrateAsync();
+
+    if (migrationOnly)
+    {
+        return;
+    }
 }
 
 if (app.Environment.IsDevelopment())

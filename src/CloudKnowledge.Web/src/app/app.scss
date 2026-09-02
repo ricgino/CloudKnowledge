@@ -276,6 +276,23 @@ button:disabled {
   background: #f6f8fc;
 }
 
+.build-version {
+  position: fixed;
+  right: 0.85rem;
+  bottom: 0.75rem;
+  z-index: 1000;
+  padding: 0.32rem 0.5rem;
+  border: 1px solid #dfe4ef;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #7a8497;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 14px rgba(34, 48, 78, 0.08);
+}
+
 @media (max-width: 900px) {
   .workspace-shell {
     grid-template-columns: 1fr;

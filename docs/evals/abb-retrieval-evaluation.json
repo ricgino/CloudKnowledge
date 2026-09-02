@@ -1,0 +1,186 @@
+{
+  "name": "ABB ACS880 real-corpus retrieval evaluation",
+  "version": 1,
+  "purpose": "Evaluate retrieval and grounded-answer quality on the real ABB corpus without tuning to a single altitude question.",
+  "scoring": {
+    "evidenceRecallTop5": "PASS when at least one source in the final top 5 contains the required evidence, not merely a table of contents or related-manual reference.",
+    "answerCorrectness": "PASS when the answer states all required facts and calculations without contradicting the source evidence.",
+    "grounding": "PASS when the answer does not add unsupported limits, permissions, safety claims, or numeric values.",
+    "navigationNoise": "Record how many final top-5 sources are navigation/index/manual-list chunks. This is diagnostic, not an automatic failure when required evidence is still present.",
+    "retrievalChannel": "Record semantic, lexical, or both for the selected evidence. Channel is diagnostic, not a pass/fail criterion."
+  },
+  "cases": [
+    {
+      "id": "ABB-01",
+      "category": "numeric-multi-hop",
+      "question": "Posso installare un ACS880-01 a 3500 metri di altitudine mantenendo la corrente nominale completa? Spiega eventuali limitazioni usando esclusivamente la documentazione disponibile.",
+      "expectedGroundTruth": [
+        "Installation altitude is allowed up to 4000 m when the applicable hardware-manual conditions are met.",
+        "Above 1000 m, output current is derated by 1% for every additional 100 m.",
+        "At 3500 m the altitude above the 1000 m threshold is 2500 m, so the derating is approximately 25%.",
+        "Full nominal output current therefore cannot be maintained under that rule."
+      ],
+      "requiredEvidenceMarkers": ["1000", "4000", "1%", "100 m"],
+      "failureMode": "Compound evidence is split or unique derating evidence is displaced by generic ACS880 chunks."
+    },
+    {
+      "id": "ABB-02",
+      "category": "exact-parameter-dependency",
+      "question": "Se uso un ACS880-01 con motore SynRM ma l'opzione +N7502 non è installata, quale impostazione ABB raccomanda di modificare e quali parametri vengono influenzati?",
+      "expectedGroundTruth": [
+        "ABB recommends manually setting bit 1 of parameter 95.21 HW options word 2.",
+        "The change affects parameters 25.2, 25.3, 25.15 and 99.3."
+      ],
+      "requiredEvidenceMarkers": ["95.21", "bit 1", "25.2", "25.3", "25.15", "99.3"],
+      "failureMode": "Exact parameter numbers are missed or replaced by generic SynRM setup guidance."
+    },
+    {
+      "id": "ABB-03",
+      "category": "conditional-parameter",
+      "question": "Quale parametro viene usato per attivare le impostazioni di derating per un motore Ex ABB o per un filtro sinusoidale ABB su ACS880-01 SynRM? Cosa dice il manuale se uso un motore Ex non ABB o un filtro sinusoidale diverso da quelli raccomandati?",
+      "expectedGroundTruth": [
+        "Parameter 95.15 Special HW settings is used for the EX motor and ABB sine filter selections.",
+        "For non-ABB Ex motors or sine filters other than the recommended ones, the manual says to contact ABB."
+      ],
+      "requiredEvidenceMarkers": ["95.15", "EX motor", "ABB sine filter", "contact ABB"],
+      "failureMode": "Conditional wording is lost or the answer generalizes the ABB-specific settings to unsupported hardware."
+    },
+    {
+      "id": "ABB-04",
+      "category": "table-extraction",
+      "question": "Con 'Low noise optimization' attivo nel parametro 97.09, quali sono le correnti nominale, light-duty e heavy-duty indicate per un ACS880-01-103A-3 a 400 V?",
+      "expectedGroundTruth": [
+        "For ACS880-01-103A-3 at 400 V with Low noise optimization enabled, the table gives 86 A nominal use, 82 A light-duty use and 67 A heavy-duty use."
+      ],
+      "requiredEvidenceMarkers": ["97.09", "103A-3", "86", "82", "67"],
+      "failureMode": "Table rows/columns are mixed, or nearby drive ratings are returned instead of the requested model."
+    },
+    {
+      "id": "ABB-05",
+      "category": "safety-negation",
+      "question": "Posso alimentare l'encoder di sicurezza FSE-31 da una sorgente esterna invece che dal connettore X31?",
+      "expectedGroundTruth": [
+        "No. The manual warns to use only connector X31 of the FSE-31 module to supply power to the encoder.",
+        "Supplying the encoder from a different source can damage the module."
+      ],
+      "requiredEvidenceMarkers": ["X31", "different source", "damage"],
+      "failureMode": "The retriever finds generic wiring content and the answer incorrectly permits an external encoder supply."
+    },
+    {
+      "id": "ABB-06",
+      "category": "configuration-limit",
+      "question": "Quanti moduli FSE-31 posso installare su un singolo drive e come devono essere alimentati FSE-31 e FSO-21? Cosa succede se l'alimentazione manca o è insufficiente?",
+      "expectedGroundTruth": [
+        "Do not install more than one FSE-31 module to a drive or inverter unit.",
+        "Use the same power supply for FSE-31 and FSO-21.",
+        "Without sufficient power FSE-31 remains in Safe state; if FSO is running, FSO goes into fail-safe mode."
+      ],
+      "requiredEvidenceMarkers": ["more than one", "same power supply", "Safe state", "fail-safe"],
+      "failureMode": "Only one of the three linked constraints is retrieved."
+    },
+    {
+      "id": "ABB-07",
+      "category": "commissioning-sequence",
+      "question": "Quale versione minima di Drive Composer Pro è richiesta per mettere in servizio FSE-31 e quali controlli sul numero di encoder e moduli FSE-31 vanno fatti nel commissioning test?",
+      "expectedGroundTruth": [
+        "Drive Composer pro version 1.8 or later is required.",
+        "Only one safety encoder must be connected to FSE-31 and it must be on X31.",
+        "Only one FSE-31 module must be connected to the drive or inverter unit."
+      ],
+      "requiredEvidenceMarkers": ["1.8", "one safety encoder", "X31", "one FSE-31"],
+      "failureMode": "Version or commissioning checklist evidence is omitted because the facts are in adjacent sections."
+    },
+    {
+      "id": "ABB-08",
+      "category": "status-code-like",
+      "question": "Sul modulo FSE-31, cosa significano ENC STATUS spento, STATUS verde lampeggiante e STATUS spento?",
+      "expectedGroundTruth": [
+        "ENC STATUS off means an encoder fault is active.",
+        "STATUS flashing green means the module is initializing.",
+        "STATUS off means a module fault is active."
+      ],
+      "requiredEvidenceMarkers": ["ENC STATUS", "encoder fault", "flashing", "initializing", "module fault"],
+      "failureMode": "LED names and states are confused because several rows use the same colors."
+    },
+    {
+      "id": "ABB-09",
+      "category": "exact-capability",
+      "question": "Che tipo di encoder di sicurezza supporta FSE-31, quale tensione di alimentazione è indicata e qual è la frequenza massima rilevabile dall'ingresso HTL?",
+      "expectedGroundTruth": [
+        "Supported safety encoders are differential push-pull HTL encoders.",
+        "The listed supply voltage is 15 V DC.",
+        "Only safety-certified encoders are supported.",
+        "The HTL encoder input can detect signal frequencies up to 300 kHz."
+      ],
+      "requiredEvidenceMarkers": ["differential push-pull HTL", "15 V DC", "safety-certified", "300 kHz"],
+      "failureMode": "Exact hardware capabilities are diluted by general encoder documentation."
+    },
+    {
+      "id": "ABB-10",
+      "category": "revision-specific",
+      "question": "Nel collegamento FSE-31, come cambia la tensione VCC tra le revisioni A-E e la revisione F o successive?",
+      "expectedGroundTruth": [
+        "VCC is 24 V DC in revisions A through E.",
+        "VCC is 15 V DC in revision F and later."
+      ],
+      "requiredEvidenceMarkers": ["24 V DC", "A", "E", "15 V DC", "F"],
+      "failureMode": "Revision-specific values are merged into one generic voltage."
+    },
+    {
+      "id": "ABB-11",
+      "category": "no-single-value",
+      "question": "Qual è la lunghezza massima del cavo encoder supportata da FSE-31? Dammi un valore numerico preciso se il manuale lo specifica.",
+      "expectedGroundTruth": [
+        "The manual does not give one universal numeric maximum.",
+        "Maximum cable length depends on encoder type, cable type and cable termination.",
+        "The encoder manufacturer's data must be consulted for the maximum length."
+      ],
+      "requiredEvidenceMarkers": ["depends on", "encoder type", "cable type", "termination", "manufacturer"],
+      "mustNotClaim": ["A single universal maximum cable length not explicitly provided by the source"],
+      "failureMode": "Hallucination-resistance test: the model invents a numeric cable length."
+    },
+    {
+      "id": "ABB-12",
+      "category": "explicit-negation",
+      "question": "FSE-31 riesce a rilevare uno slittamento meccanico dell'albero motore rispetto all'encoder?",
+      "expectedGroundTruth": [
+        "No. FSE-31 does not detect mechanical failures outside the encoder, with motor shaft slipping given as an example."
+      ],
+      "requiredEvidenceMarkers": ["does not detect", "mechanical failures", "motor shaft slipping"],
+      "failureMode": "Semantic similarity to safety monitoring causes the answer to overstate FSE-31 capabilities."
+    },
+    {
+      "id": "ABB-13",
+      "category": "variant-installation",
+      "question": "Per un ACS880-01 marine +C132 frame R4-R9 installato a parete servono i vibration dampers +C131? E se lo installo in cabinet?",
+      "expectedGroundTruth": [
+        "For ACS880-01 frames R4 to R9 in wall installations, +C132 requires option +C131 vibration dampers.",
+        "Vibration dampers are not needed in cabinet installations."
+      ],
+      "requiredEvidenceMarkers": ["R4", "R9", "+C131", "wall", "not needed", "cabinet"],
+      "failureMode": "Wall and cabinet requirements are conflated or the frame range is lost."
+    },
+    {
+      "id": "ABB-14",
+      "category": "variant-multi-condition",
+      "question": "Per la conformità EMC marine in una rete TN messa a terra, quali opzioni/componenti sono richiesti per frame R8 e quali per frame R11?",
+      "expectedGroundTruth": [
+        "Frame R8 requires +E202 and +E208.",
+        "Frame R11 requires +E202 (ARFI-10), +E208 and two input-side common-mode ferrite rings."
+      ],
+      "requiredEvidenceMarkers": ["R8", "+E202", "+E208", "R11", "ARFI-10", "2", "ferrite"],
+      "failureMode": "Frame-specific requirements are mixed together or the ferrite-ring count is omitted."
+    },
+    {
+      "id": "ABB-15",
+      "category": "environmental-arithmetic",
+      "question": "Per un ACS880-01 marine IP21 oppure IP55 frame R1-R7/R9, quale derating della corrente nominale si applica a 50 °C rispetto al valore della rating table a 45 °C?",
+      "expectedGroundTruth": [
+        "For the specified ACS880-01 variants, rated output current is derated by 1% per added 1 °C in the documented range.",
+        "From 45 °C to 50 °C the reduction is 5%, corresponding to a factor of 0.95 relative to the 45 °C rating-table value."
+      ],
+      "requiredEvidenceMarkers": ["45", "50", "1%", "0.95"],
+      "failureMode": "The model confuses the temperature range endpoint with the 45 °C rating-table reference or applies a rule from another frame/variant."
+    }
+  ]
+}

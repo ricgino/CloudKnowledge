@@ -1,4 +1,8 @@
 import {
+  HttpClient
+} from '@angular/common/http';
+
+import {
   TestBed
 } from '@angular/core/testing';
 
@@ -30,6 +34,9 @@ import {
 } from './features/notifications/notifications';
 
 describe('App', () => {
+  const deployedVersion =
+    '1234567890abcdef1234567890abcdef12345678';
+
   const msalSubject$ =
     new Subject<never>();
 
@@ -65,6 +72,13 @@ describe('App', () => {
     stopRealtime: () => undefined
   };
 
+  const httpMock = {
+    get: () =>
+      of({
+        version: deployedVersion
+      })
+  };
+
   beforeEach(async () => {
     markedNotificationIds = [];
 
@@ -87,6 +101,10 @@ describe('App', () => {
         {
           provide: Notifications,
           useValue: notificationsMock
+        },
+        {
+          provide: HttpClient,
+          useValue: httpMock
         }
       ]
     })
@@ -118,6 +136,28 @@ describe('App', () => {
         ?.textContent)
       .toContain(
         'Private knowledge, securely searchable.');
+  });
+
+  it('should always render the deployed build version', () => {
+    const fixture =
+      TestBed.createComponent(App);
+
+    fixture.detectChanges();
+
+    const compiled =
+      fixture.nativeElement as HTMLElement;
+
+    const versionBadge =
+      compiled.querySelector('.build-version');
+
+    expect(versionBadge)
+      .not.toBeNull();
+
+    expect(versionBadge?.textContent)
+      .toContain('Build 12345678');
+
+    expect(versionBadge?.getAttribute('title'))
+      .toBe(`CloudKnowledge build ${deployedVersion}`);
   });
 
   it('marks currently visible unread notifications as read when the panel opens', () => {

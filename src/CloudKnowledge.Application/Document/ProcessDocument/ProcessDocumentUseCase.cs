@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CloudKnowledge.Application.Documents.ProcessDocument.Exceptions;
 using CloudKnowledge.Domain.Documents;
 
@@ -13,6 +14,7 @@ public sealed class ProcessDocumentUseCase
     private readonly IEmbeddingGenerator _embeddingGenerator;
     private readonly IDocumentChunkEmbeddingRepository
         _documentChunkEmbeddingRepository;
+    private readonly IDocumentProcessingDiagnostics _diagnostics;
 
     public ProcessDocumentUseCase(
         IDocumentRepository documentRepository,
@@ -21,7 +23,8 @@ public sealed class ProcessDocumentUseCase
         IDocumentChunkRepository documentChunkRepository,
         TextChunker textChunker,
         IEmbeddingGenerator embeddingGenerator,
-        IDocumentChunkEmbeddingRepository documentChunkEmbeddingRepository)
+        IDocumentChunkEmbeddingRepository documentChunkEmbeddingRepository,
+        IDocumentProcessingDiagnostics? diagnostics = null)
     {
         _documentRepository =
             documentRepository;
@@ -43,6 +46,10 @@ public sealed class ProcessDocumentUseCase
 
         _documentChunkEmbeddingRepository =
             documentChunkEmbeddingRepository;
+
+        _diagnostics =
+            diagnostics
+            ?? NullDocumentProcessingDiagnostics.Instance;
     }
 
     public async Task ExecuteAsync(
@@ -89,16 +96,24 @@ public sealed class ProcessDocumentUseCase
         }
 
         await using var blobContent =
-            await _documentStorage.OpenReadAsync(
+            await TraceAsync(
                 document.Id,
-                cancellationToken);
+                "blob-open",
+                () =>
+                    _documentStorage.OpenReadAsync(
+                        document.Id,
+                        cancellationToken));
 
         await using var bufferedContent =
             new MemoryStream();
 
-        await blobContent.CopyToAsync(
-            bufferedContent,
-            cancellationToken);
+        await TraceAsync(
+            document.Id,
+            "blob-copy",
+            () =>
+                blobContent.CopyToAsync(
+                    bufferedContent,
+                    cancellationToken));
 
         bufferedContent.Position = 0;
 
@@ -107,11 +122,15 @@ public sealed class ProcessDocumentUseCase
         try
         {
             extractedText =
-                _documentTextExtractor.Extract(
-                    document.FileName,
-                    document.ContentType,
-                    bufferedContent,
-                    cancellationToken);
+                Trace(
+                    document.Id,
+                    "text-extract",
+                    () =>
+                        _documentTextExtractor.Extract(
+                            document.FileName,
+                            document.ContentType,
+                            bufferedContent,
+                            cancellationToken));
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
@@ -132,8 +151,12 @@ public sealed class ProcessDocumentUseCase
         }
 
         var chunkContents =
-            _textChunker.Chunk(
-                extractedText);
+            Trace(
+                document.Id,
+                "chunk",
+                () =>
+                    _textChunker.Chunk(
+                        extractedText));
 
         if (chunkContents.Count == 0)
         {
@@ -152,13 +175,17 @@ public sealed class ProcessDocumentUseCase
                 .ToArray();
 
         var embeddingVectors =
-            await _embeddingGenerator.GenerateAsync(
-                chunks
-                    .Select(
-                        chunk =>
-                            chunk.Content)
-                    .ToArray(),
-                cancellationToken);
+            await TraceAsync(
+                document.Id,
+                "embeddings",
+                () =>
+                    _embeddingGenerator.GenerateAsync(
+                        chunks
+                            .Select(
+                                chunk =>
+                                    chunk.Content)
+                            .ToArray(),
+                        cancellationToken));
 
         if (embeddingVectors.Count != chunks.Length)
         {
@@ -187,20 +214,103 @@ public sealed class ProcessDocumentUseCase
                             embeddingVectors[index]))
                 .ToArray();
 
-        await _documentChunkRepository.ReplaceForDocumentAsync(
+        await TraceAsync(
             document.Id,
-            chunks,
-            cancellationToken);
+            "save-chunks",
+            () =>
+                _documentChunkRepository.ReplaceForDocumentAsync(
+                    document.Id,
+                    chunks,
+                    cancellationToken));
 
-        await _documentChunkEmbeddingRepository.ReplaceForDocumentAsync(
+        await TraceAsync(
             document.Id,
-            embeddings,
-            cancellationToken);
+            "save-embeddings",
+            () =>
+                _documentChunkEmbeddingRepository.ReplaceForDocumentAsync(
+                    document.Id,
+                    embeddings,
+                    cancellationToken));
 
-        document.MarkAsReady();
+        await TraceAsync(
+            document.Id,
+            "mark-ready",
+            async () =>
+            {
+                document.MarkAsReady();
 
-        await _documentRepository.UpdateAsync(
-            document,
-            cancellationToken);
+                await _documentRepository.UpdateAsync(
+                    document,
+                    cancellationToken);
+            });
+    }
+
+    private async Task<T> TraceAsync<T>(
+        Guid documentId,
+        string stage,
+        Func<Task<T>> operation)
+    {
+        _diagnostics.StageStarted(
+            documentId,
+            stage);
+
+        var startedAt =
+            Stopwatch.GetTimestamp();
+
+        var result =
+            await operation();
+
+        _diagnostics.StageCompleted(
+            documentId,
+            stage,
+            Stopwatch.GetElapsedTime(
+                startedAt));
+
+        return result;
+    }
+
+    private async Task TraceAsync(
+        Guid documentId,
+        string stage,
+        Func<Task> operation)
+    {
+        _diagnostics.StageStarted(
+            documentId,
+            stage);
+
+        var startedAt =
+            Stopwatch.GetTimestamp();
+
+        await operation();
+
+        _diagnostics.StageCompleted(
+            documentId,
+            stage,
+            Stopwatch.GetElapsedTime(
+                startedAt));
+    }
+
+    private T Trace<T>(
+        Guid documentId,
+        string stage,
+        Func<T> operation)
+    {
+        _diagnostics.StageStarted(
+            documentId,
+            stage);
+
+        var startedAt =
+            Stopwatch.GetTimestamp();
+
+        var result =
+            operation();
+
+        _diagnostics.StageCompleted(
+            documentId,
+            stage,
+            Stopwatch.GetElapsedTime(
+                startedAt));
+
+        return result;
     }
 }

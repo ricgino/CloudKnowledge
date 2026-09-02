@@ -1,6 +1,7 @@
 using CloudKnowledge.Api.Contracts.Ask;
 using CloudKnowledge.Api.Contracts.Documents;
 using CloudKnowledge.Application.Documents.AskDocuments;
+using CloudKnowledge.Application.Documents.HybridSearchDocuments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Identity.Web.Resource;
@@ -14,6 +15,9 @@ namespace CloudKnowledge.Api.Controllers;
 public sealed class AskController
     : ControllerBase
 {
+    private const int MaximumDiagnosticCandidates =
+        8;
+
     private readonly AskDocumentsUseCase
         _askDocumentsUseCase;
 
@@ -63,9 +67,116 @@ public sealed class AskController
                             source.Similarity))
                 .ToArray();
 
+        var retrievalDiagnostics =
+            result.RetrievalDiagnostics
+                .Select(
+                    MapDiagnostics)
+                .ToArray();
+
         return Ok(
             new AskDocumentsResponse(
                 result.Answer,
-                sources));
+                sources,
+                result.RetrievalQueries,
+                retrievalDiagnostics));
+    }
+
+    private static AskRetrievalQueryDiagnosticsResponse MapDiagnostics(
+        AskRetrievalQueryDiagnostics diagnostics)
+    {
+        var semanticCandidates =
+            diagnostics.SemanticCandidates
+                .Take(
+                    MaximumDiagnosticCandidates)
+                .Select(
+                    candidate =>
+                        new AskRetrievalCandidateResponse(
+                            candidate.DocumentId,
+                            candidate.ChunkId,
+                            candidate.Rank,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null))
+                .ToArray();
+
+        var lexicalCandidates =
+            diagnostics.LexicalCandidates
+                .Take(
+                    MaximumDiagnosticCandidates)
+                .Select(
+                    candidate =>
+                        new AskRetrievalCandidateResponse(
+                            candidate.DocumentId,
+                            candidate.ChunkId,
+                            candidate.Rank,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null))
+                .ToArray();
+
+        var hybridCandidates =
+            diagnostics.HybridCandidates
+                .Take(
+                    MaximumDiagnosticCandidates)
+                .Select(
+                    candidate =>
+                        new AskRetrievalCandidateResponse(
+                            candidate.DocumentId,
+                            candidate.ChunkId,
+                            null,
+                            candidate.SemanticRank,
+                            candidate.LexicalRank,
+                            candidate.FusedScore,
+                            candidate.AdjustedFusedScore,
+                            MapChannel(
+                                candidate.Channel),
+                            candidate.NavigationPenalty,
+                            candidate.Selected))
+                .ToArray();
+
+        return new AskRetrievalQueryDiagnosticsResponse(
+            diagnostics.Kind switch
+            {
+                AskRetrievalQueryKind.Original =>
+                    "original",
+                AskRetrievalQueryKind.Focused =>
+                    "focused",
+                _ =>
+                    throw new ArgumentOutOfRangeException(
+                        nameof(diagnostics),
+                        diagnostics.Kind,
+                        "Unsupported retrieval query kind.")
+            },
+            diagnostics.Query,
+            semanticCandidates,
+            lexicalCandidates,
+            hybridCandidates);
+    }
+
+    private static string MapChannel(
+        HybridRetrievalChannel channel)
+    {
+        return channel switch
+        {
+            HybridRetrievalChannel.Semantic =>
+                "semantic",
+            HybridRetrievalChannel.Lexical =>
+                "lexical",
+            HybridRetrievalChannel.Both =>
+                "both",
+            _ =>
+                throw new ArgumentOutOfRangeException(
+                    nameof(channel),
+                    channel,
+                    "Unsupported retrieval channel.")
+        };
     }
 }

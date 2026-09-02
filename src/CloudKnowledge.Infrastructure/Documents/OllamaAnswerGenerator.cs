@@ -104,6 +104,13 @@ public sealed class OllamaAnswerGenerator
             - Non inventare informazioni mancanti.
             - Se il contesto non contiene abbastanza informazioni,
             dichiaralo chiaramente.
+            - Ogni ruolo, categoria o relazione attribuita a un'entità deve essere supportata dalle fonti recuperate; non completare collegamenti mancanti per supposizione.
+            - La co-occorrenza di due nomi, fatti o attributi nello stesso documento o contesto non dimostra da sola una relazione tra loro.
+            - Se la domanda contiene un qualificatore o una categoria, verifica sia l'appartenenza dell'entità a quella categoria sia la relazione richiesta prima di includerla nella risposta.
+            - Quando una fonte esplicita un'associazione tra due elementi, preserva entrambi gli estremi della relazione nella risposta; non ridurre un'associazione esplicita a un elenco di soli valori se il contesto fornisce anche le entità corrispondenti.
+            - Se le fonti supportano solo una parte della domanda, dichiara quale relazione o qualificatore non può essere verificato e rispondi comunque alla parte supportata senza inventare il collegamento mancante.
+            - Se il qualificatore non può essere verificato ma una relazione più generale è supportata, dichiara il gap e fornisci comunque le associazioni supportate.
+            - Quando la risposta diretta non è completamente verificabile ma le fonti contengono informazioni pertinenti, non fermarti alla sola dichiarazione del gap: dopo aver dichiarato il limite, riporta i fatti, le associazioni o gli elenchi pertinenti esplicitamente supportati dalle fonti, mantenendo chiaro che non provano il collegamento mancante.
             - Rispondi nella stessa lingua della domanda.
             - Quando affermi qualcosa ricavato dal contesto,
             cita la fonte usando il formato [S1], [S2], ecc.

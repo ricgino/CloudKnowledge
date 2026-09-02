@@ -1,0 +1,133 @@
+name: Azure Infrastructure Validation
+
+on:
+  push:
+    branches:
+      - feat/azure-deployment
+    paths:
+      - "infra/azure/**"
+      - "scripts/azure/**"
+      - "tests/azure/**"
+      - "src/CloudKnowledge.Application/Document/ProcessDocument/**"
+      - "src/CloudKnowledge.Infrastructure/Persistence/Configurations/**"
+      - "src/CloudKnowledge.Infrastructure/Persistence/Migrations/**"
+      - "src/CloudKnowledge.Worker/**"
+      - "src/CloudKnowledge.Web/nginx.conf.template"
+      - ".github/workflows/azure-deploy.yml"
+      - ".github/workflows/azure-validate.yml"
+  pull_request:
+    branches:
+      - feat/team-hierarchy-document-library
+      - main
+    paths:
+      - "infra/azure/**"
+      - "scripts/azure/**"
+      - "tests/azure/**"
+      - "src/CloudKnowledge.Application/Document/ProcessDocument/**"
+      - "src/CloudKnowledge.Infrastructure/Persistence/Configurations/**"
+      - "src/CloudKnowledge.Infrastructure/Persistence/Migrations/**"
+      - "src/CloudKnowledge.Worker/**"
+      - "src/CloudKnowledge.Web/nginx.conf.template"
+      - ".github/workflows/azure-deploy.yml"
+      - ".github/workflows/azure-validate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Parse Azure PowerShell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+
+          Get-ChildItem scripts/azure -Filter *.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$errors) | Out-Null
+
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host "::error file=$($_.FullName)::PowerShell parse failed."
+              $errors | ForEach-Object { Write-Error $_.Message }
+            }
+            else {
+              Write-Host "PowerShell parse passed: $($_.Name)"
+            }
+          }
+
+          if ($failed) {
+            exit 1
+          }
+
+      - name: Test Azure bootstrap script contract
+        shell: pwsh
+        run: ./tests/azure/bootstrap-script-tests.ps1
+
+      - name: Test GitHub OIDC script contract
+        shell: pwsh
+        run: ./tests/azure/oidc-script-tests.ps1
+
+      - name: Test Azure AI discovery script contract
+        shell: pwsh
+        run: ./tests/azure/ai-discovery-script-tests.ps1
+
+      - name: Test Azure platform deployment contract
+        shell: pwsh
+        run: ./tests/azure/platform-deployment-tests.ps1
+
+      - name: Test CloudKnowledge Web internal API proxy contract
+        shell: pwsh
+        run: ./tests/azure/web-proxy-tests.ps1
+
+      - name: Test Worker processing diagnostics contract
+        shell: pwsh
+        run: ./tests/azure/worker-processing-diagnostics-tests.ps1
+
+      - name: Test direct OpenAI deployment contract
+        shell: pwsh
+        run: ./tests/azure/openai-deployment-tests.ps1
+
+      - name: Parse Azure workflow YAML
+        shell: ruby {0}
+        run: |
+          require "yaml"
+
+          [
+            ".github/workflows/azure-deploy.yml",
+            ".github/workflows/azure-validate.yml"
+          ].each do |path|
+            YAML.parse_file(path)
+            puts "YAML parse passed: #{path}"
+          end
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+
+      - name: Terraform format
+        run: terraform fmt -check -diff -recursive infra/azure
+
+      - name: Validate bootstrap
+        run: |
+          terraform -chdir=infra/azure/bootstrap init -backend=false -lockfile=readonly
+          terraform -chdir=infra/azure/bootstrap validate
+
+      - name: Validate platform
+        run: |
+          terraform -chdir=infra/azure/platform init -backend=false -lockfile=readonly
+          terraform -chdir=infra/azure/platform validate

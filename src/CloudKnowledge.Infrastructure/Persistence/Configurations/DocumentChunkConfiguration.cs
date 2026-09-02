@@ -1,6 +1,7 @@
 using CloudKnowledge.Domain.Documents;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NpgsqlTypes;
 
 namespace CloudKnowledge.Infrastructure.Persistence.Configurations;
 
@@ -31,6 +32,13 @@ public sealed class DocumentChunkConfiguration
             .HasColumnType("text")
             .IsRequired();
 
+        builder.Property<NpgsqlTsVector>("SearchVector")
+            .HasColumnName("search_vector")
+            .HasColumnType("tsvector")
+            .HasComputedColumnSql(
+                "to_tsvector('simple'::regconfig, coalesce(content, ''::text))",
+                stored: true);
+
         builder.HasOne<Document>()
             .WithMany()
             .HasForeignKey(chunk => chunk.DocumentId)
@@ -45,5 +53,10 @@ public sealed class DocumentChunkConfiguration
             .IsUnique()
             .HasDatabaseName(
                 "IX_document_chunks_document_id_position");
+
+        builder.HasIndex("SearchVector")
+            .HasDatabaseName(
+                "IX_document_chunks_search_vector")
+            .HasMethod("GIN");
     }
 }

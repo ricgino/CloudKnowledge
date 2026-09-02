@@ -235,6 +235,18 @@
               </span>
 
               <div class="document-actions">
+                @if (document.status === 'Failed' && document.isOwner) {
+                  <button
+                    type="button"
+                    class="secondary-button compact-button"
+                    (click)="retryDocument(document)"
+                    [disabled]="retryingDocumentId === document.id"
+                    [attr.aria-label]="'Retry processing ' + document.fileName"
+                    [title]="retryingDocumentId === document.id ? 'Retrying...' : 'Retry processing'">
+                    &#8635;
+                  </button>
+                }
+
                 <button
                   type="button"
                   class="secondary-button compact-button"

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using NpgsqlTypes;
 using Pgvector;
 
 #nullable disable
@@ -94,7 +95,17 @@ namespace CloudKnowledge.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("position");
 
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasColumnName("search_vector")
+                        .HasComputedColumnSql("to_tsvector('simple'::regconfig, coalesce(content, ''::text))", true);
+
                     b.HasKey("Id");
+
+                    b.HasIndex("SearchVector")
+                        .HasDatabaseName("IX_document_chunks_search_vector")
+                        .HasMethod("GIN");
 
                     b.HasIndex("DocumentId", "Position")
                         .IsUnique()
