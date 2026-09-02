@@ -1,4 +1,5 @@
 using CloudKnowledge.Application.Documents.AskDocuments;
+using CloudKnowledge.Application.Documents.SearchDocuments;
 using CloudKnowledge.Application.Teams;
 using CloudKnowledge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
