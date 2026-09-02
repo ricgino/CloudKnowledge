@@ -91,11 +91,17 @@ public sealed class AiRetrievalQueryGenerator
 
             if (queries.Count > 0)
             {
+                var repairedQueries =
+                    RepairRequiredCoverage(
+                        question,
+                        queries,
+                        maximumQueries);
+
                 _logger.LogInformation(
                     "Generated retrieval queries: {Queries}",
-                    string.Join(" | ", queries));
+                    string.Join(" | ", repairedQueries));
 
-                return queries;
+                return repairedQueries;
             }
         }
         catch (OperationCanceledException)
@@ -339,6 +345,67 @@ public sealed class AiRetrievalQueryGenerator
                 StringComparer.OrdinalIgnoreCase)
             .Take(maximumQueries)
             .ToArray();
+    }
+
+    private static IReadOnlyList<string> RepairRequiredCoverage(
+        string question,
+        IReadOnlyList<string> queries,
+        int maximumQueries)
+    {
+        if (!RequiresVoiceCastMapping(question)
+            || HasCanonicalVoiceCastMapping(queries))
+        {
+            return queries;
+        }
+
+        var canonicalMappingQuery =
+            $"principal cast voice cast character actor {question.Trim()}";
+
+        return new[]
+            {
+                canonicalMappingQuery
+            }
+            .Concat(queries)
+            .Distinct(
+                StringComparer.OrdinalIgnoreCase)
+            .Take(maximumQueries)
+            .ToArray();
+    }
+
+    private static bool RequiresVoiceCastMapping(
+        string question)
+    {
+        var normalized =
+            question.ToLowerInvariant();
+
+        return normalized.Contains("attor", StringComparison.Ordinal)
+               || normalized.Contains("actor", StringComparison.Ordinal)
+               || normalized.Contains("doppiator", StringComparison.Ordinal)
+               || normalized.Contains("doppiano", StringComparison.Ordinal)
+               || normalized.Contains("doppia ", StringComparison.Ordinal)
+               || normalized.Contains("doppiare", StringComparison.Ordinal)
+               || normalized.Contains("voice actor", StringComparison.Ordinal)
+               || normalized.Contains("voice cast", StringComparison.Ordinal)
+               || normalized.Contains("voiced by", StringComparison.Ordinal);
+    }
+
+    private static bool HasCanonicalVoiceCastMapping(
+        IReadOnlyList<string> queries)
+    {
+        return queries.Any(
+            query =>
+                query.Contains(
+                    "principal cast",
+                    StringComparison.OrdinalIgnoreCase)
+                || query.Contains(
+                    "voice cast",
+                    StringComparison.OrdinalIgnoreCase)
+                || query.Contains(
+                    "character actor",
+                    StringComparison.OrdinalIgnoreCase)
+                || query.Contains(
+                    "character-to-actor",
+                    StringComparison.OrdinalIgnoreCase));
     }
 
     private static string BuildSystemPrompt()
