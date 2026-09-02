@@ -1,3 +1,5 @@
+using CloudKnowledge.Application.Documents.SearchDocuments;
+
 namespace CloudKnowledge.Application.Documents.AskDocuments;
 
 public interface IDocumentChunkContextRepository
