@@ -124,6 +124,71 @@ public sealed class RelationshipRetrievalPlanningPromptTests
             StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task RetrievalPlanner_ShouldRepairNearDuplicateVoiceCastQueriesWithCanonicalMappingCoverage()
+    {
+        const string question =
+            "quali sono gli attori che doppiano i cani protagonisti del film isola dei cani";
+
+        var handler =
+            new RecordingHandler(
+                """
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "role": "assistant",
+                        "content": "{\"queries\":[\"attori doppiatori cani protagonisti isola dei cani\",\"cast e crew isola dei cani\",\"elenco personaggi e attori doppiatori cani\"]}"
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        using var httpClient =
+            new HttpClient(handler)
+            {
+                BaseAddress = new Uri("https://api.openai.com/")
+            };
+
+        var configuration =
+            new AiProviderConfiguration(
+                AiProviderConfiguration.OpenAiProvider,
+                new Uri("https://api.openai.com/"),
+                "test-key",
+                "text-embedding-3-small",
+                "gpt-4.1-nano",
+                768,
+                0.1,
+                256);
+
+        var sut =
+            new AiRetrievalQueryGenerator(
+                httpClient,
+                configuration,
+                NullLogger<AiRetrievalQueryGenerator>.Instance);
+
+        var result =
+            await sut.GenerateAsync(
+                question,
+                maximumQueries: 3,
+                CancellationToken.None);
+
+        Assert.Equal(3, result.Count);
+        Assert.Contains(
+            result,
+            query =>
+                query.Contains(
+                    "principal cast",
+                    StringComparison.OrdinalIgnoreCase)
+                || query.Contains(
+                    "voice cast",
+                    StringComparison.OrdinalIgnoreCase)
+                || query.Contains(
+                    "character actor",
+                    StringComparison.OrdinalIgnoreCase));
+    }
+
     private sealed class RecordingHandler(string responseJson)
         : HttpMessageHandler
     {
